@@ -43,7 +43,8 @@ public enum XTStatus: Equatable, Sendable {
 @MainActor
 @Observable
 public final class AppModel {
-    public var section: AppSection = .outputs
+    /// 侧边栏选中的视图（List 单选要求可选值；nil 按“输出”显示）。
+    public var section: AppSection? = .outputs
     public var settings: OSCSettings {
         didSet {
             saveSettings()

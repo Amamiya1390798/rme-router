@@ -9,24 +9,11 @@ public struct RootView: View {
 
     public var body: some View {
         NavigationSplitView {
-            List(selection: Binding(get: { model.section }, set: { if let s = $0 { model.section = s } })) {
-                Section("视图") {
-                    ForEach(AppSection.allCases) { s in
-                        Label(s.title, systemImage: s.symbol).tag(s)
-                    }
-                }
-                Section("设备") {
-                    ForEach(model.snapshot.topology.devices.filter { $0.model != .p16i && $0.model != .p16m }, id: \.id) { d in
-                        HStack(spacing: Tokens.Space.s) {
-                            EvidenceDot(deviceEvidence(d.id))
-                            Text(d.name)
-                        }
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            Sidebar(selection: $model.section, devices: deviceRows)
+                .equatable()
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            switch model.section {
+            switch model.section ?? .outputs {
             case .outputs: OutputsView(model: model)
             case .signalFlow: SignalFlowView(model: model)
             case .connection: ConnectionView(model: model)
@@ -46,6 +33,11 @@ public struct RootView: View {
         .task { if model.xtStatus == .notLoaded { await model.refresh() } }
     }
 
+    private var deviceRows: [Sidebar.DeviceRow] {
+        model.snapshot.topology.devices.filter { $0.model != .p16i && $0.model != .p16m }
+            .map { .init(id: $0.id, name: $0.name, evidence: deviceEvidence($0.id)) }
+    }
+
     private func deviceEvidence(_ id: String) -> Evidence {
         if id == "xt" {
             switch model.xtStatus {
@@ -56,6 +48,40 @@ public struct RootView: View {
             }
         }
         return model.isDemo(id) ? .unknown : .confirmed
+    }
+}
+
+/// 侧边栏。单独成 Equatable 视图：选中变化只改绑定，不重建列表内容
+/// （否则 AppKit 在表格回调里收到重建，会报 “reentrant operation in its NSTableView delegate”）。
+struct Sidebar: View, Equatable {
+    struct DeviceRow: Equatable, Identifiable {
+        var id: String
+        var name: String
+        var evidence: Evidence
+    }
+
+    @Binding var selection: AppSection?
+    var devices: [DeviceRow]
+
+    static func == (a: Sidebar, b: Sidebar) -> Bool { a.devices == b.devices }
+
+    var body: some View {
+        List(selection: $selection) {
+            Section("视图") {
+                ForEach(AppSection.allCases) { s in
+                    Label(s.title, systemImage: s.symbol).tag(s)
+                }
+            }
+            Section("设备") {
+                ForEach(devices) { d in
+                    HStack(spacing: Tokens.Space.s) {
+                        EvidenceDot(d.evidence)
+                        Text(d.name)
+                    }
+                    .selectionDisabled()
+                }
+            }
+        }
     }
 }
 

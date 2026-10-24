@@ -10,16 +10,9 @@ public struct SignalFlowView: View {
 
     public var body: some View {
         HSplitView {
-            List(selection: $model.traceTarget) {
-                ForEach(groupedCandidates, id: \.0) { device, refs in
-                    Section(device) {
-                        ForEach(refs, id: \.self) { ref in
-                            Text(ref.description).font(Tokens.Font.mono).tag(ref)
-                        }
-                    }
-                }
-            }
-            .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
+            CandidateList(groups: groupedCandidates, selection: $model.traceTarget)
+                .equatable()
+                .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
 
             ScrollView {
                 if let target = model.traceTarget {
@@ -35,7 +28,7 @@ public struct SignalFlowView: View {
         }
     }
 
-    private var groupedCandidates: [(String, [ChannelRef])] {
+    private var groupedCandidates: [CandidateList.Group] {
         var order: [String] = []
         var groups: [String: [ChannelRef]] = [:]
         for ref in model.traceCandidates {
@@ -43,7 +36,32 @@ public struct SignalFlowView: View {
             if groups[name] == nil { order.append(name) }
             groups[name, default: []].append(ref)
         }
-        return order.map { ($0, groups[$0]!) }
+        return order.map { CandidateList.Group(device: $0, refs: groups[$0]!) }
+    }
+}
+
+/// 可追踪通道列表。Equatable：选中变化不重建列表内容（见 Sidebar 的说明）。
+struct CandidateList: View, Equatable {
+    struct Group: Equatable {
+        var device: String
+        var refs: [ChannelRef]
+    }
+
+    var groups: [Group]
+    @Binding var selection: ChannelRef?
+
+    static func == (a: CandidateList, b: CandidateList) -> Bool { a.groups == b.groups }
+
+    var body: some View {
+        List(selection: $selection) {
+            ForEach(groups, id: \.device) { g in
+                Section(g.device) {
+                    ForEach(g.refs, id: \.self) { ref in
+                        Text(ref.description).font(Tokens.Font.mono).tag(ref)
+                    }
+                }
+            }
+        }
     }
 }
 
