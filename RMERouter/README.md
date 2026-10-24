@@ -28,6 +28,7 @@ RMERouter/                     Swift Package（无 UI，可在 CI 里测）
 ├─ Sources/rme-probe/          只读命令行：swift run rme-probe --port <TotalMix 接收端口> --listen <发送端口>
 ├─ Sources/RMEApp/             SwiftUI 界面：AppModel、设计 token、StudioSetup（本工作室拓扑）、视图
 ├─ Sources/RMERouterApp/       App 入口：swift run RMERouterApp（--render <目录> 出图）
+├─ scripts/make-app.sh         打包成 .build/RMERouter.app（之后 open 即可）
 ├─ Tests/RMEAppTests/          界面数据层测试
 └─ Tests/RMEEngineTests/       夹具 + T1–T10 + GlobalOSCTests + SignalTraceTests
 

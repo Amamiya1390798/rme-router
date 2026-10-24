@@ -151,3 +151,31 @@ public enum TotalMixFader {
         return min(max(pos / 1023, 0), 1)
     }
 }
+
+/// 写入类消息（文档第 7.1 节）。第一版只写混音节点电平。
+/// 只能经 `TotalMixGlobalOSCClient.write` 发出，那里要求用户确认（`UserConfirmation`）。
+public enum TotalMixWrite: Equatable, Sendable {
+    /// 节点电平；dB 为 nil 表示关（发送 -300 dB）。超过 +6 dB 截到 +6，低于 -65 dB 视为关。
+    case sendGain(source: TotalMixChannel, output: TotalMixChannel, dB: Double?)
+
+    public static let offDB: Float = -300
+    public static let maxDB = 6.0
+
+    public var output: TotalMixChannel {
+        switch self { case let .sendGain(_, o, _): return o }
+    }
+
+    public var message: OSCMessage {
+        switch self {
+        case let .sendGain(src, out, dB):
+            precondition(src.bus != .output && out.bus == .output, "节点来源须为输入/回放，目标须为输出")
+            let value: Float = dB.flatMap(Self.clamp).map { Float($0) } ?? Self.offDB
+            return OSCMessage("/mix/\(src.bus.shortToken)/\(src.wireIndex)/\(out.wireIndex)/fader", [.float(value)])
+        }
+    }
+
+    /// 截到 [-65, +6]；-65 及以下统一为关。
+    static func clamp(_ dB: Double) -> Double? {
+        dB <= TotalMixFader.offThresholdDB ? nil : min(dB, maxDB)
+    }
+}

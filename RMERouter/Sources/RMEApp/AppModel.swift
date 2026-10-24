@@ -59,13 +59,28 @@ public final class AppModel {
     /// 信号流视图当前查看的通道。
     public var traceTarget: ChannelRef?
 
-    @ObservationIgnored private var adapter: TotalMixOSCAdapter?
+    // 写入（文档第 7.1 节）：待应用的改动、应用历史、确认框状态。
+    public internal(set) var pending: [PendingChange] = []
+    public internal(set) var history: [AppliedBatch] = []
+    public var showConfirm = false
+    public internal(set) var isApplying = false
+    /// 最近一次从 TotalMix 读回的原始状态与对照表（写入时用来反查 TotalMix 通道）。
+    public internal(set) var tmState = TotalMixState()
+    public internal(set) var xtMap = TotalMixChannelMap()
+
+    @ObservationIgnored var adapter: TotalMixOSCAdapter?
     @ObservationIgnored private var retired: [TotalMixOSCAdapter] = []
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
     private static let settingsKey = "osc.settings"
 
-    public init(defaults: UserDefaults = .standard, snapshot: SystemSnapshot? = nil) {
+    /// makeAdapter：测试时注入假 TotalMix 传输；默认走 UDP。
+    public init(defaults: UserDefaults = .standard, snapshot: SystemSnapshot? = nil,
+                makeAdapter: @escaping (OSCSettings) -> TotalMixOSCAdapter = {
+                    TotalMixOSCAdapter(host: $0.host, port: $0.port, localPort: $0.listenPort)
+                }) {
         self.defaults = defaults
+        self.makeAdapter = makeAdapter
         if let data = defaults.data(forKey: Self.settingsKey),
            let saved = try? JSONDecoder().decode(OSCSettings.self, from: data) {
             settings = saved
@@ -84,12 +99,11 @@ public final class AppModel {
         xtStatus = .loading
         for old in retired { await old.client.stop() }
         retired = []
-        if adapter == nil {
-            adapter = TotalMixOSCAdapter(host: settings.host, port: settings.port, localPort: settings.listenPort)
-        }
+        if adapter == nil { adapter = makeAdapter(settings) }
         guard let adapter else { return }
         do {
             let xt = try await adapter.snapshot()
+            await captureTotalMixState(from: adapter)
             apply(xt: xt)
         } catch {
             await adapter.client.stop()
@@ -104,6 +118,14 @@ public final class AppModel {
         xtStatus = xt.reachable ? .live : .offlineSaved
         lastLoaded = Date()
         if traceTarget == nil { traceTarget = traceCandidates.first }
+    }
+
+    /// 记下 TotalMix 原始状态与推断后的对照表。
+    func captureTotalMixState(from adapter: TotalMixOSCAdapter) async {
+        tmState = await adapter.client.state
+        var map = adapter.channelMap
+        map.infer(from: tmState)
+        xtMap = map
     }
 
     static func describe(_ error: Error) -> String {

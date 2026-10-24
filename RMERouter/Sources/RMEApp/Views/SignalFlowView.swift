@@ -10,8 +10,10 @@ public struct SignalFlowView: View {
 
     public var body: some View {
         HSplitView {
-            CandidateList(groups: groupedCandidates, selection: $model.traceTarget)
-                .equatable()
+            // 只在值真的变了才写：@Observable 对同值写入也会通知观察者，避免无谓的重建。
+            CandidateList(groups: groupedCandidates,
+                          selection: Binding(get: { model.traceTarget },
+                                             set: { if model.traceTarget != $0 { model.traceTarget = $0 } }))
                 .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
 
             ScrollView {
@@ -40,8 +42,8 @@ public struct SignalFlowView: View {
     }
 }
 
-/// 可追踪通道列表。Equatable：选中变化不重建列表内容（见 Sidebar 的说明）。
-struct CandidateList: View, Equatable {
+/// 可追踪通道列表。
+struct CandidateList: View {
     struct Group: Equatable {
         var device: String
         var refs: [ChannelRef]
@@ -49,8 +51,6 @@ struct CandidateList: View, Equatable {
 
     var groups: [Group]
     @Binding var selection: ChannelRef?
-
-    static func == (a: CandidateList, b: CandidateList) -> Bool { a.groups == b.groups }
 
     var body: some View {
         List(selection: $selection) {

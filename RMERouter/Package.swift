@@ -27,7 +27,7 @@ let package = Package(
         .target(name: "RMEApp", dependencies: ["RMECore", "RMEEngine", "RMEAdapters"]),
         // App 入口：swift run RMERouterApp
         .executableTarget(name: "RMERouterApp", dependencies: ["RMECore", "RMEEngine", "RMEApp"]),
-        .testTarget(name: "RMEAppTests", dependencies: ["RMECore", "RMEEngine", "RMEApp"]),
+        .testTarget(name: "RMEAppTests", dependencies: ["RMECore", "RMEEngine", "RMEAdapters", "RMEApp"]),
         .testTarget(name: "RMEEngineTests", dependencies: ["RMECore", "RMEEngine", "RMEAdapters"]),
     ]
 )

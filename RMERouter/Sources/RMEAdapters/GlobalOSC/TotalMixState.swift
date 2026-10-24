@@ -89,6 +89,10 @@ public struct TotalMixState: Sendable, Equatable {
     public struct NodeKey: Hashable, Sendable {
         public var source: TotalMixChannel
         public var output: TotalMixChannel
+        public init(source: TotalMixChannel, output: TotalMixChannel) {
+            self.source = source
+            self.output = output
+        }
     }
 
     public private(set) var nodes: [NodeKey: [String: OSCValue]] = [:]

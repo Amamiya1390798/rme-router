@@ -9,16 +9,25 @@ public struct RootView: View {
 
     public var body: some View {
         NavigationSplitView {
-            Sidebar(selection: $model.section, devices: deviceRows)
+            // 只在值变了才写（同值写入也会通知观察者）。
+            Sidebar(selection: Binding(get: { model.section },
+                                       set: { if model.section != $0 { model.section = $0 } }),
+                    devices: deviceRows)
                 .equatable()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            switch model.section ?? .outputs {
-            case .outputs: OutputsView(model: model)
-            case .signalFlow: SignalFlowView(model: model)
-            case .connection: ConnectionView(model: model)
+            Group {
+                switch model.section ?? .outputs {
+                case .outputs: OutputsView(model: model)
+                case .signalFlow: SignalFlowView(model: model)
+                case .connection: ConnectionView(model: model)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !model.pending.isEmpty || !model.history.isEmpty { PendingBar(model: model) }
             }
         }
+        .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .toolbar {
             ToolbarItem {
                 Button {
@@ -51,8 +60,8 @@ public struct RootView: View {
     }
 }
 
-/// 侧边栏。单独成 Equatable 视图：选中变化只改绑定，不重建列表内容
-/// （否则 AppKit 在表格回调里收到重建，会报 “reentrant operation in its NSTableView delegate”）。
+/// 侧边栏。单独成 Equatable 视图：设备状态不变时不重建列表内容。
+/// 注：进入“信号流”页时终端仍会打印 “reentrant operation in its NSTableView delegate”，原因待查（见文档第 2 节）。
 struct Sidebar: View, Equatable {
     struct DeviceRow: Equatable, Identifiable {
         var id: String
