@@ -1,0 +1,10 @@
+# Swift Package Manager 编译产物
+.build/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# 打包文件与系统文件
+*.zip
+.DS_Store
