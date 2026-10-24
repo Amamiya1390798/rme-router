@@ -11,6 +11,8 @@ let package = Package(
         .library(name: "RMEEngine", targets: ["RMEEngine"]),
         .library(name: "RMEAdapters", targets: ["RMEAdapters"]),
         .executable(name: "rme-probe", targets: ["rme-probe"]),
+        .library(name: "RMEApp", targets: ["RMEApp"]),
+        .executable(name: "RMERouterApp", targets: ["RMERouterApp"]),
     ],
     targets: [
         // 纯数据模型：证据、流格式、拓扑、路由、时钟、快照
@@ -21,6 +23,11 @@ let package = Package(
         .target(name: "RMEAdapters", dependencies: ["RMECore"]),
         // 只读命令行工具：检查 TotalMix Global OSC 读回结果
         .executableTarget(name: "rme-probe", dependencies: ["RMECore", "RMEAdapters"]),
+        // SwiftUI 界面：模型、设计 token、视图（库，便于测试与出图）
+        .target(name: "RMEApp", dependencies: ["RMECore", "RMEEngine", "RMEAdapters"]),
+        // App 入口：swift run RMERouterApp
+        .executableTarget(name: "RMERouterApp", dependencies: ["RMECore", "RMEEngine", "RMEApp"]),
+        .testTarget(name: "RMEAppTests", dependencies: ["RMECore", "RMEEngine", "RMEApp"]),
         .testTarget(name: "RMEEngineTests", dependencies: ["RMECore", "RMEEngine", "RMEAdapters"]),
     ]
 )

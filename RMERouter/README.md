@@ -26,7 +26,10 @@ RMERouter/                     Swift Package（无 UI，可在 CI 里测）
 │     ├─ XTCMIDIAdapter.swift          骨架：协议未证实部分一律 manual/unknown
 │     └─ MockDevice.swift      Mock + PlanExecutor（回滚）
 ├─ Sources/rme-probe/          只读命令行：swift run rme-probe --port <TotalMix 接收端口> --listen <发送端口>
-└─ Tests/RMEEngineTests/       夹具 + T1–T10 + GlobalOSCTests
+├─ Sources/RMEApp/             SwiftUI 界面：AppModel、设计 token、StudioSetup（本工作室拓扑）、视图
+├─ Sources/RMERouterApp/       App 入口：swift run RMERouterApp（--render <目录> 出图）
+├─ Tests/RMEAppTests/          界面数据层测试
+└─ Tests/RMEEngineTests/       夹具 + T1–T10 + GlobalOSCTests + SignalTraceTests
 
 App/（Xcode 工程，另建）        SwiftUI，依赖 RMEEngine + RMEAdapters
   Topology/  拓扑编辑与连接校验
