@@ -8,15 +8,23 @@ struct InspectorPanel: View {
 
     var body: some View {
         ScrollView {
-            if let ref = model.inspectorTarget {
-                InspectorContent(info: model.inspectorInfo(ref),
-                                 strip: model.deviceID(of: ref) == "xt" && model.lastLoaded != nil ? model.stripActions : nil) { model.inspect($0) }
-                    .padding(Tokens.Space.l)
-            } else {
-                Text("在信号流、输出卡标题或前级卡上选一个通道，这里显示它的全部信息。")
-                    .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
-                    .padding(Tokens.Space.l)
+            VStack(alignment: .leading, spacing: Tokens.Space.l) {
+                // 设备页选中的接口（第 6.8 节）：详情放在检查器顶部
+                if model.section == .devices, let (panel, c) = model.selectedConnector {
+                    ConnectorDetail(model: model, panel: panel, connector: c, showPath: { model.panelChannel = $0.channel; model.traceTarget = $0 }) {
+                        model.panelSelection = nil; model.panelChannel = nil
+                    }
+                    if model.inspectorTarget != nil { Divider() }
+                }
+                if let ref = model.inspectorTarget {
+                    InspectorContent(info: model.inspectorInfo(ref),
+                                     strip: model.deviceID(of: ref) == "xt" && model.lastLoaded != nil ? model.stripActions : nil) { model.inspect($0) }
+                } else if model.section != .devices || model.panelSelection == nil {
+                    Text("点设备页的接口或通道条、输出卡标题、前级卡，这里显示它的全部信息。")
+                        .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
+                }
             }
+            .padding(Tokens.Space.l)
         }
         .background(Tokens.Palette.surface)
     }

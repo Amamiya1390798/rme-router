@@ -60,7 +60,7 @@ extension AppModel {
             return
         }
         guard xtcSettings.endpointsChosen else {
-            xtcStatus = .unreachable("先在“连接”页选择 XTC 的 MIDI 输入和输出端点")
+            xtcStatus = .unreachable("先在“设置 → 连接”选择 XTC 的 MIDI 输入和输出端点")
             return
         }
         xtcStatus = .loading

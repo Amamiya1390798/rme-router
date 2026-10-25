@@ -41,8 +41,7 @@ public struct PreampsView: View {
             ScrollView {
                 PreampsContent(sections: sections, trace: SignalTrace(snapshot: model.snapshot),
                                columns: max(1, Int((geo.size.width - 48) / 220)), actions: actions) { ref in
-                    model.traceTarget = ref
-                    model.section = .signalFlow
+                    model.showTrace(ref)
                 }
                 .padding(Tokens.Space.xl)
             }
@@ -90,20 +89,20 @@ public struct PreampsView: View {
             PreampSection(id: "xt", deviceName: "MADIface XT", preamps: xtPreamps,
                           available: !xtPreamps.isEmpty && (model.xtStatus == .live || model.xtStatus == .offlineSaved),
                           note: xtNote,
-                          emptyHelp: "XT 前面板 Mic 1–2 的话放经 TotalMix Global OSC 读取。在“连接”页确认 TotalMix 端口，然后点“读取设备”。若 TotalMix 里隐藏了这两路，会读不到。",
+                          emptyHelp: "XT 前面板 Mic 1–2 的话放经 TotalMix Global OSC 读取。在“设置 → 连接”确认 TotalMix 端口，然后点“读取设备”。若 TotalMix 里隐藏了这两路，会读不到。",
                           unreachableReason: xtReason, loading: model.xtStatus == .loading),
             PreampSection(id: "12mic", deviceName: "12Mic", preamps: model.snapshot.devices["12mic"]?.preamps ?? [],
                           available: model.twelveMicStatus == .live && !(model.snapshot.devices["12mic"]?.preamps.isEmpty ?? true),
                           note: model.twelveMicStatus == .live ? "实时读取自 12Mic。" : nil,
-                          emptyHelp: "接上 12Mic（网线或 USB），在“连接”页确认地址，打开设备上的 STATE → remote → HTTP Remote，然后点“读取设备”。",
+                          emptyHelp: "接上 12Mic（网线或 USB），在“设置 → 连接”确认地址，打开设备上的 STATE → remote → HTTP Remote，然后点“读取设备”。",
                           unreachableReason: micReason, loading: model.twelveMicStatus == .loading),
             PreampSection(id: "xtc", deviceName: "OctaMic XTC", preamps: xtcPreamps,
                           available: !xtcPreamps.isEmpty,
                           note: model.xtcStatus == .live
                               ? (model.xtcWritable ? "读取自 XTC（MIDI）。增益只有 0 dB 与 10–65 dB，1–9 dB 按 10 dB 发送。"
-                                                   : "读取自 XTC（MIDI），只读：在“连接”页允许本 App 改动 XTC 后才能修改。")
+                                                   : "读取自 XTC（MIDI），只读：在“设置 → 连接”允许本 App 改动 XTC 后才能修改。")
                               : nil,
-                          emptyHelp: "在“连接”页的 XTC 一节选好 MIDI 端点，打开“读取 XTC”，然后点“读取设备”。",
+                          emptyHelp: "在“设置 → 连接”的 XTC 一节选好 MIDI 端点，打开“读取 XTC”，然后点“读取设备”。",
                           unreachableReason: xtcReason, loading: model.xtcStatus == .loading),
         ]
     }

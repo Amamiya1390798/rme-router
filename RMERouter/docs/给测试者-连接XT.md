@@ -33,7 +33,7 @@ open .build/RMERouter.app
    - Compatibility 选 **Global OSC**；
    - 关闭 Follow Submix；
    - 勾 **Send Level Data**。
-3. 开着 Wi-Fi 时 TotalMix 可能用 IPv6；App 连不上时，把 App“连接”页的 TotalMix 地址改成 `::1` 再试。
+3. 开着 Wi-Fi 时 TotalMix 可能用 IPv6；App 连不上时，把 App 的“设置 → 连接”的 TotalMix 地址改成 `::1` 再试。
 
 ## 4. 测试清单（按顺序，全部只读）
 

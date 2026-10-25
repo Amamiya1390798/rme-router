@@ -100,11 +100,11 @@ struct IdentifySheet: View {
                           systemImage: "exclamationmark.triangle").foregroundStyle(Tokens.Palette.warn)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(found.portID != expected.first?.portID
-                         ? "进了另一个口：多半是线插反了，或接线表填错。到“接线”页按实物改。"
+                         ? "进了另一个口：多半是线插反了，或接线表填错。到“设置 → 接线”里按实物改。"
                          : "口对了但通道不同：发出这一路的设备（如 12Mic）路由和预期不同。到“输出”页看它的路由。")
                         .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
                     HStack {
-                        Button("去接线页") { model.section = .wiring; model.cancelIdentify(); close() }
+                        Button("去接线页") { model.showWiring(); model.cancelIdentify(); close() }
                         Button("去输出页") { model.section = .outputs; model.cancelIdentify(); close() }
                     }
                 }

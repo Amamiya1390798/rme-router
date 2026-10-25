@@ -9,18 +9,13 @@ struct ControlRoomBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            HStack(spacing: Tokens.Space.m) {
-                Text("控制室").font(Tokens.Font.cardTitle)
-                toggle(.dim, onColor: Tokens.Palette.warn)
-                toggle(.mainMono, onColor: Tokens.Palette.warn)
-                toggle(.globalMute, onColor: Tokens.Palette.problem)
-                Divider().frame(height: 18)
-                Text("快照").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
-                if model.snapshots.isEmpty {
-                    Text("没读到").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
+            // 栏窄时快照换到第二行（设备页右栏，第 6.8 节）
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Tokens.Space.m) { toggles; Divider().frame(height: 18); snapshots; Spacer(minLength: 0) }
+                VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                    HStack(spacing: Tokens.Space.m) { toggles; Spacer(minLength: 0) }
+                    HStack(spacing: Tokens.Space.m) { snapshots; Spacer(minLength: 0) }
                 }
-                ForEach(model.snapshots, id: \.number) { s in snapshot(s.number, state: s.state) }
-                Spacer()
             }
             if let error {
                 Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem)
@@ -31,6 +26,21 @@ struct ControlRoomBar: View {
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
     }
 
+    @ViewBuilder private var toggles: some View {
+        Text("控制室").font(Tokens.Font.cardTitle).fixedSize()
+        toggle(.dim, onColor: Tokens.Palette.warn)
+        toggle(.mainMono, onColor: Tokens.Palette.warn)
+        toggle(.globalMute, onColor: Tokens.Palette.problem)
+    }
+
+    @ViewBuilder private var snapshots: some View {
+        Text("快照").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize()
+        if model.snapshots.isEmpty {
+            Text("没读到").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown).fixedSize()
+        }
+        ForEach(model.snapshots, id: \.number) { s in snapshot(s.number, state: s.state) }
+    }
+
     private func toggle(_ g: TotalMixGlobal, onColor: Color) -> some View {
         let now = model.globalValue(g), pend = model.pendingGlobal(g)
         let isOn = pend.map(\.on) ?? ((now ?? 0) >= 0.5)
@@ -38,7 +48,7 @@ struct ControlRoomBar: View {
             error = model.stageGlobal(g, on: !isOn)?.text
             if error == nil { Task { await model.commitIfQuick() } }
         } label: {
-            Text(g.label).font(Tokens.Font.caption)
+            Text(g.label).font(Tokens.Font.caption).fixedSize()
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(RoundedRectangle(cornerRadius: 5).fill(isOn ? onColor.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(pend != nil ? Tokens.Palette.accent : .clear))

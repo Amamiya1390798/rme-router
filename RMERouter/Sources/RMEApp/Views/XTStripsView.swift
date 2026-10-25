@@ -28,7 +28,7 @@ struct XTStripsView: View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
             header(selectedSource, sends: sends)
             if outputs.isEmpty {
-                Text("还没有从 TotalMix 读到通道。在“连接”页确认端口后点“读取设备”。")
+                Text("还没有从 TotalMix 读到通道。在“设置 → 连接”确认端口后点“读取设备”。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
             } else {
                 row("硬件输入", sub: "= 电脑录音", ids: inputs.map(\.tm)) {

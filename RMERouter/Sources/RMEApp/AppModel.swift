@@ -12,35 +12,51 @@ public struct OSCSettings: Codable, Equatable, Sendable {
     public init() {}
 }
 
+/// 侧边栏的页（第 6.8 节：6 页，部分页内再分栏）。
 public enum AppSection: String, CaseIterable, Identifiable, Sendable {
-    case devices, outputs, signalFlow, preamps, clock, checkup, scenes, wiring, connection
+    case devices, outputs, preamps, checkup, scenes, settings
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .devices: return "设备"
         case .outputs: return "输出"
-        case .signalFlow: return "信号流"
         case .preamps: return "前级"
-        case .clock: return "时钟"
         case .checkup: return "体检"
         case .scenes: return "场景"
-        case .wiring: return "接线"
-        case .connection: return "连接"
+        case .settings: return "设置"
         }
     }
     public var symbol: String {
         switch self {
         case .devices: return "rectangle.stack"
         case .outputs: return "speaker.wave.2"
-        case .signalFlow: return "point.3.connected.trianglepath.dotted"
         case .preamps: return "mic"
-        case .clock: return "clock"
         case .checkup: return "stethoscope"
         case .scenes: return "square.stack.3d.up"
-        case .wiring: return "cable.coaxial"
-        case .connection: return "cable.connector"
+        case .settings: return "gearshape"
         }
     }
+}
+
+/// 设备页右栏：通道条或信号流。
+public enum DevicesPane: String, CaseIterable, Identifiable, Sendable {
+    case strips, signalFlow
+    public var id: String { rawValue }
+    public var title: String { self == .strips ? "通道条" : "信号流" }
+}
+
+/// 体检页的分栏。
+public enum CheckupTab: String, CaseIterable, Identifiable, Sendable {
+    case checkup, clock
+    public var id: String { rawValue }
+    public var title: String { self == .checkup ? "体检" : "时钟" }
+}
+
+/// 设置页的分栏。
+public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
+    case connection, wiring
+    public var id: String { rawValue }
+    public var title: String { self == .connection ? "连接" : "接线" }
 }
 
 public enum XTStatus: Equatable, Sendable {
@@ -49,6 +65,20 @@ public enum XTStatus: Equatable, Sendable {
     case live                 // TotalMix 回话，设备已连接
     case offlineSaved         // TotalMix 回话，设备未连接：显示保存的配置
     case unreachable(String)  // TotalMix 没回话
+}
+
+extension AppModel {
+    /// 跳到设备页的信号流，追这一路。
+    public func showTrace(_ ref: ChannelRef) {
+        traceTarget = ref
+        devicesPane = .signalFlow
+        section = .devices
+    }
+
+    public func showWiring() {
+        settingsTab = .wiring
+        section = .settings
+    }
 }
 
 /// 写入的确认方式（文档第 7.4 节）。
@@ -74,6 +104,13 @@ public enum TwelveMicStatus: Equatable, Sendable {
 public final class AppModel {
     /// 侧边栏选中的视图（List 单选要求可选值；nil 按“输出”显示）。
     public var section: AppSection? = .devices
+    public var devicesPane: DevicesPane = .strips
+    public var checkupTab: CheckupTab = .checkup
+    public var settingsTab: SettingsTab = .connection
+    /// 设备页面板上选中的接口（PanelConnector.id）；接口详情显示在检查器里。
+    public var panelSelection: String?
+    /// 选中接口后在通道格里点的那一路；nil = 整个接口。
+    public var panelChannel: Int?
     public var settings: OSCSettings {
         didSet {
             saveSettings()

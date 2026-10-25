@@ -1,7 +1,7 @@
 import SwiftUI
 import RMECore
 
-/// 首次使用向导（阶段 D2）：TotalMix 连接、12Mic 地址、接线确认、确认方式。随时可从“连接”页重新打开。
+/// 首次使用向导（阶段 D2）：TotalMix 连接、12Mic 地址、接线确认、确认方式。随时可从“设置 → 连接”重新打开。
 struct OnboardingSheet: View {
     @Bindable var model: AppModel
     var finish: () -> Void
@@ -112,7 +112,7 @@ struct OnboardingSheet: View {
 
     private var wiring: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            Text("App 按下面这张接线表计算信号路径。和实物不一样的话，之后在“接线”页改。")
+            Text("App 按下面这张接线表计算信号路径。和实物不一样的话，之后在“设置 → 接线”改。")
                 .font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
             ForEach(model.links) { link in
                 Text(verbatim: "\(name(link.from)) ⇒ \(name(link.to))").font(Tokens.Font.body)
@@ -126,7 +126,7 @@ struct OnboardingSheet: View {
                 ForEach(ConfirmMode.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
-            Text("每次确认：改动先进底部“待应用”栏，确认后才发送（推荐刚开始用）。\n快速：点下改动就发送；切换 48V、一次抬高超过 20 dB 仍会确认。\n之后在“连接”页随时可以改。")
+            Text("每次确认：改动先进底部“待应用”栏，确认后才发送（推荐刚开始用）。\n快速：点下改动就发送；切换 48V、一次抬高超过 20 dB 仍会确认。\n之后在“设置 → 连接”随时可以改。")
                 .font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
         }
     }

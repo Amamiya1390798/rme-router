@@ -2,38 +2,28 @@ import SwiftUI
 import RMECore
 import RMEAdapters
 
-/// “设备”页（文档第 6.4.3 节）：三台设备的前后面板、实物线缆、XT 的 TotalMix 式通道条。
+/// “设备”页（文档第 6.4.3、6.8 节）：左栏是三台设备的前后面板与实物线缆，
+/// 右栏是 XT 的 TotalMix 式通道条（或信号流）。选中接口的详情显示在检查器里。
 struct DevicesView: View {
     @Bindable var model: AppModel
     @State private var face: PanelFace = .rear
-    @State private var selected: String?
     @State private var onlySignal = false
     @State private var identifying = false
-    /// 看路径（第 6.4.4 节）：选中的通道。
-    /// 选接口看链路（第 6.4.4 节）：在通道格里点了某一路时的通道号；nil = 整个接口。
-    @State private var focusChannel: Int?
     /// 拖线的结果（第 6.4.4 节）。
     @State private var linkProposal: (from: String, to: String)?
     @State private var sendPreset: (from: ChannelRef, to: ChannelRef)?
     @State private var dragMessage: String?
 
-    private var selectedConnector: (DevicePanel, PanelConnector)? {
-        guard let id = selected else { return nil }
-        for p in PanelLayout.all { if let c = p.connectors.first(where: { $0.id == id }) { return (p, c) } }
-        return nil
-    }
-
     var body: some View {
-        HStack(spacing: 0) {
+        HSplitView {
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.l) {
                     header
-                    if let f = focus { focusBar(f) }
                     if let dragMessage {
                         Text(dragMessage).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
                     }
-                    RackView(model: model, face: face, selected: $selected,
-                             highlightLinks: focus?.links, onPick: { focusChannel = nil }) { a, b in
+                    RackView(model: model, face: face, selected: Binding(get: { model.panelSelection }, set: select),
+                             highlightLinks: focus?.links) { a, b in
                         dragMessage = nil
                         switch model.dragIntent(from: a, to: b) {
                         case let .addLink(f, t): linkProposal = (f, t)
@@ -41,22 +31,33 @@ struct DevicesView: View {
                         case let .rejected(why): dragMessage = "拖不上：\(why)"
                         }
                     }
-                    ControlRoomBar(model: model)
-                    XTStripsView(model: model, onlySignal: onlySignal, focus: focus)
                 }
                 .padding(Tokens.Space.xl)
-                .frame(minWidth: 600, alignment: .leading)
             }
-            if let (panel, c) = selectedConnector {
+            .frame(minWidth: 380, idealWidth: 520)
+            .background(Tokens.Palette.bg)
+
+            VStack(spacing: 0) {
+                paneBar
                 Divider()
-                ConnectorDetail(model: model, panel: panel, connector: c, showPath: { focusChannel = $0.channel }) {
-                    selected = nil; focusChannel = nil
+                switch model.devicesPane {
+                case .strips:
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                            if let f = focus { focusBar(f) }
+                            ControlRoomBar(model: model)
+                            XTStripsView(model: model, onlySignal: onlySignal, focus: focus)
+                        }
+                        .padding(Tokens.Space.l)
+                    }
+                    .background(Tokens.Palette.bg)
+                case .signalFlow:
+                    SignalFlowView(model: model)
                 }
-                .frame(width: 280)
             }
+            .frame(minWidth: 460, maxWidth: .infinity)
         }
-        .background(Tokens.Palette.bg)
-        .onExitCommand { focusChannel = nil; selected = nil }
+        .onExitCommand { select(nil) }
         .confirmationDialog(linkProposal.map { "在接线表里加一根线：\(name($0.from)) ⇒ \(name($0.to))？" } ?? "",
                             isPresented: Binding(get: { linkProposal != nil }, set: { if !$0 { linkProposal = nil } })) {
             Button("加这根线") {
@@ -74,6 +75,13 @@ struct DevicesView: View {
         }
     }
 
+    /// 点接口：选中它（详情进检查器），通道条高亮它的整条链；再点一次取消。
+    private func select(_ id: String?) {
+        model.panelChannel = nil
+        model.panelSelection = id
+        if id != nil { model.showInspector = true }
+    }
+
     private func name(_ portID: String) -> String {
         let topo = model.snapshot.topology
         return topo.port(portID).map { "\(topo.device($0.deviceID)?.name ?? $0.deviceID) \($0.name)" } ?? portID
@@ -81,8 +89,8 @@ struct DevicesView: View {
 
     /// 选中的接口在通道条上的链路（只看音频接口）。
     private var focus: StripFocus? {
-        guard let (_, c) = selectedConnector, c.routes else { return nil }
-        return model.stripFocus(connector: c, channel: focusChannel)
+        guard let (_, c) = model.selectedConnector, c.routes else { return nil }
+        return model.stripFocus(connector: c, channel: model.panelChannel)
     }
 
     /// 顶部一行：选中了什么、链上有几条通道条。
@@ -90,29 +98,55 @@ struct DevicesView: View {
         HStack(spacing: Tokens.Space.s) {
             Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").foregroundStyle(Tokens.Palette.accent)
             Text(verbatim: f.isEmpty ? "\(f.title)：链上没有 XT 通道（没接线或没有路由）"
-                 : "\(f.title)：通道条里高亮 \(f.inputs.count) 条输入、\(f.playbacks.count) 条回放、\(f.outputs.count) 个输出；\(f.edges.count) 条发送"
+                 : "\(f.title)：高亮 \(f.inputs.count) 条输入、\(f.playbacks.count) 条回放、\(f.outputs.count) 个输出；\(f.edges.count) 条发送"
                    + (f.edges.count > StripFocus.maxEdges ? "（只画前 \(StripFocus.maxEdges) 条线）" : ""))
                 .font(Tokens.Font.body)
             Spacer()
-            Button("取消选择") { selected = nil; focusChannel = nil }.keyboardShortcut(.cancelAction)
+            Button("取消选择") { select(nil) }.keyboardShortcut(.cancelAction)
         }
         .padding(Tokens.Space.s)
         .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.accent.opacity(0.12)))
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: Tokens.Space.m) {
-            ViewHeader(title: "设备", subtitle: "实物接口与线缆。点一个接口只看它自己的线；下面是 XT 的通道条，用法同 TotalMix。")
-            Picker("面", selection: $face) { ForEach(PanelFace.allCases) { Text($0.title).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
-                .onChange(of: face) { selected = nil }   // 路径模式在两面都能看，不清
-            Button("信号核对…") { identifying = true }
-                .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
-                .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
-            Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox)
-                .disabled(!model.meters.live)
-                .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            ViewHeader(title: "设备", subtitle: "实物接口与线缆。点一个接口看它的整条链，详情在右侧检查器；拖到另一个接口可接线或送一路声音。")
+            HStack(spacing: Tokens.Space.m) {
+                Picker("面", selection: $face) { ForEach(PanelFace.allCases) { Text($0.title).tag($0) } }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .onChange(of: face) { select(nil) }
+                Button("信号核对…") { identifying = true }
+                    .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
+                    .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
+            }
         }
+    }
+
+    /// 右栏顶部：通道条 / 信号流，以及只看有信号。
+    private var paneBar: some View {
+        HStack(spacing: Tokens.Space.m) {
+            Picker("右栏", selection: $model.devicesPane) {
+                ForEach(DevicesPane.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            Spacer()
+            if model.devicesPane == .strips {
+                Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox)
+                    .disabled(!model.meters.live)
+                    .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
+            }
+        }
+        .padding(.horizontal, Tokens.Space.l).padding(.vertical, Tokens.Space.s)
+        .background(Tokens.Palette.bg)
+    }
+}
+
+extension AppModel {
+    /// 设备页选中的接口和它所在的面板。
+    var selectedConnector: (DevicePanel, PanelConnector)? {
+        guard let id = panelSelection else { return nil }
+        for p in PanelLayout.all { if let c = p.connectors.first(where: { $0.id == id }) { return (p, c) } }
+        return nil
     }
 }
 
@@ -143,19 +177,26 @@ struct RackView: View {
         return Set(model.cables(face: face).flatMap { c in c.from == key || c.to == key ? [c.from, c.to] : [] })
     }
 
+    /// 竖排四行（第 6.8 节）：12Mic、XT、“这台 Mac”与 P16-I、XTC；线缆在行与行之间的缝里走。
+    /// 面板都铺满栏宽，接口位置随栏宽等比；Mac 卡在左、P16-I 在右，让开中间 MADI 线走的那一段。
     var body: some View {
-        VStack(alignment: .leading, spacing: 64) {
+        VStack(alignment: .leading, spacing: 56) {
             unit("12mic").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:0"] = $1 }
-            HStack(alignment: .center, spacing: Tokens.Space.l) {
-                unit("xt").frame(maxWidth: 560)
-                MacNodeCard(model: model)
-                    .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:mac"] = $1 }
-                NodeCard(title: "Behringer P16-I", lines: ["ADAT A 输入", "ADAT B 输入"], color: Color(hex: 0x6AA6C9))
-                    .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:p16i"] = $1 }
-                Spacer(minLength: 0)
+            unit("xt").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:1"] = $1 }
+            GeometryReader { g in
+                HStack(alignment: .top, spacing: 0) {
+                    MacNodeCard(model: model)
+                        .frame(width: max(150, g.size.width * 0.26))
+                        .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:mac"] = $1 }
+                    Spacer(minLength: Tokens.Space.m)
+                    NodeCard(title: "Behringer P16-I", lines: ["ADAT A 输入", "ADAT B 输入"], color: Color(hex: 0x6AA6C9))
+                        .frame(width: max(150, g.size.width * 0.3))
+                        .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:p16i"] = $1 }
+                }
             }
-            .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:1"] = $1 }
-            unit("xtc").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:2"] = $1 }
+            .frame(height: 96)
+            .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:2"] = $1 }
+            unit("xtc").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:3"] = $1 }
         }
         .padding(.top, Tokens.Space.l)
         .overlayPreferenceValue(RackAnchorKey.self) { anchors in
@@ -262,7 +303,7 @@ struct NodeCard: View {
             }
         }
         .padding(Tokens.Space.m)
-        .frame(width: 170, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: Tokens.Radius.card).fill(Tokens.Palette.surface))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
     }
@@ -289,7 +330,7 @@ struct CableLayer: View {
     }
 
     var body: some View {
-        let rows = (0 ..< 3).compactMap { anchors["row:\($0)"] }
+        let rows = (0 ..< Self.rowCount).compactMap { anchors["row:\($0)"] }
         let routed = Self.route(cables, anchors: anchors, rows: rows)
         ZStack {
             ForEach(routed, id: \.cable.id) { r in
@@ -312,20 +353,27 @@ struct CableLayer: View {
 
     struct Routed { var cable: CableSpec; var points: [CGPoint]; var labelAt: CGPoint }
 
+    static let rowCount = 4
+
+    /// 每根线：起点垂直走到一条缝，在缝里横走，再垂直进终点。
+    /// 两端在不同行时走上面那台设备下方的缝；同一行时走这一行下方的缝（最后一行走上方）。
+    /// 节点卡片（Mac、P16-I）从靠近那条缝的一边进：缝在上就进上沿，否则进下沿。
     static func route(_ cables: [CableSpec], anchors: [String: CGRect], rows: [CGRect]) -> [Routed] {
-        guard rows.count == 3 else { return [] }
+        guard rows.count >= 2 else { return [] }
         func rowOf(_ y: CGFloat) -> Int? { rows.firstIndex { y >= $0.minY - 4 && y <= $0.maxY + 4 } }
         var lanes: [Int: Int] = [:]
         return cables.compactMap { c in
             guard let fa = anchors[c.from], let fb = anchors[c.to] else { return nil }
-            let a = CGPoint(x: fa.midX, y: fa.midY)
-            let toNode = c.to.hasPrefix("node:")
-            let b = toNode ? CGPoint(x: fb.minX + 28, y: fb.maxY) : CGPoint(x: fb.midX, y: fb.midY)
-            guard let ra = rowOf(a.y), let rb = rowOf(toNode ? fb.midY : b.y) else { return nil }
-            let gap = min(ra == rb ? ra : min(ra, rb), 1)
+            guard let ra = rowOf(fa.midY), let rb = rowOf(fb.midY) else { return nil }
+            let gap = ra == rb ? min(ra, rows.count - 2) : min(ra, rb)
             lanes[gap, default: 0] += 1
             let mid = (rows[gap].maxY + rows[gap + 1].minY) / 2
             let gy = mid + CGFloat(lanes[gap]! - 3) * 7
+            func end(_ f: CGRect, node: Bool) -> CGPoint {
+                guard node else { return CGPoint(x: f.midX, y: f.midY) }
+                return CGPoint(x: f.minX + 28, y: gy < f.minY ? f.minY : f.maxY)
+            }
+            let a = end(fa, node: c.from.hasPrefix("node:")), b = end(fb, node: c.to.hasPrefix("node:"))
             return Routed(cable: c, points: [a, CGPoint(x: a.x, y: gy), CGPoint(x: b.x, y: gy), b],
                           labelAt: CGPoint(x: max(a.x, b.x) + 150, y: gy))
         }
@@ -353,8 +401,7 @@ struct ConnectorDetail: View {
     var close: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.m) {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
                 HStack {
                     Text(connector.name).font(Tokens.Font.cardTitle).fixedSize(horizontal: false, vertical: true)
                     Spacer()
@@ -366,15 +413,13 @@ struct ConnectorDetail: View {
                     Text(explain).font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(connector.ports, id: \.self) { portSection($0) }
-            }
-            .padding(Tokens.Space.l)
         }
-        .background(Tokens.Palette.surface)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var explain: String {
         switch connector.kind {
-        case .clock: return "字时钟接口，不参与路由。时钟状态在“时钟”页。"
+        case .clock: return "字时钟接口，不参与路由。时钟状态在“体检 → 时钟”。"
         case .computer: return "连接电脑的接口，不参与路由。"
         default: return "电源、网络或控制接口，不参与路由，只用来对照实物。"
         }

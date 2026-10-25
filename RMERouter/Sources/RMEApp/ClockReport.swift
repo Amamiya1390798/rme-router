@@ -34,7 +34,7 @@ public enum ClockReport {
     /// 读不到时的人工确认方法（XT 的 Global OSC 没有时钟地址；XTC 没有可读协议）。
     static let hints: [String: String] = [
         "xt": "TotalMix 的 Global OSC 读不到时钟：在 TotalMix 的 Settings（选项 → 设置）里查看 Sample Rate 与 Clock Source。",
-        "12mic": "在 12Mic 的 CLOCK 页查看；或在“连接”页确认 12Mic 地址后点“读取设备”。",
+        "12mic": "在 12Mic 的 CLOCK 页查看；或在“设置 → 连接”确认 12Mic 地址后点“读取设备”。",
         "xtc": "XTC 没有可读的控制协议：在面板 CLOCK 菜单查看采样率与时钟源。",
     ]
 

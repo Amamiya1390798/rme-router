@@ -18,16 +18,25 @@ public struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             Group {
-                switch model.section ?? .outputs {
+                switch model.section ?? .devices {
                 case .devices: DevicesView(model: model)
                 case .outputs: OutputsView(model: model)
-                case .signalFlow: SignalFlowView(model: model)
                 case .preamps: PreampsView(model: model)
-                case .clock: ClockView(model: model)
-                case .checkup: CheckupView(model: model)
+                case .checkup:
+                    PageTabs(selection: $model.checkupTab) {
+                        switch model.checkupTab {
+                        case .checkup: CheckupView(model: model)
+                        case .clock: ClockView(model: model)
+                        }
+                    }
                 case .scenes: ScenesView(model: model)
-                case .wiring: WiringView(model: model)
-                case .connection: ConnectionView(model: model)
+                case .settings:
+                    PageTabs(selection: $model.settingsTab) {
+                        switch model.settingsTab {
+                        case .connection: ConnectionView(model: model)
+                        case .wiring: WiringView(model: model)
+                        }
+                    }
                 }
             }
             .inspector(isPresented: $model.showInspector) {
@@ -108,12 +117,12 @@ struct Sidebar: View, Equatable {
 
     var body: some View {
         List(selection: $selection) {
-            Section("视图") {
+            Section("页面") {
                 ForEach(AppSection.allCases) { s in
                     Label(s.title, systemImage: s.symbol).tag(s)
                 }
             }
-            Section("设备") {
+            Section("设备状态") {
                 ForEach(devices) { d in
                     HStack(spacing: Tokens.Space.s) {
                         EvidenceDot(d.evidence)
@@ -125,6 +134,31 @@ struct Sidebar: View, Equatable {
         }
     }
 }
+
+/// 页内分栏（第 6.8 节）：顶部居中一组分段按钮，下面是当前分栏。
+struct PageTabs<Tab: Hashable & Identifiable & CaseIterable & TitledTab, Content: View>: View where Tab.AllCases: RandomAccessCollection {
+    @Binding var selection: Tab
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("分栏", selection: $selection) {
+                ForEach(Tab.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            .padding(.vertical, Tokens.Space.s)
+            .frame(maxWidth: .infinity)
+            .background(Tokens.Palette.bg)
+            Divider()
+            content()
+        }
+    }
+}
+
+protocol TitledTab { var title: String { get } }
+extension CheckupTab: TitledTab {}
+extension SettingsTab: TitledTab {}
+extension DevicesPane: TitledTab {}
 
 /// “连接”视图：TotalMix Global OSC 的端口设置与说明。
 struct ConnectionView: View {

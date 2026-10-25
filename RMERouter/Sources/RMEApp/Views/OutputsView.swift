@@ -24,8 +24,7 @@ public struct OutputsView: View {
     private var actions: OutputActions {
         var a = OutputActions()
         a.selectSource = { ref in
-            model.traceTarget = ref
-            model.section = .signalFlow
+            model.showTrace(ref)
         }
         a.canEdit = { card in card.port.deviceID == "xt" && model.lastLoaded != nil }
         a.pendingGain = { src, dst in model.pendingGain(source: src, destination: dst) }
