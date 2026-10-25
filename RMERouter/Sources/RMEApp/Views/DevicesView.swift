@@ -47,6 +47,7 @@ struct DevicesView: View {
                         ControlRoomBar(model: model)
                         XTStripsView(model: model, onlySignal: onlySignal, focus: focus, highlightEdge: hoverEdge,
                                      onFocusPick: narrow)
+                            .equatable()
                     case .signalFlow:
                         SignalFlowView(model: model)
                             .frame(height: 560)
@@ -462,20 +463,20 @@ struct ConnectorDetail: View {
             ForEach(first ..< first + n, id: \.self) { ch in
                 let ref = ChannelRef(port.id, ch)
                 let sig = model.hasSignal(ref) == true
-                Button {
-                    showPath(ref)
-                    model.inspect(ref)
-                } label: {
-                    Text("\(ch)").font(.system(size: 9, design: .monospaced))
-                        .frame(maxWidth: .infinity, minHeight: 18)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(
-                            sig ? Tokens.Palette.ok.opacity(0.45) : routed.contains(ch) ? Tokens.Palette.border : Tokens.Palette.bg))
-                        .foregroundStyle(routed.contains(ch) || sig ? Tokens.Palette.text : Tokens.Palette.textMuted)
-                }
-                .buttonStyle(.plain)
-                .help("\(ref.description)：点了在面板上画出它的完整路径")
+                // 轻量格子：64 格各带一个按钮和提示会让检查器重建变慢，改为文字 + 点按
+                Text("\(ch)").font(.system(size: 9, design: .monospaced))
+                    .frame(maxWidth: .infinity, minHeight: 18)
+                    .background(RoundedRectangle(cornerRadius: 3).fill(
+                        sig ? Tokens.Palette.ok.opacity(0.45) : routed.contains(ch) ? Tokens.Palette.border : Tokens.Palette.bg))
+                    .foregroundStyle(routed.contains(ch) || sig ? Tokens.Palette.text : Tokens.Palette.textMuted)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showPath(ref)
+                        model.inspect(ref)
+                    }
             }
         }
+        .help("点一格：通道条只看这一路，下面显示它的详情")
     }
 }
 

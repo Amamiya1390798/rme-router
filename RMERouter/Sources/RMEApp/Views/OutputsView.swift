@@ -105,11 +105,12 @@ public struct OutputsContent: View {
                         if demoDevices.contains(group.device.name) { Badge(text: "演示数据", color: Tokens.Palette.unknown) }
                         if actions.canAddRoute(group.device.id) { NewRouteButton(actions: actions) }
                     }
-                    Grid(alignment: .topLeading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.m) {
+                    // 懒加载：只建看得见的几行卡片（输出多时整页一次建完，切页要卡 0.2 秒）
+                    LazyVStack(alignment: .leading, spacing: Tokens.Space.m) {
                         ForEach(Array(rows(group.cards).enumerated()), id: \.offset) { _, row in
-                            GridRow {
-                                ForEach(row) { OutputCardView(card: $0, actions: actions) }
-                                ForEach(0 ..< (columns - row.count), id: \.self) { _ in Color.clear.gridCellUnsizedAxes([.vertical]) }
+                            HStack(alignment: .top, spacing: Tokens.Space.m) {
+                                ForEach(row) { OutputCardView(card: $0, actions: actions).frame(maxWidth: .infinity, alignment: .topLeading) }
+                                ForEach(0 ..< (columns - row.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
                             }
                         }
                     }

@@ -123,6 +123,9 @@ public final class AppModel {
     /// 快照每变一次加 1；派生数据（源头标签）按它缓存。
     @ObservationIgnored var snapshotVersion = 0
     @ObservationIgnored var originCache: (version: Int, labels: [ChannelRef: OriginLabel])?
+    /// 选接口看链路的结果缓存（第 6.4.4 节）：快照、TotalMix 状态、有信号的通道都没变就不重算。
+    @ObservationIgnored var outputsCache: (key: [Int], groups: [DeviceOutputs])?
+    @ObservationIgnored var focusCache: (key: [AnyHashable], focus: StripFocus)?
     /// 线缆核对结果（第 6.5 节），按两端端口记，存在 UserDefaults。
     public internal(set) var linkVerifications: [String: LinkVerification] = [:] {
         didSet {
@@ -194,7 +197,7 @@ public final class AppModel {
     public var confirmMode: ConfirmMode { didSet { defaults.set(confirmMode.rawValue, forKey: ConfirmMode.defaultsKey) } }
     public internal(set) var isApplying = false
     /// 最近一次从 TotalMix 读回的原始状态与对照表（写入时用来反查 TotalMix 通道）。
-    public internal(set) var tmState = TotalMixState()
+    public internal(set) var tmState = TotalMixState() { didSet { outputsCache = nil; focusCache = nil } }
     public internal(set) var xtMap = TotalMixChannelMap()
 
     @ObservationIgnored var adapter: TotalMixOSCAdapter?
@@ -379,9 +382,15 @@ public final class AppModel {
     public var outputsOnlySignal = false
 
     public var outputs: [DeviceOutputs] {
-        let all = OutputCards.build(snapshot, showPlayback: showPlayback) { [self] ref in
-            guard deviceID(of: ref) == "xt", let tm = tmChannel(for: ref) else { return nil }
-            return tmState.isStereo(tm)
+        // 按快照、TotalMix 状态、是否显示回放缓存：每次重绘都重建全部输出卡太慢
+        let key = [snapshotVersion, tmState.revision, showPlayback ? 1 : 0]
+        let all: [DeviceOutputs]
+        if let c = outputsCache, c.key == key { all = c.groups } else {
+            all = OutputCards.build(snapshot, showPlayback: showPlayback) { [self] ref in
+                guard deviceID(of: ref) == "xt", let tm = tmChannel(for: ref) else { return nil }
+                return tmState.isStereo(tm)
+            }
+            outputsCache = (key, all)
         }
         return outputsOnlySignal ? Self.onlyWithSignal(all, active: meters.active) : all
     }

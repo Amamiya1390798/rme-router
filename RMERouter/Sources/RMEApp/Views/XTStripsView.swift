@@ -8,7 +8,7 @@ import RMEAdapters
 /// - 点输出：上两行显示送到它的电平（同 TotalMix）；
 /// - 点输入 / 回放：画出它送到哪些输出（线上标电平），输入还画到“电脑录音 n”；
 /// - 把上面一条拖到下面一条 = 新建发送（-30 dB，进待应用栏）。
-struct XTStripsView: View {
+struct XTStripsView: View, Equatable {
     @Bindable var model: AppModel
     var onlySignal: Bool
     /// 在面板上选中接口时：要高亮的通道条和它们之间的线（第 6.4.4 节）。
@@ -17,30 +17,35 @@ struct XTStripsView: View {
     var highlightEdge: StripFocus.Edge? = nil
     /// 选中接口时点了一条通道条：返回 true 表示已处理（缩小到这一路），false 则照常选中。
     var onFocusPick: ((XTStrip) -> Bool)? = nil
+    /// 只比较会变的参数（回调每次都是新的闭包）：模型里的变化由 Observation 自己触发重绘。
+    static func == (a: Self, b: Self) -> Bool {
+        a.model === b.model && a.onlySignal == b.onlySignal && a.focus == b.focus && a.highlightEdge == b.highlightEdge
+    }
+
     @State private var output: TotalMixChannel?
     @State private var source: TotalMixChannel?
 
-    private var outputs: [XTStrip] { model.xtStrips(.output) }
-    private var current: XTStrip? { outputs.first { $0.tm == output } ?? outputs.first }
-
     var body: some View {
+        // 每次重绘只算一次（以前每条通道条都重新算一遍输出列表）
+        let outputs = model.xtStrips(.output)
+        let current = outputs.first { $0.tm == output } ?? outputs.first
         let inputs = filtered(model.xtStrips(.input)), playbacks = filtered(model.xtStrips(.playback))
         let all = inputs + playbacks
         let selectedSource = all.first { $0.tm == source }
         let sends = selectedSource.map { model.xtSends(from: $0.tm) } ?? []
         let origins = model.originLabels(inputs.compactMap(\.ref))
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            header(selectedSource, sends: sends)
+            header(selectedSource, sends: sends, outputs: outputs, current: current)
             if outputs.isEmpty {
                 Text("还没有从 TotalMix 读到通道。在“设置 → 连接”确认端口后点“读取设备”。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
             } else {
                 row("硬件输入", sub: "= 电脑录音", ids: inputs.map(\.tm)) {
-                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }).id(s.tm) }
+                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }, current: current).id(s.tm) }
                 }
                 row("软件回放", sub: "DAW 送来", ids: playbacks.map(\.tm)) {
                     if focus == nil, let s = selectedSource, s.tm.bus == .input { RecordingGhost(strip: s) }
-                    ForEach(playbacks) { s in strip(s, origin: nil).id(s.tm) }
+                    ForEach(playbacks) { s in strip(s, origin: nil, current: current).id(s.tm) }
                 }
                 row("硬件输出", sub: nil, ids: outputs.map(\.tm)) {
                     ForEach(outputs) { s in
@@ -80,7 +85,8 @@ struct XTStripsView: View {
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
     }
 
-    @ViewBuilder private func header(_ s: XTStrip?, sends: [(output: TotalMixChannel, dB: Double)]) -> some View {
+    @ViewBuilder private func header(_ s: XTStrip?, sends: [(output: TotalMixChannel, dB: Double)],
+                                     outputs: [XTStrip], current: XTStrip?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
             Text("MADIface XT · 通道条").font(Tokens.Font.cardTitle)
             if let s {
@@ -97,7 +103,7 @@ struct XTStripsView: View {
         }
     }
 
-    private func strip(_ s: XTStrip, origin: OriginLabel?) -> some View {
+    private func strip(_ s: XTStrip, origin: OriginLabel?, current: XTStrip?) -> some View {
         SourceStrip(model: model, strip: s, output: current, origin: origin,
                     selected: focus == nil ? source == s.tm : false, lit: focus.map { $0.contains(s.tm) }) {
             if focus != nil, onFocusPick?(s) == true { return }
@@ -122,8 +128,9 @@ struct XTStripsView: View {
             }
             .frame(width: 66, alignment: .leading)
             ScrollViewReader { proxy in
+                // 懒加载：只建屏幕上看得见的通道条（MADI 三个口共 200 多条，全建切页要卡 1 秒）
                 ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: 4) { content() }.padding(.bottom, 6)
+                    LazyHStack(alignment: .top, spacing: 4) { content() }.padding(.bottom, 6)
                 }
                 // 选中接口后自动滚到这一行第一条高亮的通道条
                 .onChange(of: focus) {

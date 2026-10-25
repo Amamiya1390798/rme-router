@@ -75,6 +75,15 @@ extension AppModel {
     /// 选中一个接口（channel 为 nil 时是整个接口的全部通道）后，沿路由和接线追出的整条链在通道条上的样子。
     /// activeOnly 为 nil 时自动：选中超过 `StripFocus.activeOnlyAbove` 路才只看在用的。
     public func stripFocus(connector c: PanelConnector, channel: Int? = nil, activeOnly: Bool? = nil) -> StripFocus {
+        // 追链要沿全部路由走一遍（整个 MADI 口 64 路），每次重绘都算会让切页、点选变卡
+        let key: [AnyHashable] = [c.id, channel, activeOnly, snapshotVersion, tmState.revision, meters.live, meters.active]
+        if let cached = focusCache, cached.key == key { return cached.focus }
+        let focus = computeStripFocus(connector: c, channel: channel, activeOnly: activeOnly)
+        focusCache = (key, focus)
+        return focus
+    }
+
+    private func computeStripFocus(connector c: PanelConnector, channel: Int?, activeOnly: Bool?) -> StripFocus {
         let topo = snapshot.topology
         var refs: [ChannelRef] = []
         for portID in c.ports {

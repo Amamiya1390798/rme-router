@@ -12,6 +12,7 @@ struct ChainCard: View {
     @Binding var hoverEdge: StripFocus.Edge?
     var close: () -> Void
     @State private var error: String?
+    @Environment(\.pageActive) private var pageActive
 
     var body: some View {
         let strips = Dictionary((model.xtStrips(.input) + model.xtStrips(.playback) + model.xtStrips(.output)).map { ($0.tm, $0) },
@@ -57,7 +58,7 @@ struct ChainCard: View {
             } else if showAll {
                 Button("只看在用的") { showAll = false }.buttonStyle(.link).font(Tokens.Font.caption)
             }
-            Button("取消选择", action: close).keyboardShortcut(.cancelAction)
+            Button("取消选择", action: close).keyboardShortcut(pageActive ? .cancelAction : nil)
         }
     }
 

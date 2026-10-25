@@ -6,6 +6,8 @@ import RMECore
 public struct RootView: View {
     @Bindable var model: AppModel
 
+    @State private var devicesBuilt = false
+
     public init(model: AppModel) { self.model = model }
 
     public var body: some View {
@@ -17,28 +19,18 @@ public struct RootView: View {
                 .equatable()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            Group {
-                switch model.section ?? .devices {
-                case .devices: DevicesView(model: model)
-                case .outputs: OutputsView(model: model)
-                case .preamps: PreampsView(model: model)
-                case .checkup:
-                    PageTabs(selection: $model.checkupTab) {
-                        switch model.checkupTab {
-                        case .checkup: CheckupView(model: model)
-                        case .clock: ClockView(model: model)
-                        }
-                    }
-                case .scenes: ScenesView(model: model)
-                case .settings:
-                    PageTabs(selection: $model.settingsTab) {
-                        switch model.settingsTab {
-                        case .connection: ConnectionView(model: model)
-                        case .wiring: WiringView(model: model)
-                        }
-                    }
+            ZStack {
+                // 设备页建一次就一直留着（藏在后面），切回来不用重建：200 多条通道条重建一次要 0.2 秒以上
+                if devicesBuilt {
+                    DevicesView(model: model)
+                        .opacity(onDevices ? 1 : 0)
+                        .allowsHitTesting(onDevices)
+                        .accessibilityHidden(!onDevices)
+                        .environment(\.pageActive, onDevices)
                 }
+                if !onDevices { otherPage }
             }
+            .onChange(of: model.section, initial: true) { if onDevices { devicesBuilt = true } }
             .inspector(isPresented: $model.showInspector) {
                 InspectorPanel(model: model).inspectorColumnWidth(min: 260, ideal: 300, max: 420)
             }
@@ -72,6 +64,31 @@ public struct RootView: View {
         .task {
             if !model.onboardingDone { model.showOnboarding = true }
             if model.xtStatus == .notLoaded { await model.refresh() }
+        }
+    }
+
+    private var onDevices: Bool { (model.section ?? .devices) == .devices }
+
+    @ViewBuilder private var otherPage: some View {
+        switch model.section ?? .devices {
+        case .devices: EmptyView()
+        case .outputs: OutputsView(model: model)
+        case .preamps: PreampsView(model: model)
+        case .checkup:
+            PageTabs(selection: $model.checkupTab) {
+                switch model.checkupTab {
+                case .checkup: CheckupView(model: model)
+                case .clock: ClockView(model: model)
+                }
+            }
+        case .scenes: ScenesView(model: model)
+        case .settings:
+            PageTabs(selection: $model.settingsTab) {
+                switch model.settingsTab {
+                case .connection: ConnectionView(model: model)
+                case .wiring: WiringView(model: model)
+                }
+            }
         }
     }
 
@@ -153,6 +170,11 @@ struct PageTabs<Tab: Hashable & Identifiable & CaseIterable & TitledTab, Content
             content()
         }
     }
+}
+
+extension EnvironmentValues {
+    /// 这一页是不是当前显示的页（设备页藏在后面时为 false：不响应 Esc 等快捷键）。
+    @Entry var pageActive = true
 }
 
 protocol TitledTab { var title: String { get } }
