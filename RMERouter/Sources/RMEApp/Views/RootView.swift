@@ -23,6 +23,7 @@ public struct RootView: View {
                 case .preamps: PreampsView(model: model)
                 case .clock: ClockView(model: model)
                 case .checkup: CheckupView(model: model)
+                case .scenes: ScenesView(model: model)
                 case .wiring: WiringView(model: model)
                 case .connection: ConnectionView(model: model)
                 }

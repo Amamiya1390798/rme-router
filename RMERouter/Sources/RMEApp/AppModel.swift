@@ -13,7 +13,7 @@ public struct OSCSettings: Codable, Equatable, Sendable {
 }
 
 public enum AppSection: String, CaseIterable, Identifiable, Sendable {
-    case outputs, signalFlow, preamps, clock, checkup, wiring, connection
+    case outputs, signalFlow, preamps, clock, checkup, scenes, wiring, connection
     public var id: String { rawValue }
     public var title: String {
         switch self {
@@ -22,6 +22,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .preamps: return "前级"
         case .clock: return "时钟"
         case .checkup: return "体检"
+        case .scenes: return "场景"
         case .wiring: return "接线"
         case .connection: return "连接"
         }
@@ -33,6 +34,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .preamps: return "mic"
         case .clock: return "clock"
         case .checkup: return "stethoscope"
+        case .scenes: return "square.stack.3d.up"
         case .wiring: return "cable.coaxial"
         case .connection: return "cable.connector"
         }
@@ -93,6 +95,8 @@ public final class AppModel {
     public internal(set) var pendingRoutes: [PendingRouteChange] = []
     /// 需要在设备上手动完成的步骤（跨设备“送一路声音”里的 XTC 等，第 7.5 节）。
     public internal(set) var manualTasks: [ManualTask] = []
+    /// 已保存的场景（第 7.6 节），新的在前。
+    public internal(set) var scenes: [StudioScene] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
     /// 确认方式（第 7.4 节）。
@@ -108,6 +112,7 @@ public final class AppModel {
     @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
     @ObservationIgnored let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
     @ObservationIgnored let linkStore: LinkStore
+    @ObservationIgnored let sceneStore: SceneStore
     private static let settingsKey = "osc.settings"
     private static let twelveMicKey = "12mic.url"
 
@@ -117,9 +122,11 @@ public final class AppModel {
                     TotalMixOSCAdapter(host: $0.host, port: $0.port, localPort: $0.listenPort)
                 },
                 makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) },
-                linkStore: LinkStore = .none) {
+                linkStore: LinkStore = .none, sceneStore: SceneStore = .none) {
         self.defaults = defaults
         self.linkStore = linkStore
+        self.sceneStore = sceneStore
+        self.scenes = sceneStore.load()
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
