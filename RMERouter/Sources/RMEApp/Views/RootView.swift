@@ -214,7 +214,7 @@ struct Sidebar: View, Equatable {
     /// 页面项：圆角块，选中浅色底（不用系统蓝）。
     private func item(_ s: AppSection) -> some View {
         let on = selection == s
-        let gemini = UITheme.current == .gemini
+        let theme = UITheme.current, gemini = theme == .gemini
         return Button { selection = s } label: {
             HStack(spacing: 10) {
                 Group {
@@ -227,8 +227,8 @@ struct Sidebar: View, Equatable {
                 Spacer()
             }
             .padding(.horizontal, gemini ? 14 : 10).padding(.vertical, gemini ? 8 : 6)
-            .background(RoundedRectangle(cornerRadius: gemini ? 20 : 8)
-                .fill(on ? (gemini ? Tokens.Palette.accent.opacity(0.18) : Tokens.Palette.border.opacity(0.7)) : .clear))
+            .background(RoundedRectangle(cornerRadius: theme.itemRadius)
+                .fill(on ? (theme.tintedSelection ? Tokens.Palette.accent.opacity(0.16) : Tokens.Palette.border.opacity(0.8)) : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -425,7 +425,8 @@ struct AppearanceCard: View {
                 ForEach(UIAppearance.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 260)
-            HStack(spacing: Tokens.Space.m) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: Tokens.Space.m, alignment: .leading)],
+                      alignment: .leading, spacing: Tokens.Space.m) {
                 ForEach(UITheme.allCases) { t in swatch(t) }
             }
             Text("只换颜色，不改布局。绿 = 已确认、黄 = 推断、红 = 有问题，在每套主题里意义都一样。")

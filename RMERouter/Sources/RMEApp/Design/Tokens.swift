@@ -35,7 +35,7 @@ public enum Tokens {
     public enum Radius {
         public static let control: CGFloat = 8
         /// 卡片圆角随主题：Gemini 风格更圆（第 5.1 节）。
-        public static var card: CGFloat { UITheme.current == .gemini ? 20 : 12 }
+        public static var card: CGFloat { UITheme.current.cardRadius }
     }
 
     /// 主题点缀渐变（只有 Gemini 风格有：蓝→紫→粉）；其他主题为 nil。
@@ -48,13 +48,25 @@ public enum Tokens {
 
 /// 视觉主题（文档第 5.1 节）。只换颜色，状态色意义不变。
 public enum UITheme: String, CaseIterable, Identifiable, Sendable {
-    case warm, studio, contrast, gemini
+    case warm, studio, contrast, gemini, gpt, deepseek, kimi
     public var id: String { rawValue }
     public var title: String {
         switch self {
-        case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比"; case .gemini: return "Gemini 风格"
+        case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比"
+        case .gemini: return "Gemini 风格"; case .gpt: return "GPT 风格"; case .deepseek: return "DeepSeek 风格"; case .kimi: return "Kimi 风格"
         }
     }
+
+    /// 卡片圆角（第 5.1 节）。
+    public var cardRadius: CGFloat {
+        switch self { case .gemini: return 20; case .gpt, .kimi: return 16; case .deepseek: return 14; default: return 12 }
+    }
+    /// 侧栏页面项圆角（Gemini 是胶囊）。
+    public var itemRadius: CGFloat {
+        switch self { case .gemini: return 20; case .gpt, .deepseek, .kimi: return 10; default: return 8 }
+    }
+    /// 侧栏选中块用强调色淡底（否则用灰底）。
+    public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi }
     public static let defaultsKey = "ui.theme"
 
     /// 当前主题。只在主线程改（设置页），颜色在绘制时读。
@@ -107,6 +119,48 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             case .warn: return (0xE37400, 0xFDD663)
             case .problem: return (0xD93025, 0xF28B82)
             case .unknown: return (0x9AA0A6, 0x5F6368)
+            }
+        case .gpt:
+            switch t {
+            case .chrome: return (0xF9F9F9, 0x171717)
+            case .bg: return (0xFFFFFF, 0x212121)
+            case .surface: return (0xF7F7F8, 0x2F2F2F)
+            case .border: return (0xE5E5E5, 0x3A3A3A)
+            case .text: return (0x0D0D0D, 0xECECEC)
+            case .textMuted: return (0x5D5D5D, 0xB4B4B4)
+            case .accent: return (0x0D0D0D, 0xECECEC)
+            case .ok: return (0x10A37F, 0x19C37D)
+            case .warn: return (0xC27C0E, 0xF0B429)
+            case .problem: return (0xD93F3F, 0xFF6B6B)
+            case .unknown: return (0xA3A3A3, 0x6B6B6B)
+            }
+        case .deepseek:
+            switch t {
+            case .chrome: return (0xF5F7FB, 0x212327)
+            case .bg: return (0xFFFFFF, 0x292A2D)
+            case .surface: return (0xF5F7FB, 0x33353A)
+            case .border: return (0xE1E5EE, 0x43464D)
+            case .text: return (0x1A1C21, 0xE8EAED)
+            case .textMuted: return (0x5E6573, 0xA0A6B0)
+            case .accent: return (0x4D6BFE, 0x6D88FF)
+            case .ok: return (0x2E9E5B, 0x5BC98A)
+            case .warn: return (0xD08A1A, 0xF2C14E)
+            case .problem: return (0xE0453A, 0xFF7A70)
+            case .unknown: return (0xA0A6B0, 0x6A707A)
+            }
+        case .kimi:
+            switch t {
+            case .chrome: return (0xF4F4F5, 0x101012)
+            case .bg: return (0xFFFFFF, 0x18181B)
+            case .surface: return (0xF4F4F5, 0x27272A)
+            case .border: return (0xE4E4E7, 0x3F3F46)
+            case .text: return (0x09090B, 0xFAFAFA)
+            case .textMuted: return (0x52525B, 0xA1A1AA)
+            case .accent: return (0x4F46E5, 0x8B8CF6)
+            case .ok: return (0x16A34A, 0x4ADE80)
+            case .warn: return (0xCA8A04, 0xFACC15)
+            case .problem: return (0xDC2626, 0xF87171)
+            case .unknown: return (0xA1A1AA, 0x71717A)
             }
         case .contrast:
             switch t {

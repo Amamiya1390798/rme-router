@@ -35,7 +35,9 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(UITheme.studio.value(.accent).0, 0x2F6FB5)
         XCTAssertEqual(UITheme.contrast.value(.bg).1, 0x121212)
         XCTAssertEqual(UITheme.gemini.value(.accent).0, 0x1A73E8)
-        XCTAssertEqual(UITheme.allCases.count, 4)
+        XCTAssertEqual(UITheme.allCases.count, 7)
+        XCTAssertEqual(UITheme.deepseek.value(.accent).0, 0x4D6BFE)
+        XCTAssertEqual(UITheme.gpt.cardRadius, 16)
         for t in UITheme.allCases {
             // 文字与底色要拉开：亮度差不小于默认主题的一半（粗略的对比检查）
             func lum(_ c: UInt32) -> Double { Double((c >> 16) & 0xFF) * 0.3 + Double((c >> 8) & 0xFF) * 0.59 + Double(c & 0xFF) * 0.11 }
