@@ -4,6 +4,8 @@ import RMECore
 /// 代价权重（第 9 节初值；用第 11 节场景调整）。
 public struct CostWeights: Sendable {
     public var overrideExisting = 100
+    /// 覆盖时每个失去声音的终点再加（第 7.5 节第 7 条）。
+    public var overrideImpactPerEndpoint = 50
     public var manualStep = 10
     public var domainSwitch = 3
     public var hop = 1
@@ -26,6 +28,12 @@ public struct PathEdge: Equatable, Sendable {
     public var formatEvidence: Evidence   // 线缆边：两端格式是否已知
 }
 
+/// 覆盖一条已有路由的影响：原来经它送到的终点会失去原来的声音（第 7.5 节第 7 条）。
+public struct OverrideImpact: Equatable, Sendable {
+    public var route: Route
+    public var lostEndpoints: [ChannelRef]
+}
+
 /// 计划中的一步（第 9 节第 5 步的字段）。
 public struct PlanStep: Equatable, Sendable {
     public enum Location: Equatable, Sendable { case cable, device(String, ControlDomain) }
@@ -33,6 +41,7 @@ public struct PlanStep: Equatable, Sendable {
     public var summary: String
     public var change: RouteChange?
     public var overrides: [Route]          // 旧值，供回滚
+    public var impacts: [OverrideImpact] = []
     public var remoteWritable: Bool
     public var status: Evidence            // 这一段目前的可信度
     public var verification: String
@@ -43,6 +52,7 @@ public struct RoutePlan: Equatable, Sendable {
     public var steps: [PlanStep]           // 已按“下游到上游”排好执行顺序
     public var totalCost: Int
     public var overrides: [Route] { steps.flatMap(\.overrides) }
+    public var impacts: [OverrideImpact] { steps.flatMap(\.impacts) }
     public var manualSteps: [PlanStep] { steps.filter { $0.change != nil && !$0.remoteWritable } }
 }
 
@@ -56,9 +66,20 @@ public struct PathFinder {
     public var snapshot: SystemSnapshot
     public var weights: CostWeights
 
+    private let trace: SignalTrace
+
     public init(snapshot: SystemSnapshot, weights: CostWeights = CostWeights()) {
         self.snapshot = snapshot
         self.weights = weights
+        self.trace = SignalTrace(snapshot: snapshot)
+    }
+
+    /// 覆盖这些路由时失去原来声音的终点：各路由目标往下游走到的终点；没有下游时就是目标本身。
+    public func impacts(of overrides: [Route]) -> [OverrideImpact] {
+        overrides.map { r in
+            let ends = trace.destinations(of: r.destination)
+            return OverrideImpact(route: r, lostEndpoints: ends.isEmpty ? [r.destination] : ends)
+        }
     }
 
     // MARK: 搜索（Dijkstra，状态 = 通道 + 上一个控制域）
@@ -174,10 +195,14 @@ public struct PathFinder {
                 for ch in targets {
                     let dest = ChannelRef(outID, ch)
                     if out.contains(where: { $0.to == dest }) { continue }   // 已有同一路由
-                    let overrides = occupants(of: dest, by: node, granularity: cap.granularity, in: existing)
+                    // 混音（TotalMix 发送）是叠加，不替换送到同一输出的其他发送：不算覆盖
+                    let overrides = cap.kindIsMix ? [] : occupants(of: dest, by: node, granularity: cap.granularity, in: existing)
                     var cost = weights.hop + extra
                     if cap.access != .readWrite { cost += weights.manualStep }
-                    if !overrides.isEmpty { cost += weights.overrideExisting }
+                    if !overrides.isEmpty {
+                        let lost = Set(impacts(of: overrides).flatMap(\.lostEndpoints)).count
+                        cost += weights.overrideExisting + weights.overrideImpactPerEndpoint * min(lost, 20)
+                    }
                     let change = RouteChange(domain: cap.domain, source: node, destination: dest, kind: kind)
                     out.append(PathEdge(from: node, to: dest, kind: .newRoute(change, access: cap.access, overrides: overrides),
                                         cost: cost, formatEvidence: .documented))
@@ -223,6 +248,7 @@ public struct PathFinder {
             case let .newRoute(c, access, overrides):
                 steps.append(PlanStep(location: .device(deviceID(of: c.source), c.domain),
                                       summary: "新建 \(c.source) → \(c.destination)", change: c, overrides: overrides,
+                                      impacts: impacts(of: overrides),
                                       remoteWritable: access == .readWrite, status: .inferred,
                                       verification: access == .readWrite ? "写后回读比对" : "人工设置后在设备上核对"))
             }

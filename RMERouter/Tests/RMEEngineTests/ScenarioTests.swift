@@ -97,16 +97,37 @@ final class ScenarioTests: XCTestCase {
         XCTAssertTrue(issues.contains { $0.link.id == "L1" && !$0.issue.isError })
     }
 
-    // T8 块/通道冲突：XT MADI 2 输出 1 已被别的信号占用，计划必须列出将被覆盖的路由。
-    // 占用者的来源取 xt.madi3.in（无来线、搜索不可达）。若用 xt.madi1.in:20（= Mic 12），
-    // 搜索会改去覆盖 12Mic 的 Mic 12 路由来复用这条 XT 路由（代价 107 < 117），测不到本场景。
-    func testT8_Override() {
+    // T8 覆盖（第 7.5 节第 7 条，2026-10-26 改）：
+    // TotalMix 发送是混音，新建发送不替换送到同一输出的其他发送——不算覆盖。
+    func testT8_MixSendIsNotOverride() {
         var s = Fixture.golden()
         let other = Route(domain: .totalMix, source: ChannelRef("xt.madi3.in", 1),
                           destination: ChannelRef("xt.madi2.out", 1), kind: .mixSend(gainDB: 0), evidence: .confirmed)
         s.devices["xt"]!.routes = [other]
         guard case let .found(plan) = PathFinder(snapshot: s).find(from: mic1, to: p16ch1) else { return XCTFail() }
-        XCTAssertEqual(plan.overrides, [other])
+        XCTAssertEqual(plan.overrides, [], "混音发送叠加，不算覆盖")
+    }
+
+    // 直通路由的目标已被占用、又没有别的路可走：只能覆盖，计划写明哪些终点会失去原来的声音，代价按影响加。
+    func testT8b_PassthroughOverrideListsImpact() {
+        let s = Fixture.golden()
+        let target = ChannelRef("12mic.madi_optical.out", 10)        // 现在是 Mic 2 的
+        guard case let .found(plan) = PathFinder(snapshot: s).find(from: mic1, to: target) else { return XCTFail() }
+        let impact = try! XCTUnwrap(plan.impacts.first)
+        XCTAssertEqual(impact.route.source, ChannelRef("12mic.analog.in", 2))
+        XCTAssertFalse(impact.lostEndpoints.isEmpty)
+        let w = CostWeights()
+        XCTAssertGreaterThanOrEqual(plan.totalCost, w.overrideExisting + w.overrideImpactPerEndpoint * impact.lostEndpoints.count)
+    }
+
+    // 有不覆盖的路就不覆盖：Mic 1 送到 XT MADI 1 输入第 30 路，用 12Mic 空着的输出 30。
+    func testT8c_AvoidsOverrideWhenFreePathExists() {
+        let s = Fixture.golden()
+        guard case let .found(plan) = PathFinder(snapshot: s).find(from: mic1, to: ChannelRef("xt.madi1.in", 30)) else {
+            return XCTFail()
+        }
+        XCTAssertTrue(plan.overrides.isEmpty)
+        XCTAssertTrue(plan.impacts.isEmpty)
     }
 
     // T9 写入部分失败：第 2 步失败，第 1 步回滚。

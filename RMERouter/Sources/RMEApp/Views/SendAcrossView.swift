@@ -17,6 +17,8 @@ struct SendAcrossSheet: View {
     @State private var pair = false
     @State private var result: SendPlanResult?
     @State private var errors: [String] = []
+    /// 计划会让别的去向断声时，须先勾选（第 7.5 节第 7 条）。
+    @State private var impactAcknowledged = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.l) {
@@ -51,6 +53,10 @@ struct SendAcrossSheet: View {
                     .frame(minHeight: 120, maxHeight: 320)
             }
             ForEach(errors, id: \.self) { Text($0).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
+            if hasImpact {
+                Toggle("我知道会影响上面这些去向（它们原来的声音会断）", isOn: $impactAcknowledged)
+                    .toggleStyle(.checkbox).font(Tokens.Font.body).foregroundStyle(Tokens.Palette.problem)
+            }
 
             HStack {
                 Spacer()
@@ -58,7 +64,7 @@ struct SendAcrossSheet: View {
                 Button(ConfirmMode.current.applyLabel) { stage() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent).tint(Tokens.Palette.accent)
-                    .disabled(plans.allSatisfy { $0.autoCount == 0 && $0.manualSteps.isEmpty })
+                    .disabled(plans.allSatisfy { $0.autoCount == 0 && $0.manualSteps.isEmpty } || (hasImpact && !impactAcknowledged))
             }
         }
         .padding(Tokens.Space.xl)
@@ -76,6 +82,8 @@ struct SendAcrossSheet: View {
         .onChange(of: pair) { result = nil; errors = [] }
     }
 
+    private var hasImpact: Bool { plans.contains { !$0.impacts.isEmpty } }
+
     private var plans: [SendPlan] {
         if case let .found(p)? = result { return p }
         return []
@@ -83,6 +91,7 @@ struct SendAcrossSheet: View {
 
     private func compute() {
         errors = []
+        impactAcknowledged = false
         result = SendAcross.plan(model.snapshot, from: ChannelRef(sourcePort, sourceChannel),
                                  to: ChannelRef(destPort, destChannel), pair: pair)
     }
@@ -139,9 +148,17 @@ struct SendAcrossSheet: View {
                 Label("这条路径已经通了，不需要改动", systemImage: "checkmark.circle")
                     .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.ok)
             }
-            if !plan.overrides.isEmpty {
-                Text("会覆盖已有路由：" + plan.overrides.map { "\($0.source) → \($0.destination)" }.joined(separator: "、"))
-                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
+            if !plan.impacts.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("没有不覆盖的路，只能替换已有路由：").font(Tokens.Font.caption.weight(.semibold))
+                    ForEach(Array(plan.impacts.enumerated()), id: \.offset) { _, i in
+                        Text(verbatim: "· 覆盖 \(i.route.domain.displayName) 路由 \(model.shortName(i.route.source)) → \(i.route.destination)："
+                             + "原来经这里送到 " + i.lostEndpoints.prefix(4).map(model.shortName).joined(separator: "、")
+                             + (i.lostEndpoints.count > 4 ? " 等 \(i.lostEndpoints.count) 处" : "") + " 的声音会断")
+                            .font(Tokens.Font.caption).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .foregroundStyle(Tokens.Palette.problem)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

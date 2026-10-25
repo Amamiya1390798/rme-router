@@ -24,6 +24,8 @@ public struct SendPlan: Equatable, Sendable {
         public var action: Action
         /// 这一步会覆盖的已有路由。
         public var overrides: [Route]
+        /// 覆盖造成的影响：原来经这些路由送到的终点会失去原来的声音（第 7.5 节第 7 条）。
+        public var impacts: [OverrideImpact] = []
     }
 
     public var source: ChannelRef
@@ -31,6 +33,7 @@ public struct SendPlan: Equatable, Sendable {
     public var steps: [Step]
 
     public var overrides: [Route] { steps.flatMap(\.overrides) }
+    public var impacts: [OverrideImpact] { steps.flatMap(\.impacts) }
     public var manualSteps: [String] {
         steps.compactMap { if case let .manual(t) = $0.action { return t } else { return nil } }
     }
@@ -94,7 +97,8 @@ public enum SendAcross {
                 default:
                     action = .manual(manualText(change, in: snapshot))
                 }
-                steps.append(.init(id: i, action: action, overrides: overrides))
+                steps.append(.init(id: i, action: action, overrides: overrides,
+                                   impacts: PathFinder(snapshot: snapshot).impacts(of: overrides)))
             }
         }
         return SendPlan(source: source, destination: destination, steps: steps)
