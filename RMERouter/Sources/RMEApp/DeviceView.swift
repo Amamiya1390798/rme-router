@@ -154,3 +154,31 @@ extension ChannelRef {
         self.init(String(text[..<i]), n)
     }
 }
+
+/// 通道条对应的源头话放（文档第 6.4.3 节“通道条上调增益”）。
+public struct StripPreamp: Equatable, Sendable {
+    public var deviceID: String
+    public var preamp: PreampChannel
+}
+
+extension AppModel {
+    /// 硬件输入条的源头话放：XT 自己的 Mic，或沿接线、路由追到的 12Mic / XTC 话放。追到多个话放时为 nil（避免改错）。
+    public func stripPreamp(_ ref: ChannelRef) -> StripPreamp? {
+        if stripPreampCache?.version != snapshotVersion {
+            var byInput: [ChannelRef: StripPreamp] = [:]
+            for (dev, d) in snapshot.devices {
+                for p in d.preamps { byInput[p.input] = StripPreamp(deviceID: dev, preamp: p) }
+            }
+            let trace = SignalTrace(snapshot: snapshot)
+            var map: [ChannelRef: StripPreamp] = [:]
+            for s in xtStrips(.input) {
+                guard let r = s.ref else { continue }
+                if let direct = byInput[r] { map[r] = direct; continue }
+                let origins = Set(trace.upstream(to: r).compactMap { $0.first?.hop.from }).filter { byInput[$0] != nil }
+                if origins.count == 1, let o = origins.first { map[r] = byInput[o] }
+            }
+            stripPreampCache = (snapshotVersion, map)
+        }
+        return stripPreampCache?.map[ref]
+    }
+}

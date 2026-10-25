@@ -366,6 +366,10 @@ struct SourceStrip: View {
             .buttonStyle(.plain)
             .help((origin.map { $0.verified ? "\($0.text)\n" : "\($0.text)（未核对：这一段来自演示数据，设备还没读到）\n" } ?? "") + "点了看它送到哪里")
             if let ref = strip.ref { MeterBar(store: model.meters, ref: ref, width: 46) } else { Spacer().frame(height: 6) }
+            // 源头话放的增益（第 6.4.3 节）：XT Mic，或追到的 12Mic / XTC 话放
+            if strip.tm.bus == .input, let ref = strip.ref, let sp = model.stripPreamp(ref) {
+                StripGainChip(model: model, sp: sp)
+            }
             Button { editing = true } label: {
                 Group {
                     if let p = pending { Text(PendingChange.format(p)).foregroundStyle(Tokens.Palette.accent) }
@@ -567,6 +571,46 @@ struct StripShortcuts: View {
                 }
             }
             .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+        }
+    }
+}
+
+/// 通道条上的增益按钮：显示源头话放的增益，点了改（走前级写入流程）。
+struct StripGainChip: View {
+    var model: AppModel
+    var sp: StripPreamp
+    @State private var editing = false
+    @State private var error: String?
+
+    var body: some View {
+        let pending = model.pendingPreamp(deviceID: sp.deviceID, input: sp.preamp.input, field: .gain)
+            .flatMap { if case let .gain(g) = $0 { return g } else { return nil } }
+        let gain = pending ?? sp.preamp.gainDB.knownValue
+        Button { editing = true } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "mic.fill").font(.system(size: 8))
+                Text(gain.map { String(format: "%.0f", $0) } ?? "?").font(.system(size: 10, design: .monospaced))
+                if sp.preamp.phantom.knownValue == true {
+                    Text("48V").font(.system(size: 7, weight: .bold)).foregroundStyle(Tokens.Palette.warn)
+                }
+            }
+            .foregroundStyle(pending != nil ? Tokens.Palette.accent : Tokens.Palette.textMuted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 1)
+            .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.3)))
+        }
+        .buttonStyle(.plain)
+        .disabled(sp.preamp.gainDB.knownValue == nil)
+        .help(error ?? "源头话放：\(model.snapshot.topology.device(sp.deviceID)?.name ?? sp.deviceID) \(sp.preamp.input)；点了改增益（先进待应用栏）")
+        .popover(isPresented: $editing, arrowEdge: .bottom) {
+            PreampGainEditor(title: "\(model.snapshot.topology.device(sp.deviceID)?.name ?? sp.deviceID) \(sp.preamp.input) 增益",
+                             current: sp.preamp.gainDB.knownValue ?? 0, initial: gain ?? 0) { value in
+                if let v = value {
+                    error = model.stagePreamp(deviceID: sp.deviceID, input: sp.preamp.input, field: .gain, value: .gain(v))?.text
+                    if error == nil { Task { await model.commitIfQuick() } }
+                }
+                editing = false
+            }
         }
     }
 }

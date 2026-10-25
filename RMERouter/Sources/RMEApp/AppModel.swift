@@ -146,6 +146,7 @@ public final class AppModel {
     @ObservationIgnored var outputsCache: (key: [Int], groups: [DeviceOutputs])?
     @ObservationIgnored var checkupCache: (version: Int, results: [RuleResult])?
     @ObservationIgnored var loopbackCache: (revision: Int, version: Int, map: [Int: XTStrip])?
+    @ObservationIgnored var stripPreampCache: (version: Int, map: [ChannelRef: StripPreamp])?
     @ObservationIgnored var focusCache: (key: [AnyHashable], focus: StripFocus)?
     /// 线缆核对结果（第 6.5 节），按两端端口记，存在 UserDefaults。
     public internal(set) var linkVerifications: [String: LinkVerification] = [:] {
