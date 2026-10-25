@@ -2,7 +2,13 @@ import AppKit
 import SwiftUI
 import RMEApp
 
+/// 单窗口工具：关掉窗口即退出，不留一个没有窗口的后台进程（看起来像 App 消失了）。
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
 struct RMERouterApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
 
     init() {
@@ -12,7 +18,8 @@ struct RMERouterApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("RME Router") {
+        // 只有一个主窗口（Window 而不是 WindowGroup）：Cmd+N 不会再开出共享同一模型的第二个窗口。
+        Window("RME Router", id: "main") {
             RootView(model: model)
                 .frame(minWidth: 900, minHeight: 600)
         }

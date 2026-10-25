@@ -193,7 +193,8 @@ struct SourceRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("修改电平（先进待应用栏）")
-                .popover(isPresented: $editing, arrowEdge: .bottom) {
+                // 电平按钮在卡片最右侧：向左弹出，窗口窄时也不会伸出窗口右边。
+                .popover(isPresented: $editing, arrowEdge: .leading) {
                     GainEditor(current: source.kind.gainDB, initial: pending ?? source.kind.gainDB,
                                title: "\(source.label) → \(destination)") { dB in
                         _ = actions.stage(source.refs[0], destination, dB)
