@@ -1,6 +1,38 @@
 import Foundation
 import RMECore
 
+/// 接线表的存取（阶段 A4）：JSON 文件，默认在 ~/Library/Application Support/RME Router/links.json。
+public struct LinkStore: Sendable {
+    public var url: URL?
+
+    public init(url: URL?) { self.url = url }
+
+    public static var standard: LinkStore {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        return LinkStore(url: base?.appendingPathComponent("RME Router/links.json"))
+    }
+
+    /// 不读写任何文件（测试与出图用）。
+    public static let none = LinkStore(url: nil)
+
+    public func load() -> [Link]? {
+        guard let url, let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode([Link].self, from: data)
+    }
+
+    public func save(_ links: [Link]?) {
+        guard let url else { return }
+        if let links {
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try? enc.encode(links).write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+}
+
 /// 本工作室的拓扑与约束（文档第 6.1 节端口登记表）。接头类型是占位，按实物改。
 /// 12Mic 与 XTC 的客户端接入前，用 `demoDevices()` 占位，路由一律标 unknown，界面明示“演示数据”。
 public enum StudioSetup {
@@ -111,10 +143,14 @@ public enum StudioSetup {
                               clock: ClockState(configuredRate: .unknown(src), source: .unknown(src)))
     }
 
-    public static func snapshot(xt: DeviceSnapshot, others: [String: DeviceSnapshot] = demoDevices()) -> SystemSnapshot {
+    /// links 为 nil 时用默认接线；用户在“接线”页改过的接线由 AppModel 传入（阶段 A4）。
+    public static func snapshot(xt: DeviceSnapshot, others: [String: DeviceSnapshot] = demoDevices(),
+                                links: [Link]? = nil) -> SystemSnapshot {
         var devices = others
         devices["xt"] = xt
-        return SystemSnapshot(topology: topology(), devices: devices, capabilities: capabilities, terminals: terminals,
+        var topo = topology()
+        if let links { topo.links = links }
+        return SystemSnapshot(topology: topo, devices: devices, capabilities: capabilities, terminals: terminals,
                               concurrency: concurrency)
     }
 }

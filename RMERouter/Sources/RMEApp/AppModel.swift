@@ -13,7 +13,7 @@ public struct OSCSettings: Codable, Equatable, Sendable {
 }
 
 public enum AppSection: String, CaseIterable, Identifiable, Sendable {
-    case outputs, signalFlow, preamps, clock, checkup, connection
+    case outputs, signalFlow, preamps, clock, checkup, wiring, connection
     public var id: String { rawValue }
     public var title: String {
         switch self {
@@ -22,6 +22,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .preamps: return "前级"
         case .clock: return "时钟"
         case .checkup: return "体检"
+        case .wiring: return "接线"
         case .connection: return "连接"
         }
     }
@@ -32,6 +33,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .preamps: return "mic"
         case .clock: return "clock"
         case .checkup: return "stethoscope"
+        case .wiring: return "cable.coaxial"
         case .connection: return "cable.connector"
         }
     }
@@ -76,7 +78,7 @@ public final class AppModel {
             adapter = nil
         }
     }
-    public private(set) var snapshot: SystemSnapshot
+    public internal(set) var snapshot: SystemSnapshot
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
     /// 12Mic HTTP 地址（文档第 6.2 节）：网络 http://12mic.local，USB 直连 http://172.20.0.1。
@@ -105,6 +107,7 @@ public final class AppModel {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
     @ObservationIgnored let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
+    @ObservationIgnored let linkStore: LinkStore
     private static let settingsKey = "osc.settings"
     private static let twelveMicKey = "12mic.url"
 
@@ -113,8 +116,10 @@ public final class AppModel {
                 makeAdapter: @escaping (OSCSettings) -> TotalMixOSCAdapter = {
                     TotalMixOSCAdapter(host: $0.host, port: $0.port, localPort: $0.listenPort)
                 },
-                makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) }) {
+                makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) },
+                linkStore: LinkStore = .none) {
         self.defaults = defaults
+        self.linkStore = linkStore
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
@@ -125,7 +130,7 @@ public final class AppModel {
         } else {
             settings = OSCSettings()
         }
-        self.snapshot = snapshot ?? StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"))
+        self.snapshot = snapshot ?? StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
     }
 
     private func saveSettings() {
@@ -189,7 +194,7 @@ public final class AppModel {
 
     /// 用读到的 XT 快照更新（测试与预览也走这里）。
     public func apply(xt: DeviceSnapshot) {
-        snapshot = StudioSetup.snapshot(xt: xt, others: snapshot.devices.filter { $0.key != "xt" })
+        snapshot = StudioSetup.snapshot(xt: xt, others: snapshot.devices.filter { $0.key != "xt" }, links: snapshot.topology.links)
         xtStatus = xt.reachable ? .live : .offlineSaved
         lastLoaded = Date()
         if traceTarget == nil { traceTarget = traceCandidates.first }

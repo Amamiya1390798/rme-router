@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct RMERouterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel()
+    @State private var model = AppModel(linkStore: .standard)
 
     init() {
         // swift run 启动的可执行文件没有 .app 包：手动设为普通前台应用，窗口才会出现在前面。
