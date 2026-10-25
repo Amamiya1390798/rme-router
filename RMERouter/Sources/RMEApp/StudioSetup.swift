@@ -63,6 +63,10 @@ public enum StudioSetup {
             port("12mic.madi_optical.out", "MADI 光口输出", .madiOptical, .output, .sfp, 64),
             port("12mic.madi_coaxial.out", "MADI 同轴输出", .madiCoaxial, .output, .bnc, 64),
             port("12mic.phones.out", "耳机", .analog, .output, .trs, 2),
+            // 第 6.4.1 节补登：后面板 ADAT 输出 ×3
+            port("12mic.adat1.out", "ADAT 1 输出", .adat, .output, .toslink, 8),
+            port("12mic.adat2.out", "ADAT 2 输出", .adat, .output, .toslink, 8),
+            port("12mic.adat3.out", "ADAT 3 输出", .adat, .output, .toslink, 8),
         ])
         let xtc = Device(id: "xtc", model: .octamicXTC, name: "OctaMic XTC", ports: [
             port("xtc.mic.in", "Mic 1–8", .analog, .input, .combo, 8),
@@ -70,6 +74,11 @@ public enum StudioSetup {
             port("xtc.madi.out", "MADI 输出", .madiOptical, .output, .sc, 64),
             port("xtc.adat1.out", "ADAT 1 输出", .adat, .output, .toslink, 8),
             port("xtc.adat2.out", "ADAT 2 输出", .adat, .output, .toslink, 8),
+            // 第 6.4.1 节补登：ADAT 输入、AES 4 入 4 出（D-sub 25）、前面板耳机 1–2
+            port("xtc.adat.in", "ADAT 输入", .adat, .input, .toslink, 8),
+            port("xtc.aes.in", "AES 输入 1–4", .aes, .input, .dsub, 8),
+            port("xtc.aes.out", "AES 输出 1–4", .aes, .output, .dsub, 8),
+            port("xtc.phones.out", "耳机 1–2", .analog, .output, .trs, 4),
         ])
         let p16 = Device(id: "p16i", model: .p16i, name: "POWERPLAY P16-I", ports: [
             port("p16i.adat_a.in", "ADAT A", .adat, .input, .toslink, 8),

@@ -13,10 +13,11 @@ public struct OSCSettings: Codable, Equatable, Sendable {
 }
 
 public enum AppSection: String, CaseIterable, Identifiable, Sendable {
-    case outputs, signalFlow, preamps, clock, checkup, scenes, wiring, connection
+    case devices, outputs, signalFlow, preamps, clock, checkup, scenes, wiring, connection
     public var id: String { rawValue }
     public var title: String {
         switch self {
+        case .devices: return "设备"
         case .outputs: return "输出"
         case .signalFlow: return "信号流"
         case .preamps: return "前级"
@@ -29,6 +30,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
     }
     public var symbol: String {
         switch self {
+        case .devices: return "rectangle.stack"
         case .outputs: return "speaker.wave.2"
         case .signalFlow: return "point.3.connected.trianglepath.dotted"
         case .preamps: return "mic"
@@ -71,7 +73,7 @@ public enum TwelveMicStatus: Equatable, Sendable {
 @Observable
 public final class AppModel {
     /// 侧边栏选中的视图（List 单选要求可选值；nil 按“输出”显示）。
-    public var section: AppSection? = .outputs
+    public var section: AppSection? = .devices
     public var settings: OSCSettings {
         didSet {
             saveSettings()

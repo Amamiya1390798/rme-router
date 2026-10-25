@@ -19,6 +19,7 @@ public struct RootView: View {
         } detail: {
             Group {
                 switch model.section ?? .outputs {
+                case .devices: DevicesView(model: model)
                 case .outputs: OutputsView(model: model)
                 case .signalFlow: SignalFlowView(model: model)
                 case .preamps: PreampsView(model: model)

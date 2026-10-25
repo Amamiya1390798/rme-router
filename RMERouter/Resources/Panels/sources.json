@@ -1,0 +1,62 @@
+[
+  {
+    "model": "MADIface XT",
+    "face": "front",
+    "file": "madiface-xt-front.png",
+    "width": 2500,
+    "height": 538,
+    "source_page": "https://rme-audio.de/madiface-xt.html",
+    "source_archive": "https://www.rme-usa.com/downloads.html?file=files/downloads/Media-Material/RME_Madiface_XT_Images_Web_PNG.zip",
+    "sha256": "1e8a97b27c31c88343063caca994220f4254695ebf23f44932ffb4bd1a35b748"
+  },
+  {
+    "model": "MADIface XT",
+    "face": "rear",
+    "file": "madiface-xt-rear.png",
+    "width": 2500,
+    "height": 533,
+    "source_page": "https://rme-audio.de/madiface-xt.html",
+    "source_archive": "https://www.rme-usa.com/downloads.html?file=files/downloads/Media-Material/RME_Madiface_XT_Images_Web_PNG.zip",
+    "sha256": "8483aca5e1c5ef6c64c8115ccc698a57315b99551a70faa5862989fdf616fe0e"
+  },
+  {
+    "model": "12Mic",
+    "face": "front",
+    "file": "12mic-front.png",
+    "width": 6400,
+    "height": 2720,
+    "source_page": "https://rme-audio.de/12mic.html",
+    "source_archive": "https://www.rme-usa.com/downloads.html?file=files/downloads/Media-Material/RME_12Mic_Images.zip",
+    "sha256": "0981f5df67c13dfcc8a823b667c5412aafe5fc128433260191c683180a666a22"
+  },
+  {
+    "model": "12Mic",
+    "face": "rear",
+    "file": "12mic-rear.png",
+    "width": 6400,
+    "height": 2720,
+    "source_page": "https://rme-audio.de/12mic.html",
+    "source_archive": "https://www.rme-usa.com/downloads.html?file=files/downloads/Media-Material/RME_12Mic_Images.zip",
+    "sha256": "62b28ee703d96ac7ac86bc7e856396dcaa89689ecf3cd51ca2844e8f3415a9c8"
+  },
+  {
+    "model": "OctaMic XTC",
+    "face": "front",
+    "file": "octamic-xtc-front.png",
+    "width": 2953,
+    "height": 269,
+    "source_page": "https://www.rme-usa.com/octamic-xtc.html",
+    "source_archive": "https://www.rme-usa.com/octamic-xtc.html?file=files/downloads/Media-Material/RME_OctaMic_XTC_Images_Web_PNG.zip",
+    "sha256": "77e6e705c620951249e94a5abaa9cbb900d15f2d7beffae4010238923b8b9b48"
+  },
+  {
+    "model": "OctaMic XTC",
+    "face": "rear",
+    "file": "octamic-xtc-rear.png",
+    "width": 2953,
+    "height": 287,
+    "source_page": "https://www.rme-usa.com/octamic-xtc.html",
+    "source_archive": "https://www.rme-usa.com/octamic-xtc.html?file=files/downloads/Media-Material/RME_OctaMic_XTC_Images_Web_PNG.zip",
+    "sha256": "10b9b3cfe53070edf9faf07ed921ccdd2c7e623e98d21539d50319121cce4335"
+  }
+]
