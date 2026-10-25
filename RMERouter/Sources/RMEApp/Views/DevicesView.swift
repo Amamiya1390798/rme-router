@@ -17,12 +17,16 @@ struct DevicesView: View {
     @State private var linkProposal: (from: String, to: String)?
     @State private var sendPreset: (from: ChannelRef, to: ChannelRef)?
     @State private var dragMessage: String?
+    /// 搜索跳转（第 6.4.5 节）。
+    @State private var jump: StripJump?
+    @State private var searching = false
 
     var body: some View {
         let focus = focus
         VStack(spacing: 0) {
-            toolbar
+            toolbar.zIndex(1)   // 搜索结果浮在下面的内容上
             Divider()
+            ScrollViewReader { page in
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.l) {
                     if let dragMessage {
@@ -46,8 +50,9 @@ struct DevicesView: View {
                     case .strips:
                         ControlRoomBar(model: model)
                         XTStripsView(model: model, onlySignal: onlySignal, focus: focus, highlightEdge: hoverEdge,
-                                     onFocusPick: narrow)
+                                     onFocusPick: narrow, jump: jump, allowSelectAll: !searching)
                             .equatable()
+                            .id("strips")
                     case .signalFlow:
                         SignalFlowView(model: model)
                             .frame(height: 560)
@@ -57,6 +62,11 @@ struct DevicesView: View {
                 }
                 .padding(Tokens.Space.xl)
                 .frame(minWidth: 600, alignment: .leading)
+            }
+            .onChange(of: jump) {
+                guard jump != nil else { return }
+                DispatchQueue.main.async { withAnimation(.easeInOut(duration: 0.25)) { page.scrollTo("strips", anchor: .top) } }
+            }
             }
         }
         .background(Tokens.Palette.bg)
@@ -127,6 +137,14 @@ struct DevicesView: View {
                 .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
                 .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
             Spacer()
+            StripSearchField(model: model, editing: $searching) { tm in
+                let next = StripJump(target: tm, nonce: (jump?.nonce ?? 0) + 1)
+                if model.devicesPane == .strips { jump = next } else {
+                    // 先切回通道条，等它建出来再跳（新建的视图收不到建之前的变化）
+                    model.devicesPane = .strips
+                    DispatchQueue.main.async { jump = next }
+                }
+            }
             Picker("下方", selection: $model.devicesPane) {
                 ForEach(DevicesPane.allCases) { Text($0.title).tag($0) }
             }

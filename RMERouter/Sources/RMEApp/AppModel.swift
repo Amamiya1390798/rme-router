@@ -124,6 +124,11 @@ public final class AppModel {
     @ObservationIgnored var snapshotVersion = 0
     @ObservationIgnored var originCache: (version: Int, labels: [ChannelRef: OriginLabel])?
     /// 选接口看链路的结果缓存（第 6.4.4 节）：快照、TotalMix 状态、有信号的通道都没变就不重算。
+    /// 屏蔽的通道条（第 6.4.5 节）：只影响显示，存在本机偏好里。
+    public internal(set) var hiddenStrips: Set<TotalMixChannel> = [] {
+        didSet { if let d = try? JSONEncoder().encode(hiddenStrips) { defaults.set(d, forKey: Self.hiddenStripsKey) } }
+    }
+    static let hiddenStripsKey = "strips.hidden"
     @ObservationIgnored var outputsCache: (key: [Int], groups: [DeviceOutputs])?
     @ObservationIgnored var focusCache: (key: [AnyHashable], focus: StripFocus)?
     /// 线缆核对结果（第 6.5 节），按两端端口记，存在 UserDefaults。
@@ -244,6 +249,8 @@ public final class AppModel {
         xtcSettings = defaults.data(forKey: Self.xtcKey).flatMap { try? JSONDecoder().decode(XTCSettings.self, from: $0) }
             ?? XTCSettings()
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
+        hiddenStrips = defaults.data(forKey: Self.hiddenStripsKey)
+            .flatMap { try? JSONDecoder().decode(Set<TotalMixChannel>.self, from: $0) } ?? []
         confirmMode = defaults.string(forKey: ConfirmMode.defaultsKey).flatMap(ConfirmMode.init(rawValue:)) ?? .always
         if let data = defaults.data(forKey: Self.settingsKey),
            let saved = try? JSONDecoder().decode(OSCSettings.self, from: data) {

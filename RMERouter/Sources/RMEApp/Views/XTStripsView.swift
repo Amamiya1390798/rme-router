@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 import RMECore
 import RMEAdapters
@@ -7,7 +8,8 @@ import RMEAdapters
 /// 硬件输入（= 电脑录音）、软件回放（DAW 送来）、硬件输出三行。
 /// - 点输出：上两行显示送到它的电平（同 TotalMix）；
 /// - 点输入 / 回放：画出它送到哪些输出（线上标电平），输入还画到“电脑录音 n”；
-/// - 把上面一条拖到下面一条 = 新建发送（-30 dB，进待应用栏）。
+/// - 把上面一条拖到下面一条 = 新建发送（-30 dB，进待应用栏）；
+/// - ⌘ / ⇧ 单击多选，屏蔽（只影响显示）与取消屏蔽；搜索跳转（第 6.4.5 节）。
 struct XTStripsView: View, Equatable {
     @Bindable var model: AppModel
     var onlySignal: Bool
@@ -17,42 +19,60 @@ struct XTStripsView: View, Equatable {
     var highlightEdge: StripFocus.Edge? = nil
     /// 选中接口时点了一条通道条：返回 true 表示已处理（缩小到这一路），false 则照常选中。
     var onFocusPick: ((XTStrip) -> Bool)? = nil
+    /// 搜索跳转：每次跳转 nonce 加一。
+    var jump: StripJump? = nil
+    /// 搜索框没在输入时才接管 ⌘A（否则 ⌘A 要留给搜索框全选文字）。
+    var allowSelectAll = true
     /// 只比较会变的参数（回调每次都是新的闭包）：模型里的变化由 Observation 自己触发重绘。
     static func == (a: Self, b: Self) -> Bool {
         a.model === b.model && a.onlySignal == b.onlySignal && a.focus == b.focus && a.highlightEdge == b.highlightEdge
+            && a.jump == b.jump && a.allowSelectAll == b.allowSelectAll
     }
 
     @State private var output: TotalMixChannel?
     @State private var source: TotalMixChannel?
+    /// 多选（第 6.4.5 节）：⌘ 单击加选、⇧ 单击连选。
+    @State private var picked: Set<TotalMixChannel> = []
+    @State private var pickAnchor: TotalMixChannel?
+    @State private var showHidden = false
+    /// 搜索跳到的被屏蔽条：临时显示，直到下次跳转。
+    @State private var revealed: Set<TotalMixChannel> = []
+    @State private var flash: TotalMixChannel?
 
     var body: some View {
         // 每次重绘只算一次（以前每条通道条都重新算一遍输出列表）
-        let outputs = model.xtStrips(.output)
-        let current = outputs.first { $0.tm == output } ?? outputs.first
+        let allOutputs = model.xtStrips(.output)
+        let current = allOutputs.first { $0.tm == output } ?? allOutputs.first
+        let outputs = unhidden(allOutputs)
         let inputs = filtered(model.xtStrips(.input)), playbacks = filtered(model.xtStrips(.playback))
         let all = inputs + playbacks
         let selectedSource = all.first { $0.tm == source }
         let sends = selectedSource.map { model.xtSends(from: $0.tm) } ?? []
         let origins = model.originLabels(inputs.compactMap(\.ref))
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            header(selectedSource, sends: sends, outputs: outputs, current: current)
-            if outputs.isEmpty {
+            header(selectedSource, sends: sends, outputs: allOutputs, current: current)
+            StripShortcuts(enabled: allowSelectAll, hasPicks: !picked.isEmpty,
+                           selectAll: { picked = Set((inputs + playbacks + outputs).map(\.tm)) },
+                           hide: hidePicked, unhide: unhidePicked, clear: { picked = [] })
+            if allOutputs.isEmpty {
                 Text("还没有从 TotalMix 读到通道。在“设置 → 连接”确认端口后点“读取设备”。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
             } else {
                 row("硬件输入", sub: "= 电脑录音", ids: inputs.map(\.tm)) {
-                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }, current: current).id(s.tm) }
+                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }, current: current, row: inputs).id(s.tm) }
                 }
                 row("软件回放", sub: "DAW 送来", ids: playbacks.map(\.tm)) {
                     if focus == nil, let s = selectedSource, s.tm.bus == .input { RecordingGhost(strip: s) }
-                    ForEach(playbacks) { s in strip(s, origin: nil, current: current).id(s.tm) }
+                    ForEach(playbacks) { s in strip(s, origin: nil, current: current, row: playbacks).id(s.tm) }
                 }
                 row("硬件输出", sub: nil, ids: outputs.map(\.tm)) {
                     ForEach(outputs) { s in
                         let lit = focus.map { $0.outputs.contains(s.tm) }
                         OutputStrip(model: model, strip: s, selected: focus == nil && selectedSource == nil && s.tm == current?.tm,
                                     routedDB: focus == nil && selectedSource != nil ? sends.first { $0.output == s.tm }?.dB : nil,
-                                    lit: lit) {
+                                    lit: lit, picked: picked.contains(s.tm), flash: flash == s.tm,
+                                    hiddenMark: model.hiddenStrips.contains(s.tm)) {
+                            if pickClick(s, row: outputs) { return }
                             output = s.tm
                             source = nil
                         }
@@ -83,13 +103,103 @@ struct XTStripsView: View, Equatable {
         }
         .background(RoundedRectangle(cornerRadius: Tokens.Radius.card).fill(Tokens.Palette.surface))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
+        .onChange(of: jump) { if let j = jump { go(to: j.target) } }
+    }
+
+    // MARK: 多选、屏蔽、跳转（第 6.4.5 节）
+
+    /// ⌘ 单击加选 / 取消，⇧ 单击连选同一行；返回 true 表示这次点击只是在选。普通单击清掉多选。
+    private func pickClick(_ s: XTStrip, row: [XTStrip]) -> Bool {
+        // 用这次点击事件自己带的修饰键（比读键盘当前状态可靠）
+        let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
+        if flags.contains(.command) {
+            if picked.contains(s.tm) { picked.remove(s.tm) } else { picked.insert(s.tm) }
+            pickAnchor = s.tm
+            return true
+        }
+        if flags.contains(.shift) {
+            let ids = row.map(\.tm)
+            if let a = pickAnchor, let i = ids.firstIndex(of: a), let j = ids.firstIndex(of: s.tm) {
+                picked.formUnion(ids[min(i, j) ... max(i, j)])
+            } else {
+                picked.insert(s.tm)
+            }
+            pickAnchor = s.tm
+            return true
+        }
+        if !picked.isEmpty { picked = [] }
+        pickAnchor = s.tm
+        return false
+    }
+
+    private func hidePicked() {
+        model.hideStrips(picked)
+        if let s = source, picked.contains(s) { source = nil }
+        revealed.subtract(picked)
+        picked = []
+    }
+
+    private func unhidePicked() {
+        model.unhideStrips(picked)
+        picked = []
+    }
+
+    private var pickBar: some View {
+        let hiddenPicked = picked.filter(model.hiddenStrips.contains)
+        return HStack(spacing: Tokens.Space.s) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(nsColor: .controlAccentColor))
+            Text("已选 \(picked.count) 条").font(Tokens.Font.caption)
+            if hiddenPicked.count < picked.count { Button("屏蔽 ⌘⇧H", action: hidePicked).controlSize(.small) }
+            if !hiddenPicked.isEmpty { Button("取消屏蔽 ⌘⇧U", action: unhidePicked).controlSize(.small) }
+            Button("取消选择") { picked = [] }.controlSize(.small)
+            Text("⌘ 单击加选 · ⇧ 单击连选 · ⌘A 全选 · 屏蔽只影响显示").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                .lineLimit(1)
+        }
+    }
+
+    /// 已屏蔽的管理：显示已屏蔽、逐条或全部取消。
+    @ViewBuilder private var hiddenMenu: some View {
+        let hidden = model.hiddenStrips
+        if !hidden.isEmpty {
+            let names = Dictionary((model.xtStrips(.input) + model.xtStrips(.playback) + model.xtStrips(.output)).map { ($0.tm, $0.name) },
+                                   uniquingKeysWith: { a, _ in a })
+            Menu("已屏蔽 \(hidden.count) 条") {
+                Toggle("显示已屏蔽（淡显）", isOn: $showHidden)
+                Button("全部取消屏蔽") { model.unhideAllStrips() }
+                Divider()
+                ForEach(hidden.sorted(), id: \.self) { tm in
+                    Button("取消屏蔽 \(names[tm] ?? tm.description)（\(Self.busName(tm))）") { model.unhideStrips([tm]) }
+                }
+            }
+            .menuStyle(.borderlessButton).fixedSize()
+            .font(Tokens.Font.caption)
+        }
+    }
+
+    static func busName(_ tm: TotalMixChannel) -> String {
+        (tm.bus == .input ? "输入 " : tm.bus == .playback ? "回放 " : "输出 ") + "\(tm.number)"
+    }
+
+    /// 跳到一条：被屏蔽的临时显示，选中它，闪一下边框；各行自己滚过去（见 row）。
+    private func go(to tm: TotalMixChannel) {
+        revealed = model.hiddenStrips.contains(tm) ? [tm] : []
+        picked = []
+        if tm.bus == .output { output = tm; source = nil } else { source = tm }
+        flash = tm
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            if flash == tm { flash = nil }
+        }
     }
 
     @ViewBuilder private func header(_ s: XTStrip?, sends: [(output: TotalMixChannel, dB: Double)],
                                      outputs: [XTStrip], current: XTStrip?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
             Text("MADIface XT · 通道条").font(Tokens.Font.cardTitle)
-            if let s {
+            // 多选时这一行换成多选操作（不加新行，免得通道条往下跳、点偏）
+            if !picked.isEmpty {
+                pickBar
+            } else if let s {
                 let names = sends.map { t in "\(outputs.first { $0.tm == t.output }?.name ?? "\(t.output)") \(String(format: "%.1f", t.dB))" }
                 let rec = s.tm.bus == .input ? ["电脑录音 \(recordingText(s))"] : []
                 Text(verbatim: "「\(s.name)」→ " + ((names + rec).isEmpty ? "没有送到任何输出" : (names + rec).joined(separator: " · ")))
@@ -99,13 +209,16 @@ struct XTStripsView: View, Equatable {
                 Text(verbatim: "上两行显示送到「\(c.name)」的电平；点一条输入看它送到哪里").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
             }
             Spacer()
+            hiddenMenu
             Text("拖上面一条到下面一条 = 新建发送（-30 dB）").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         }
     }
 
-    private func strip(_ s: XTStrip, origin: OriginLabel?, current: XTStrip?) -> some View {
+    private func strip(_ s: XTStrip, origin: OriginLabel?, current: XTStrip?, row: [XTStrip]) -> some View {
         SourceStrip(model: model, strip: s, output: current, origin: origin,
-                    selected: focus == nil ? source == s.tm : false, lit: focus.map { $0.contains(s.tm) }) {
+                    selected: focus == nil ? source == s.tm : false, lit: focus.map { $0.contains(s.tm) },
+                    picked: picked.contains(s.tm), flash: flash == s.tm, hiddenMark: model.hiddenStrips.contains(s.tm)) {
+            if pickClick(s, row: row) { return }
             if focus != nil, onFocusPick?(s) == true { return }
             source = source == s.tm ? nil : s.tm
         }
@@ -116,8 +229,16 @@ struct XTStripsView: View, Equatable {
     }
 
     private func filtered(_ s: [XTStrip]) -> [XTStrip] {
+        let s = unhidden(s)
         guard onlySignal else { return s }
         return s.filter { $0.ref.map { model.hasSignal($0) == true } ?? false }
+    }
+
+    /// 去掉屏蔽的条；勾了“显示已屏蔽”、在选中接口的链上、或刚搜索跳到的照样显示。
+    private func unhidden(_ s: [XTStrip]) -> [XTStrip] {
+        let hidden = model.hiddenStrips
+        guard !hidden.isEmpty, !showHidden else { return s }
+        return s.filter { !hidden.contains($0.tm) || revealed.contains($0.tm) || focus?.contains($0.tm) == true }
     }
 
     private func row<C: View>(_ title: String, sub: String?, ids: [TotalMixChannel], @ViewBuilder content: @escaping () -> C) -> some View {
@@ -131,6 +252,13 @@ struct XTStripsView: View, Equatable {
                 // 懒加载：只建屏幕上看得见的通道条（MADI 三个口共 200 多条，全建切页要卡 1 秒）
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 4) { content() }.padding(.bottom, 6)
+                }
+                // 搜索跳转：这一行有目标就滚过去（放到下一轮，等临时显示的条先建出来）
+                .onChange(of: flash) {
+                    guard let t = flash, ids.contains(t) else { return }
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(t, anchor: .center) }
+                    }
                 }
                 // 选中接口后自动滚到这一行第一条高亮的通道条
                 .onChange(of: focus) {
@@ -211,6 +339,9 @@ struct SourceStrip: View {
     var selected: Bool
     /// 面板上选了接口时：true 高亮、false 变淡、nil 照常。
     var lit: Bool? = nil
+    var picked = false
+    var flash = false
+    var hiddenMark = false
     var select: () -> Void
     @State private var editing = false
 
@@ -264,6 +395,7 @@ struct SourceStrip: View {
         .frame(width: 72)
         .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .modifier(StripMarks(picked: picked, flash: flash, hidden: hiddenMark))
         .opacity(lit == false ? 0.3 : (strip.ref.flatMap { model.hasSignal($0) } == false && !selected && lit != true ? 0.55 : 1))
         .draggable(strip.ref?.description ?? "") {
             Text(strip.name).font(Tokens.Font.caption).padding(6).background(Tokens.Palette.surface)
@@ -279,6 +411,9 @@ struct OutputStrip: View {
     /// 选中某个来源时：它送到这里的电平（nil = 没送到）。
     var routedDB: Double?
     var lit: Bool? = nil
+    var picked = false
+    var flash = false
+    var hiddenMark = false
     var select: () -> Void
     @State private var dropTarget = false
     @State private var message: String?
@@ -297,6 +432,7 @@ struct OutputStrip: View {
         .frame(width: 72)
         .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(dropTarget || selected || routedDB != nil || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .modifier(StripMarks(picked: picked, flash: flash, hidden: hiddenMark))
         .opacity(lit == false ? 0.3 : 1)
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
@@ -363,5 +499,68 @@ struct MiniStripButtons: View {
         .buttonStyle(.plain)
         .disabled(now == nil)
         .help(p == .mute ? (isOn ? "取消静音（会出声，需要确认）" : "静音") : "切换相位")
+    }
+}
+
+/// 通道条上的标记：多选（系统强调色框和勾）、搜索跳到（闪一下）、已屏蔽（眼睛图标、淡显）。
+struct StripMarks: ViewModifier {
+    var picked: Bool
+    var flash: Bool
+    var hidden: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if picked {
+                    RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .controlAccentColor), lineWidth: 2)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlAccentColor).opacity(0.10)))
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay {
+                if flash {
+                    RoundedRectangle(cornerRadius: 6).stroke(Tokens.Palette.warn, lineWidth: 3)
+                        .shadow(color: Tokens.Palette.warn, radius: 6)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if hidden {
+                    Image(systemName: "eye.slash").font(.system(size: 8)).foregroundStyle(Tokens.Palette.textMuted).padding(3)
+                        .help("已屏蔽（只是不显示）")
+                }
+            }
+            .opacity(hidden ? 0.5 : 1)
+    }
+}
+
+/// 一次搜索跳转：nonce 每次加一，同一条连跳两次也会触发。
+struct StripJump: Equatable {
+    var target: TotalMixChannel
+    var nonce: Int
+}
+
+/// 多选的快捷键（第 6.4.5 节）。单独一个小视图读“当前页”，设备页藏在后面时不接管快捷键，也不让大视图跟着重绘。
+struct StripShortcuts: View {
+    var enabled: Bool
+    var hasPicks: Bool
+    var selectAll: () -> Void
+    var hide: () -> Void
+    var unhide: () -> Void
+    var clear: () -> Void
+    @Environment(\.pageActive) private var pageActive
+
+    var body: some View {
+        if pageActive {
+            ZStack {
+                if enabled { Button("全选通道条", action: selectAll).keyboardShortcut("a", modifiers: .command) }
+                if hasPicks {
+                    Button("屏蔽所选", action: hide).keyboardShortcut("h", modifiers: [.command, .shift])
+                    Button("取消屏蔽所选", action: unhide).keyboardShortcut("u", modifiers: [.command, .shift])
+                    Button("取消多选", action: clear).keyboardShortcut(.escape, modifiers: [])
+                }
+            }
+            .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+        }
     }
 }
