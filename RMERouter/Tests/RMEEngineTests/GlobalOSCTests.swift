@@ -183,7 +183,7 @@ final class GlobalOSCTests: XCTestCase {
         XCTAssertEqual(p[0].label.knownValue, "")                 // 默认名 → 无标签
         XCTAssertEqual(p[0].phantom.knownValue, true)
         XCTAssertEqual(p[0].gainDB.knownValue, 23.5)
-        XCTAssertEqual(p[0].gainDB.evidence, .inferred)           // 单位未核对
+        XCTAssertEqual(p[0].gainDB.evidence, .confirmed)          // 单位已实测核对为 dB
         XCTAssertEqual(p[0].phase.knownValue, false)
         XCTAssertEqual(p[0].autoGain.knownValue, false)
         XCTAssertNil(p[0].hiZ.knownValue)                         // XT 话放没有 instrument 参数

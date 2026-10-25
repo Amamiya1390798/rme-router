@@ -173,7 +173,7 @@ public struct TotalMixState: Sendable, Equatable {
     }
 
     /// XT 自带话放（文档第 7.0 节）：只取对照表映射到 `<设备>.mic.in` 的输入。
-    /// 48v / phase / autoset 为 0/1；gain 单位协议表未写，按 dB 推断（证据 inferred）。
+    /// 48v / phase / autoset 为 0/1；gain 单位为 dB（2026-10-25 实测：TotalMix 里调到 60 dB，读回 60.0）。
     public func preamps(using map: TotalMixChannelMap, micPortID: String, source: FactSource) -> [PreampChannel] {
         channels.keys.filter { $0.bus == .input }.compactMap { ch -> PreampChannel? in
             guard let entry = map[ch], entry.ref.portID == micPortID, let params = channels[ch] else { return nil }
@@ -189,7 +189,7 @@ public struct TotalMixState: Sendable, Equatable {
             let label: Fact<String> = params["name"]?.text.map { name in
                 .confirmed(name == defaultName ? "" : name, src("name"))
             } ?? .unknown(src("name"))
-            let gain: Fact<Double> = params["gain"]?.number.map { Fact($0, .inferred, source: src("gain")) } ?? .unknown(src("gain"))
+            let gain: Fact<Double> = params["gain"]?.number.map { .confirmed($0, src("gain")) } ?? .unknown(src("gain"))
             return PreampChannel(input: entry.ref, label: label, gainDB: gain, phantom: flag("48v"), phase: flag("phase"),
                                  hiZ: params["instrument"] == nil ? .unknown(src("instrument")) : flag("instrument"),
                                  autoGain: flag("autoset"), gainGroup: .unknown(src("gaingroup")))
