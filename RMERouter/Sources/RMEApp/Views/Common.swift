@@ -125,7 +125,7 @@ struct MeterBar: View {
             HStack(spacing: Tokens.Space.xs) {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Tokens.Palette.border)
-                    Capsule().fill(color(dB)).frame(width: width * fraction)
+                    fill(dB).frame(width: width * fraction)
                 }
                 .frame(width: width, height: 4)
                 Text(dB <= -60 ? "-∞" : String(format: "%.0f", dB))
@@ -136,6 +136,19 @@ struct MeterBar: View {
         } else {
             Text("无信号").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
                 .help("XT 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
+        }
+    }
+
+    /// 电平条填充按主题：红黄绿 / 品牌渐变 / 单色（过载一律红，第 5.1 节）。
+    @ViewBuilder private func fill(_ dB: Double) -> some View {
+        let t = UITheme.current
+        switch t.style.meter {
+        case .traffic: Capsule().fill(color(dB))
+        case .gradient:
+            if dB >= 0 { Capsule().fill(Tokens.Palette.problem) }
+            else { Capsule().fill(LinearGradient(colors: t.gradientColors.map { Color(nsColor: NSColor(hex: $0)) },
+                                                 startPoint: .leading, endPoint: .trailing)) }
+        case .mono: Capsule().fill(dB >= 0 ? Tokens.Palette.problem : dB >= -6 ? Tokens.Palette.warn : Tokens.Palette.text.opacity(0.75))
         }
     }
 

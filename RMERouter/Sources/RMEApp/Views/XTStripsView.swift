@@ -379,7 +379,7 @@ struct SourceStrip: View {
                 .font(.system(size: 11, design: .monospaced))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.4)))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.4)))
             }
             .buttonStyle(.plain)
             .disabled(strip.ref == nil || output?.ref == nil)
@@ -398,8 +398,8 @@ struct SourceStrip: View {
         }
         .padding(5)
         .frame(width: 72)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.strip).fill(Tokens.Palette.bg))
+        .themedSelection(selected || lit == true, cornerRadius: Tokens.Radius.strip)
         .modifier(StripMarks(picked: picked, flash: flash, hidden: hiddenMark))
         .opacity(lit == false ? 0.3 : (strip.ref.flatMap { model.hasSignal($0) } == false && !selected && lit != true ? 0.55 : 1))
         .draggable(strip.ref?.description ?? "") {
@@ -435,8 +435,8 @@ struct OutputStrip: View {
         }
         .padding(5)
         .frame(width: 72)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(dropTarget || selected || routedDB != nil || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.strip).fill(Tokens.Palette.bg))
+        .themedSelection(dropTarget || selected || routedDB != nil || lit == true, cornerRadius: Tokens.Radius.strip)
         .modifier(StripMarks(picked: picked, flash: flash, hidden: hiddenMark))
         .opacity(lit == false ? 0.3 : 1)
         .contentShape(Rectangle())
@@ -483,8 +483,8 @@ struct MiniStripButtons: View {
         } label: {
             Text(target ? "◫ 立体声" : "◧ 单声道").font(.system(size: 9))
                 .frame(width: 44, height: 14)
-                .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(pend != nil ? Tokens.Palette.accent : .clear))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend != nil ? Tokens.Palette.accent : .clear))
                 .foregroundStyle(Tokens.Palette.textMuted)
         }
         .buttonStyle(.plain)
@@ -499,8 +499,8 @@ struct MiniStripButtons: View {
         } label: {
             Text(label).font(.system(size: 10, weight: .semibold))
                 .frame(width: 20, height: 15)
-                .background(RoundedRectangle(cornerRadius: 3).fill(isOn ? color.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(pend != nil ? Tokens.Palette.accent : .clear))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(isOn ? color.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend != nil ? Tokens.Palette.accent : .clear))
                 .foregroundStyle(isOn ? Tokens.Palette.text : Tokens.Palette.textMuted)
         }
         .buttonStyle(.plain)
@@ -597,7 +597,7 @@ struct StripGainChip: View {
             .foregroundStyle(pending != nil ? Tokens.Palette.accent : Tokens.Palette.textMuted)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 1)
-            .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.3)))
+            .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.3)))
         }
         .buttonStyle(.plain)
         .disabled(sp.preamp.gainDB.knownValue == nil)

@@ -66,8 +66,8 @@ struct ControlRoomBar: View {
             }
             .menuStyle(.borderlessButton).fixedSize()
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Tokens.Palette.border.opacity(0.5)))
-            .overlay(RoundedRectangle(cornerRadius: 5).stroke(pend != nil ? Tokens.Palette.accent : .clear))
+            .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(0.5)))
+            .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend != nil ? Tokens.Palette.accent : .clear))
             .help(g == .mainOut ? "主输出接哪一对音箱（改了一定会确认）" : "\(g.label)用哪一对输出")
         }
     }
@@ -89,8 +89,8 @@ struct ControlRoomBar: View {
         } label: {
             Text(g.label).font(Tokens.Font.caption).fixedSize()
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(RoundedRectangle(cornerRadius: 5).fill(isOn ? onColor.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 5).stroke(pend != nil ? Tokens.Palette.accent : .clear))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(isOn ? onColor.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend != nil ? Tokens.Palette.accent : .clear))
                 .foregroundStyle(isOn ? Tokens.Palette.text : Tokens.Palette.textMuted)
         }
         .buttonStyle(.plain)
@@ -108,8 +108,8 @@ struct ControlRoomBar: View {
         } label: {
             Text(changed ? "\(n)•" : "\(n)").font(.system(size: 11, weight: current ? .bold : .regular, design: .monospaced))
                 .frame(width: 24, height: 20)
-                .background(RoundedRectangle(cornerRadius: 4).fill(current ? Tokens.Palette.accent.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(pend ? Tokens.Palette.accent : .clear))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(current ? Tokens.Palette.accent.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend ? Tokens.Palette.accent : .clear))
         }
         .buttonStyle(.plain)
         .help(current ? (changed ? "当前快照（已改动，未保存）" : "当前快照") : "调用快照 \(n)：整套混音会被替换，需要确认，不能撤销")

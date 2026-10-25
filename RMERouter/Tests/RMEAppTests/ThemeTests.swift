@@ -6,6 +6,21 @@ import XCTest
 final class ThemeTests: XCTestCase {
     override func tearDown() { UITheme.current = .warm }
 
+    /// 每套主题的样式卡与文档第 5.1 节的表一致（抽查）。
+    func testStyleCards() {
+        XCTAssertEqual(UITheme.warm.style.title, .serif)
+        XCTAssertEqual(UITheme.gemini.style.panel, .glow)
+        XCTAssertTrue(UITheme.gemini.style.capsuleChips)
+        XCTAssertEqual(UITheme.gpt.style.meter, .mono)
+        XCTAssertEqual(UITheme.deepseek.style.brand, .badge)
+        XCTAssertEqual(UITheme.kimi.style.card, .heavyOutline)
+        XCTAssertEqual(UITheme.contrast.style.selection, .thick)
+        UITheme.current = .kimi
+        XCTAssertEqual(Tokens.Radius.chip, 99)
+        UITheme.current = .warm
+        XCTAssertEqual(Tokens.Radius.chip, 4)
+    }
+
     /// Gemini 风格才有渐变点缀和大圆角。
     func testGeminiExtras() {
         UITheme.current = .gemini

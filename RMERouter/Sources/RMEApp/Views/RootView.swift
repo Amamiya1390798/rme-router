@@ -62,6 +62,7 @@ public struct RootView: View {
             if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
         }
         .background(Tokens.Palette.bg)
+        .overlay(PanelAtmosphere().allowsHitTesting(false))
         .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
         .shadow(color: .black.opacity(0.08), radius: 6, y: 1)
@@ -222,7 +223,8 @@ struct Sidebar: View, Equatable {
                     else { Image(systemName: s.symbol).foregroundStyle(on ? Tokens.Palette.accent : Tokens.Palette.textMuted) }
                 }
                 .frame(width: 18)
-                Text(s.title).font(.system(size: 13, weight: on ? .semibold : .regular))
+                Text(s.title).font(.system(size: 13, weight: on ? (theme.style.title == .heavy ? .bold : .semibold) : .regular,
+                                           design: theme.style.bodyRounded ? .rounded : .default))
                     .foregroundStyle(Tokens.Palette.text)
                 Spacer()
             }
@@ -475,11 +477,7 @@ struct BrandHeader: View {
         HStack(spacing: Tokens.Space.s) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 0) {
-                if let g = Tokens.sparkle {
-                    Text("RME Router").font(.system(size: 15, weight: .semibold, design: .rounded)).foregroundStyle(g)
-                } else {
-                    Text("RME Router").font(.system(size: 14, weight: .semibold))
-                }
+                BrandName()
                 Text("路由与监听").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
             }
         }
@@ -528,6 +526,28 @@ struct TransparentToolbar: ViewModifier {
             content.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         } else {
             content
+        }
+    }
+}
+
+/// 侧栏名字按主题：普通 / 加粗 / 渐变字 / 实色徽章（第 5.1 节）。
+struct BrandName: View {
+    var body: some View {
+        let t = UITheme.current
+        let colors = t.gradientColors.map { Color(nsColor: NSColor(hex: $0)) }
+        switch t.style.brand {
+        case .plain:
+            Text("RME Router").font(.system(size: 14, weight: .semibold, design: t.style.title == .serif ? .serif : .default))
+        case .bold:
+            Text("RME Router").font(.system(size: 15, weight: .bold))
+        case .gradient:
+            Text("RME Router").font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
+        case .badge:
+            Text("RME Router").font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(t == .kimi ? Tokens.Palette.bg : Color.white)
+                .padding(.horizontal, 7).padding(.vertical, 2)
+                .background(Capsule().fill(t == .kimi ? Tokens.Palette.text : Tokens.Palette.accent))
         }
     }
 }

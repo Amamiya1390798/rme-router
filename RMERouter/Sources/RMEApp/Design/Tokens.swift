@@ -20,11 +20,18 @@ public enum Tokens {
         public static let unknown = Color(token: .unknown)
     }
 
+    /// 字体随主题样式卡（第 5.1 节）。
     public enum Font {
-        public static let viewTitle = SwiftUI.Font.system(size: 22, weight: .regular, design: .serif)
-        public static let cardTitle = SwiftUI.Font.system(size: 15, weight: .semibold)
-        public static let body = SwiftUI.Font.system(size: 13)
-        public static let caption = SwiftUI.Font.system(size: 11)
+        public static var viewTitle: SwiftUI.Font {
+            let st = UITheme.current.style
+            return .system(size: st.title == .heavy ? 24 : 22, weight: st.title.weight, design: st.title.design)
+        }
+        public static var cardTitle: SwiftUI.Font {
+            let st = UITheme.current.style
+            return .system(size: 15, weight: st.title == .heavy ? .bold : .semibold, design: st.title == .serif ? .default : st.title.design)
+        }
+        public static var body: SwiftUI.Font { .system(size: 13, design: UITheme.current.style.bodyRounded ? .rounded : .default) }
+        public static var caption: SwiftUI.Font { .system(size: 11, design: UITheme.current.style.bodyRounded ? .rounded : .default) }
         public static let mono = SwiftUI.Font.system(size: 12, design: .monospaced).monospacedDigit()
     }
 
@@ -34,6 +41,10 @@ public enum Tokens {
 
     public enum Radius {
         public static let control: CGFloat = 8
+        /// 小按钮（M、Ø、开关等）圆角：胶囊样式的主题给大值。
+        public static var chip: CGFloat { UITheme.current.style.capsuleChips ? 99 : 4 }
+        /// 通道条圆角随卡片圆角（大圆角主题的通道条也更圆）。
+        public static var strip: CGFloat { max(6, UITheme.current.cardRadius / 2) }
         /// 卡片圆角随主题：Gemini 风格更圆（第 5.1 节）。
         public static var card: CGFloat { UITheme.current.cardRadius }
     }
@@ -65,6 +76,30 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
     public var itemRadius: CGFloat {
         switch self { case .gemini: return 20; case .gpt, .deepseek, .kimi: return 10; default: return 8 }
     }
+    /// 样式卡（第 5.1 节）：颜色以外的定制。
+    public var style: ThemeStyle {
+        switch self {
+        case .warm: return ThemeStyle(title: .serif, card: .outlined, panel: .flat, meter: .traffic, brand: .plain, selection: .thin)
+        case .studio: return ThemeStyle(title: .standard, card: .filled, panel: .topGradient, meter: .traffic, brand: .plain, selection: .thin)
+        case .contrast: return ThemeStyle(title: .heavy, card: .heavyOutline, panel: .flat, meter: .traffic, brand: .plain, selection: .thick)
+        case .gemini: return ThemeStyle(title: .rounded, bodyRounded: true, card: .elevated, capsuleChips: true, panel: .glow,
+                                        meter: .gradient, brand: .gradient, selection: .glow)
+        case .gpt: return ThemeStyle(title: .standard, card: .filled, capsuleChips: true, panel: .flat, meter: .mono, brand: .bold, selection: .thin)
+        case .deepseek: return ThemeStyle(title: .standard, card: .elevated, panel: .topGradient, meter: .gradient, brand: .badge, selection: .glow)
+        case .kimi: return ThemeStyle(title: .heavy, card: .heavyOutline, capsuleChips: true, panel: .flat, meter: .mono, brand: .badge, selection: .thick)
+        }
+    }
+
+    /// 主题渐变色（电平条、渐变字、柔光）。
+    public var gradientColors: [UInt32] {
+        switch self {
+        case .gemini: return [0x4285F4, 0x9B72CB, 0xD96570]
+        case .deepseek: return [0x4D6BFE, 0x7FA2FF]
+        case .kimi: return [0x4F46E5, 0x8B5CF6]
+        default: return [value(.accent).0, value(.accent).1]
+        }
+    }
+
     /// 侧栏选中块用强调色淡底（否则用灰底）。
     public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi }
     public static let defaultsKey = "ui.theme"
@@ -180,6 +215,28 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// 主题样式卡（第 5.1 节）。
+public struct ThemeStyle: Equatable, Sendable {
+    public enum Title: Sendable { case serif, rounded, standard, heavy
+        var design: SwiftUI.Font.Design { self == .serif ? .serif : self == .rounded ? .rounded : .default }
+        var weight: SwiftUI.Font.Weight { self == .heavy ? .heavy : self == .rounded ? .semibold : .regular }
+    }
+    public enum Card: Sendable { case outlined, elevated, filled, heavyOutline }
+    public enum Panel: Sendable { case flat, glow, topGradient }
+    public enum Meter: Sendable { case traffic, gradient, mono }
+    public enum Brand: Sendable { case plain, bold, gradient, badge }
+    public enum Selection: Sendable { case thin, glow, thick }
+
+    public var title: Title
+    public var bodyRounded = false
+    public var card: Card
+    public var capsuleChips = false
+    public var panel: Panel
+    public var meter: Meter
+    public var brand: Brand
+    public var selection: Selection
+}
+
 /// 外观：跟随系统 / 浅色 / 深色（第 5.1 节）。
 public enum UIAppearance: String, CaseIterable, Identifiable, Sendable {
     case system, light, dark
@@ -250,13 +307,50 @@ public extension Evidence {
     }
 }
 
-/// 卡片：surface 底、1px 细线、圆角 12，无阴影。
+/// 卡片：按主题样式卡（第 5.1 节）——细线框 / 浮起阴影 / 实色底 / 粗线框。
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Tokens.Radius.card)
+        let style = UITheme.current.style.card
         content
             .padding(Tokens.Space.m)
-            .background(Tokens.Palette.surface, in: RoundedRectangle(cornerRadius: Tokens.Radius.card))
-            .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).strokeBorder(Tokens.Palette.border, lineWidth: 1))
+            .background(Tokens.Palette.surface, in: shape)
+            .overlay {
+                switch style {
+                case .outlined: shape.strokeBorder(Tokens.Palette.border, lineWidth: 1)
+                case .heavyOutline: shape.strokeBorder(Tokens.Palette.text.opacity(0.8), lineWidth: 1.5)
+                case .elevated, .filled: EmptyView()
+                }
+            }
+            .shadow(color: style == .elevated ? .black.opacity(0.10) : .clear, radius: 8, y: 2)
+    }
+}
+
+extension View {
+    /// 通道条等被选中 / 高亮时的边框：细线 / 发光 / 粗线（第 5.1 节）。
+    func themedSelection(_ on: Bool, cornerRadius: CGFloat = 6) -> some View {
+        let sel = UITheme.current.style.selection
+        return overlay(RoundedRectangle(cornerRadius: cornerRadius)
+            .stroke(on ? Tokens.Palette.accent : .clear, lineWidth: sel == .thick ? 2.5 : 1.5))
+            .shadow(color: on && sel == .glow ? Tokens.Palette.accent.opacity(0.55) : .clear, radius: 6)
+    }
+}
+
+/// 内容面板上的背景氛围：柔光（左上角主题色光晕）或顶部渐变（第 5.1 节）。只是覆盖一层很淡的颜色，不挡点击。
+struct PanelAtmosphere: View {
+    var body: some View {
+        let t = UITheme.current
+        let colors = t.gradientColors.map { Color(nsColor: NSColor(hex: $0)) }
+        switch t.style.panel {
+        case .flat: Color.clear
+        case .glow:
+            ZStack {
+                RadialGradient(colors: [colors.first!.opacity(0.16), .clear], center: .topLeading, startRadius: 0, endRadius: 520)
+                RadialGradient(colors: [colors.last!.opacity(0.10), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 420)
+            }
+        case .topGradient:
+            LinearGradient(colors: [colors.first!.opacity(0.10), .clear], startPoint: .top, endPoint: .init(x: 0.5, y: 0.35))
+        }
     }
 }
 

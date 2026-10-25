@@ -135,7 +135,7 @@ private struct EdgeRow: View {
                     .foregroundStyle(Tokens.Palette.accent)
                     .frame(width: 72)
                     .padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.4)))
+                    .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.4)))
             }
             .buttonStyle(.plain)
             .help("改这条发送的电平和声像")

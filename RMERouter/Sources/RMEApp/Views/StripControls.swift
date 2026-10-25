@@ -180,8 +180,8 @@ struct StripControls: View {
             Text(text).font(Tokens.Font.caption)
                 .foregroundStyle(pending ? Tokens.Palette.accent : color)
                 .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 4).fill(Tokens.Palette.border.opacity(pending ? 1 : 0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(pending ? Tokens.Palette.accent : .clear, lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(pending ? 1 : 0.5)))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pending ? Tokens.Palette.accent : .clear, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

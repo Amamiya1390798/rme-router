@@ -252,7 +252,7 @@ struct SourceRow: View {
                 Button { editing = true } label: {
                     gainLabel(pending)
                         .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.5)))
+                        .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(editing ? 1 : 0.5)))
                 }
                 .buttonStyle(.plain)
                 .help("修改电平（先进待应用栏）")
@@ -283,7 +283,7 @@ struct SourceRow: View {
                     }
                     .font(Tokens.Font.mono)
                     .padding(.horizontal, 4).padding(.vertical, 1)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Tokens.Palette.border.opacity(editingRoute ? 1 : 0.5)))
+                    .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Palette.border.opacity(editingRoute ? 1 : 0.5)))
                 }
                 .buttonStyle(.plain)
                 .help("改这个输出通道的来源（先进待应用栏）")
