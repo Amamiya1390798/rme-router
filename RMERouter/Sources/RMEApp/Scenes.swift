@@ -41,6 +41,13 @@ public struct StudioScene: Codable, Identifiable, Equatable, Sendable {
         public var sourceLabel: String
     }
 
+    /// 一条 XT 通道条的一个参数（第 7.6 节）：TotalMix 原值；立体声配对 1 / 0。
+    public struct Strip: Codable, Hashable, Sendable {
+        public var ref: ChannelRef
+        public var param: TotalMixStripParam
+        public var value: Double
+    }
+
     public var id: UUID
     public var name: String
     public var date: Date
@@ -51,10 +58,13 @@ public struct StudioScene: Codable, Identifiable, Equatable, Sendable {
     public var routes: [RouteEntry]
     /// 旧场景文件没有这一项（nil）。
     public var xtcRoutes: [XTCBlock]? = nil
+    /// 旧场景文件没有这一项（nil）。
+    public var strips: [Strip]? = nil
 
     public var summary: String {
         var parts: [String] = []
         if devices.contains("xt") { parts.append("TotalMix 发送 \(sends.count) 条") }
+        if let strips, !strips.isEmpty { parts.append("通道条 \(Set(strips.map(\.ref)).count) 条") }
         if !preamps.isEmpty { parts.append("前级 \(preamps.count) 路") }
         if devices.contains("12mic") { parts.append("12Mic 路由 \(routes.count) 条") }
         if devices.contains("xtc") { parts.append("XTC 路由 \(xtcRoutes?.count ?? 0) 块") }
@@ -69,6 +79,7 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
         case preamp(device: String, input: ChannelRef, field: PreampField, scene: PreampValue, now: PreampValue?)
         case route(destination: ChannelRef, scene: ChannelRef?, now: ChannelRef?)
         case xtcRoute(scene: StudioScene.XTCBlock, now: String?)
+        case strip(ref: ChannelRef, param: TotalMixStripParam, scene: Double, now: Double?)
     }
 
     public var kind: Kind
@@ -78,6 +89,7 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
         case let .preamp(dev, i, f, _, _): return "pre|\(dev)|\(i)|\(f.rawValue)"
         case let .route(d, _, _): return "route|\(d)"
         case let .xtcRoute(b, _): return "xtc|\(b.destination)"
+        case let .strip(r, p, _, _): return "strip|\(r)|\(p.rawValue)"
         }
     }
 
@@ -91,7 +103,14 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
             return "12Mic 路由 \(d)：现在 \(PendingRouteChange.text(now))，场景 \(PendingRouteChange.text(scene))"
         case let .xtcRoute(b, now):
             return "XTC 路由 \(b.destination.portID):\(b.destination.channel)–\(b.destination.channel + 7)：现在 \(now ?? "?")，场景 \(b.sourceLabel)"
+        case let .strip(r, p, scene, now):
+            return "通道条 \(r) \(p.label)：现在 \(Self.stripText(p, now))，场景 \(Self.stripText(p, scene))"
         }
+    }
+
+    static func stripText(_ p: TotalMixStripParam, _ v: Double?) -> String {
+        guard let v else { return "?" }
+        return p == .stereo ? (v >= 0.5 ? "立体声" : "单声道") : p.text(v)
     }
 
     static func deviceLabel(_ dev: String) -> String {
@@ -183,6 +202,23 @@ extension AppModel {
         }
     }
 
+    /// 当前每条通道条的静音、相位（输出另有音量、平衡），奇数号通道的立体声配对（第 7.6 节）。
+    func currentStrips() -> [StudioScene.Strip] {
+        var out: [StudioScene.Strip] = []
+        for bus in [TotalMixBus.input, .playback, .output] {
+            for s in xtStrips(bus) {
+                guard let ref = s.ref else { continue }
+                for p in [TotalMixStripParam.mute, .phase, .volume, .balpan] where p.applies(to: bus) {
+                    if let v = stripValue(ref, p) { out.append(.init(ref: ref, param: p, value: v)) }
+                }
+                if s.tm.number % 2 == 1, let st = tmState.isStereo(s.tm) {
+                    out.append(.init(ref: ref, param: .stereo, value: st ? 1 : 0))
+                }
+            }
+        }
+        return out.sorted { ($0.ref, $0.param.rawValue) < ($1.ref, $1.param.rawValue) }
+    }
+
     // MARK: 保存、删除
 
     /// 把当前读到的真实状态存成场景。没有任何设备可存时返回 nil。
@@ -196,7 +232,8 @@ extension AppModel {
                           sends: devices.contains("xt") ? currentSends() : [],
                           preamps: currentPreamps(devices),
                           routes: devices.contains("12mic") ? currentTwelveMicRoutes() : [],
-                          xtcRoutes: devices.contains("xtc") ? currentXTCRoutes() : nil)
+                          xtcRoutes: devices.contains("xtc") ? currentXTCRoutes() : nil,
+                          strips: devices.contains("xt") ? currentStrips() : nil)
         sceneStore.save(scene)
         scenes.insert(scene, at: 0)
         return scene
@@ -221,6 +258,16 @@ extension AppModel {
                 if let s, let c, abs(s.dB - c.dB) < 0.05 { continue }
                 let ref = s ?? c!
                 out.append(SceneDiff(kind: .send(source: ref.source, destination: ref.destination, scene: s?.dB, now: c?.dB)))
+            }
+        }
+        if scene.devices.contains("xt"), now.contains("xt"), let saved = scene.strips {
+            let current = Dictionary(currentStrips().map { ("\($0.ref)|\($0.param.rawValue)", $0.value) }, uniquingKeysWith: { a, _ in a })
+            for st in saved {
+                let have = current["\(st.ref)|\(st.param.rawValue)"]
+                if let have, abs(have - st.value) < 0.05 { continue }
+                // 场景里是立体声右声道的条，现在没有了（被合并）：配对差异里已经体现，不重复列
+                if have == nil, st.param != .stereo, tmChannel(for: st.ref) == nil { continue }
+                out.append(SceneDiff(kind: .strip(ref: st.ref, param: st.param, scene: st.value, now: have)))
             }
         }
         for p in scene.preamps where now.contains(p.device) {
@@ -254,7 +301,14 @@ extension AppModel {
     @discardableResult
     public func restore(_ scene: StudioScene) -> [String] {
         var errors: [String] = []
-        for d in diff(scene) {
+        var diffs = diff(scene)
+        // 立体声配对先恢复：它改变通道布局，其余项按旧布局算会错（第 7.6 节）
+        let pairs = diffs.filter { if case let .strip(_, p, _, _) = $0.kind { return p == .stereo } else { return false } }
+        if !pairs.isEmpty, pairs.count < diffs.count {
+            diffs = pairs
+            errors.append("这次先恢复立体声配对（\(pairs.count) 处）；确认发送后再点一次“恢复…”恢复其余项。")
+        }
+        for d in diffs {
             let e: StageError?
             switch d.kind {
             case let .send(s, dst, sceneDB, _): e = stageGain(source: s, destination: dst, dB: sceneDB)
@@ -266,6 +320,7 @@ extension AppModel {
                     continue
                 }
                 e = stageXTCRoute(destination: b.destination, source: src)
+            case let .strip(r, p, want, _): e = stageStrip(r, p, want)
             }
             if let e { errors.append("\(d.text)：\(e.text)") }
         }

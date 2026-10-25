@@ -14,7 +14,7 @@ public struct ScenesView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "场景", subtitle: "把整套设置（TotalMix 发送、前级、12Mic 路由）存下来，之后对比或恢复。恢复前一定会让你确认。")
+                ViewHeader(title: "场景", subtitle: "把整套设置（TotalMix 发送与通道条、前级、12Mic 和 XTC 路由）存下来，之后对比或恢复。恢复前一定会让你确认。")
                 saveCard
                 ForEach(errors, id: \.self) { Text($0).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
                 if model.scenes.isEmpty {
