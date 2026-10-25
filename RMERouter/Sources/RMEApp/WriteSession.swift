@@ -383,6 +383,7 @@ extension AppModel {
     public var needsExplicitConfirmation: Bool {
         pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.isPhantomChange || $0.isLargeJump }
             || pendingStrips.contains { $0.isLargeJump || $0.isLoopbackOn }
+            || pendingGlobals.contains { $0.isSnapshot || $0.isMainOutChange }
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。
@@ -552,7 +553,12 @@ extension AppModel {
         // 开关可撤销；快照调用不可撤销（之前的整套状态没有保存）
         for c in batch.globals where !c.isSnapshot {
             if case .failed = batch.outcomes[c.id] { continue }
-            stageGlobal(c.control, on: !c.on)
+            if c.output != nil {
+                // 选择项撤销：选回原来的输出（原来未指定的不能撤销，没有出处说 -1 可写）
+                if let old = c.old, old >= 0 { stageMonitor(c.control, output: TotalMixChannel(.output, Int(old.rounded()) + 1)) }
+            } else {
+                stageGlobal(c.control, on: !c.on)
+            }
         }
         for r in batch.xtcRoutes {
             if case .failed = batch.outcomes[r.id] { continue }

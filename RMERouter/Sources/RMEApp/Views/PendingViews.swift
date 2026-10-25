@@ -49,6 +49,7 @@ struct PendingBar: View {
                 ForEach(model.pendingGlobals) { c in
                     row(title: c.title, change: c.changeText,
                         badges: c.isSnapshot ? [("整套替换，不能撤销", Tokens.Palette.problem)]
+                            : c.isMainOutChange ? [("监听换到另一对音箱", Tokens.Palette.problem)]
                             : (c.needsExplicit ? [("取消全局静音：会出声", Tokens.Palette.problem)] : [])) { model.discardGlobal(c.id) }
                 }
                 ForEach(model.pendingStrips) { c in
@@ -235,6 +236,7 @@ struct ConfirmSheet: View {
             Text(verbatim: c.wireText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
             HStack(spacing: Tokens.Space.s) {
                 if c.isSnapshot { Badge(text: "整套混音会被替换，不能撤销", color: Tokens.Palette.problem) }
+                else if c.isMainOutChange { Badge(text: "主输出换到另一对：监听声音会从那里出来，先确认音量", color: Tokens.Palette.problem) }
                 else if c.needsExplicit { Badge(text: "取消全局静音：会突然出声", color: Tokens.Palette.problem) }
                 outcome(c.id)
             }

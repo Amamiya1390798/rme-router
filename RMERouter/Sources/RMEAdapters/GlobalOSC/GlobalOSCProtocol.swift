@@ -210,6 +210,11 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
 /// 控制室与快照（第 7.9 节）。只有这几项可写。
 public enum TotalMixGlobal: Equatable, Hashable, Sendable {
     case dim, mainMono, globalMute
+    /// 对讲开关（需 TotalMix 里已指定对讲话筒 talkchannel）。
+    case talkback
+    /// 主输出、耳机 1/2：取值是输出通道序号（从 0 起，立体声写左声道），-1 未指定（第 7.9 节）。
+    case mainOut
+    case phones(Int)
     /// 快照 1…8：调用
     case snapshot(Int)
 
@@ -218,8 +223,16 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
         case .dim: return "controlroom/dim"
         case .mainMono: return "controlroom/mainmono"
         case .globalMute: return "globalmute"
+        case .talkback: return "controlroom/talkback"
+        case .mainOut: return "controlroom/mainout"
+        case let .phones(n): return "controlroom/phones\(n)"
         case let .snapshot(n): return "snapshot/load/\(n)"
         }
+    }
+
+    /// 取值是输出序号（选择项），不是开关。
+    public var isSelection: Bool {
+        switch self { case .mainOut, .phones: return true; default: return false }
     }
 
     public var label: String {
@@ -227,6 +240,9 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
         case .dim: return "Dim"
         case .mainMono: return "Main 单声道"
         case .globalMute: return "全局静音"
+        case .talkback: return "对讲"
+        case .mainOut: return "主输出"
+        case let .phones(n): return "耳机 \(n)"
         case let .snapshot(n): return "调用快照 \(n)"
         }
     }
@@ -235,6 +251,7 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
     public func text(_ v: Double?) -> String {
         guard let v else { return "?" }
         if case .snapshot = self { return v >= 1.5 ? (v >= 2.5 ? "已改动" : "当前") : "未用" }
+        if isSelection { return v < 0 ? "未指定" : "输出 \(Int(v.rounded()) + 1)" }
         return v >= 0.5 ? "开" : "关"
     }
 }
@@ -252,6 +269,8 @@ public enum TotalMixWrite: Equatable, Sendable {
     case strip(channel: TotalMixChannel, param: TotalMixStripParam, value: Double)
     /// 控制室开关、全局静音、快照调用（第 7.9 节）。快照只发 1.0。
     case global(TotalMixGlobal, on: Bool)
+    /// 主输出、耳机：选哪个输出（发它的序号，第 7.9 节）。
+    case controlSelect(TotalMixGlobal, output: TotalMixChannel)
 
     public static let offDB: Float = -300
     public static let maxDB = 6.0
@@ -281,6 +300,9 @@ public enum TotalMixWrite: Equatable, Sendable {
         case let .global(g, on):
             if case .snapshot = g { return OSCMessage("/\(g.key)", [.float(1)]) }
             return OSCMessage("/\(g.key)", [.float(on ? 1 : 0)])
+        case let .controlSelect(g, output):
+            precondition(g.isSelection && output.bus == .output, "只能给主输出 / 耳机选硬件输出")
+            return OSCMessage("/\(g.key)", [.float(Float(output.wireIndex))])
         }
     }
 

@@ -11,9 +11,16 @@ struct ControlRoomBar: View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
             // 栏窄时快照换到第二行（设备页右栏，第 6.8 节）
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: Tokens.Space.m) { toggles; Divider().frame(height: 18); snapshots; Spacer(minLength: 0) }
+                HStack(spacing: Tokens.Space.m) {
+                    toggles; Divider().frame(height: 18); monitors; Divider().frame(height: 18); snapshots; Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                    HStack(spacing: Tokens.Space.m) { toggles; Divider().frame(height: 18); monitors; Spacer(minLength: 0) }
+                    HStack(spacing: Tokens.Space.m) { snapshots; Spacer(minLength: 0) }
+                }
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     HStack(spacing: Tokens.Space.m) { toggles; Spacer(minLength: 0) }
+                    HStack(spacing: Tokens.Space.m) { monitors; Spacer(minLength: 0) }
                     HStack(spacing: Tokens.Space.m) { snapshots; Spacer(minLength: 0) }
                 }
             }
@@ -31,6 +38,42 @@ struct ControlRoomBar: View {
         toggle(.dim, onColor: Tokens.Palette.warn)
         toggle(.mainMono, onColor: Tokens.Palette.warn)
         toggle(.globalMute, onColor: Tokens.Palette.problem)
+        if model.talkbackReady {
+            toggle(.talkback, onColor: Tokens.Palette.accent)
+        }
+    }
+
+    @ViewBuilder private var monitors: some View {
+        monitorMenu(.mainOut)
+        monitorMenu(.phones(1))
+        monitorMenu(.phones(2))
+    }
+
+    /// 主输出 / 耳机选哪一对硬件输出（第 7.9 节）。读不到这一项时不显示。
+    @ViewBuilder private func monitorMenu(_ g: TotalMixGlobal) -> some View {
+        if model.globalValue(g) != nil {
+            let pend = model.pendingGlobal(g)
+            let current = pend?.output ?? model.monitorOutput(g)
+            let outputs = model.xtStrips(.output)
+            let name = current.map { c in outputs.first { $0.tm == c }?.name ?? "输出 \(c.number)" } ?? "未指定"
+            Menu {
+                ForEach(outputs) { o in
+                    Button {
+                        error = model.stageMonitor(g, output: o.tm)?.text
+                        if error == nil { Task { await model.commitIfQuick() } }
+                    } label: {
+                        Text(o.tm == current ? "✓ \(o.name)" : o.name)
+                    }
+                }
+            } label: {
+                Text("\(g.label)：\(name)").font(Tokens.Font.caption)
+            }
+            .menuStyle(.borderlessButton).fixedSize()
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 5).fill(Tokens.Palette.border.opacity(0.5)))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(pend != nil ? Tokens.Palette.accent : .clear))
+            .help(g == .mainOut ? "主输出接哪一对音箱（改了一定会确认）" : "\(g.label)用哪一对输出")
+        }
     }
 
     @ViewBuilder private var snapshots: some View {

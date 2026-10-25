@@ -60,6 +60,11 @@ if CommandLine.arguments.contains("--names") {
         print("\(bus.rawValue)（\(chans.count)）：" + items.joined(separator: " "))
     }
 }
+if CommandLine.arguments.contains("--globals") {
+    // 只读：控制室、快照、全局静音等不属于通道的项的原值
+    print("\n== 全局项原值 ==")
+    for (k, v) in state.globals.sorted(by: { $0.key < $1.key }) { print("  \(k) = \(v)") }
+}
 if let i = CommandLine.arguments.firstIndex(of: "--params"), i + 1 < CommandLine.arguments.count {
     // 例：--params input:1,input:2  打印这些通道收到的全部参数原值（核对单位用）
     for spec in CommandLine.arguments[i + 1].split(separator: ",") {
