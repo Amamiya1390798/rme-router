@@ -99,20 +99,20 @@ final class PreampWriteTests: XCTestCase {
         XCTAssertEqual(model.twelveMicStatus, .live)
         XCTAssertEqual(model.snapshot.devices["xt"]?.preamps.first?.gainDB.knownValue, 20)
 
-        XCTAssertNil(model.stagePreamp(deviceID: "xt", input: xtMic1, field: .gain, value: .gain(35)))
+        XCTAssertNil(model.stagePreamp(deviceID: "xt", input: xtMic1, field: .gain, value: .gain(45)))
         XCTAssertNil(model.stagePreamp(deviceID: "12mic", input: micIn3, field: .phantom, value: .flag(true)))
         XCTAssertEqual(model.pendingPreamps.count, 2)
-        XCTAssertTrue(model.pendingPreamps[0].isLargeJump)                 // 20 → 35
+        XCTAssertTrue(model.pendingPreamps[0].isLargeJump)                 // 20 → 45
         XCTAssertTrue(model.pendingPreamps[1].needsPhantomAck)
         XCTAssertEqual(model.pendingPreamps[1].label, "Vox")
         XCTAssertEqual(model.pendingPreamps[0].parameter, "/input/0/gain")
         XCTAssertEqual(fakeTM.lastWrites, [], "暂存不发送")
 
         let batch = await model.applyPending(confirmation: ConfirmationGate.userConfirmed(model.pendingPreamps.map(\.operation)))
-        XCTAssertEqual(fakeTM.lastWrites, [OSCMessage("/input/0/gain", [.float(35)])])
+        XCTAssertEqual(fakeTM.lastWrites, [OSCMessage("/input/0/gain", [.float(45)])])
         XCTAssertEqual(batch?.count, 2)
         XCTAssertEqual(batch?.verifiedCount, 2)
-        XCTAssertEqual(model.snapshot.devices["xt"]?.preamps.first?.gainDB.knownValue, 35)
+        XCTAssertEqual(model.snapshot.devices["xt"]?.preamps.first?.gainDB.knownValue, 45)
         XCTAssertEqual(model.snapshot.devices["12mic"]?.preamps.first?.phantom.knownValue, true)
         XCTAssertTrue(model.pendingPreamps.isEmpty)
 

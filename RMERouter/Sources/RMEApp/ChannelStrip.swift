@@ -58,12 +58,12 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
     /// 取消静音：会突然出声。
     public var isUnmute: Bool { param == .mute && (old ?? 0) >= 0.5 && new < 0.5 }
 
-    /// 输出音量一次抬高超过 10 dB 且目标高于 -20 dB（“关”按 -65 dB 计）。
+    /// 输出音量一次抬高超过 20 dB 且目标高于 -20 dB（“关”按 -65 dB 计，第 7.4 节）。
     public var isLargeJump: Bool {
         guard param == .volume else { return false }
         let o = old.flatMap { TotalMixFader.isOn($0) ? $0 : nil } ?? TotalMixFader.offThresholdDB
         let n = TotalMixFader.isOn(new) ? new : TotalMixFader.offThresholdDB
-        return n - o > 10 && n > -20
+        return n - o > AppModel.largeJumpDB && n > -20
     }
 
     var key: String {

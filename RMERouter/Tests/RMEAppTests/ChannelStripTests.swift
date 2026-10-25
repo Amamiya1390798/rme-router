@@ -179,14 +179,19 @@ final class ChannelStripTests: XCTestCase {
         XCTAssertEqual(m.stageSendPan(source: mic1, destination: madiOut1, pan: 0.3), .noSend)
     }
 
-    func testUnmuteNeedsExplicitConfirmEvenInQuickMode() async {
+    /// 第 7.4 节（2026-10-26）：取消静音在快速方式下直接发；输出音量抬高超过 20 dB 才要确认。
+    func testQuickModeOnlyStopsForLargeVolumeJump() async {
         let m = await model()
         m.confirmMode = .quick
         m.stageStrip(madiOut1, .mute, 0)
         XCTAssertTrue(m.pendingStrips.first?.isUnmute == true)
         await m.commitIfQuick()
-        XCTAssertTrue(m.showConfirm)
-        XCTAssertTrue(fake.lastWrites.isEmpty)
+        XCTAssertFalse(m.showConfirm)
+        XCTAssertEqual(fake.value("/output/6/mute"), 0)
+
+        m.stageStrip(phonesL, .volume, -5)          // 关 → -5 dB
+        await m.commitIfQuick()
+        XCTAssertTrue(m.showConfirm, "抬高超过 20 dB 要确认")
 
         // 静音（不会突然出声）在快速方式下直接发
         m.discardAll(); m.showConfirm = false

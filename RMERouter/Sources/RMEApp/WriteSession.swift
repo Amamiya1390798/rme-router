@@ -25,10 +25,10 @@ public struct PendingChange: Identifiable, Equatable, Sendable {
                          oldValue: Self.format(oldDB), newValue: Self.format(newDB), access: .readWrite)
     }
 
-    /// 抬高超过 10 dB 且目标高于 -20 dB（“关”按 -65 dB 计）。
+    /// 一次抬高超过 20 dB 且目标高于 -20 dB（“关”按 -65 dB 计，第 7.4 节）。
     public var isLargeJump: Bool {
         let o = oldDB ?? TotalMixFader.offThresholdDB, n = newDB ?? TotalMixFader.offThresholdDB
-        return n - o > 10 && n > -20
+        return n - o > AppModel.largeJumpDB && n > -20   // 目标很小声（如新建发送 -30 dB）不算
     }
 
     public var key: Key { Key(source: tmSource, output: tmOutput) }
@@ -58,10 +58,13 @@ public struct PendingPreampChange: Identifiable, Equatable, Sendable {
     /// 打开 48V：确认框必须先勾选“没有接带式话筒等设备”。
     public var needsPhantomAck: Bool { field == .phantom && new == .flag(true) }
 
-    /// 增益抬高超过 10 dB。
+    /// 切换 48V（开或关）：快速方式下也要确认（第 7.4 节）。
+    public var isPhantomChange: Bool { field == .phantom }
+
+    /// 增益一次抬高超过 20 dB。
     public var isLargeJump: Bool {
         guard case let .gain(n) = new else { return false }
-        if case let .gain(o)? = old { return n - o > 10 }
+        if case let .gain(o)? = old { return n - o > AppModel.largeJumpDB }
         return false
     }
 
@@ -376,11 +379,10 @@ extension AppModel {
 
     // MARK: 确认方式（第 7.4 节）
 
-    /// 待应用里有必须明确确认的改动：打开 48V，或一次抬高超过 10 dB。
+    /// 快速方式下仍要确认的改动（第 7.4 节，2026-10-26 收窄）：切换 48V，或一次抬高超过 20 dB。
     public var needsExplicitConfirmation: Bool {
-        pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.needsPhantomAck || $0.isLargeJump }
-            || pendingStrips.contains { $0.isUnmute || $0.isLargeJump || $0.isLayoutChange }
-            || pendingGlobals.contains(where: \.needsExplicit)
+        pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.isPhantomChange || $0.isLargeJump }
+            || pendingStrips.contains(where: \.isLargeJump)
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。

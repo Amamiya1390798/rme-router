@@ -51,26 +51,24 @@ final class ControlRoomTests: XCTestCase {
         XCTAssertFalse(m.hasPending)
     }
 
-    func testUnmuteAllNeedsConfirmEvenInQuickMode() async {
+    /// 第 7.4 节（2026-10-26）：取消全局静音在快速方式下直接发，确认框里仍会标出。
+    func testUnmuteAllGoesStraightInQuickMode() async {
         let m = await model()
         m.confirmMode = .quick
         m.stageGlobal(.globalMute, on: false)
         XCTAssertTrue(m.pendingGlobals.first?.needsExplicit == true)
         await m.commitIfQuick()
-        XCTAssertTrue(m.showConfirm)
-        XCTAssertTrue(fake.lastWrites.isEmpty)
+        XCTAssertFalse(m.showConfirm)
+        XCTAssertEqual(fake.value("/globalmute"), 0)
     }
 
     func testSnapshotLoadConfirmVerifyNoUndo() async throws {
         let m = await model()
-        m.confirmMode = .quick
         XCTAssertNil(m.stageSnapshot(2))
         m.stageSnapshot(3)
         XCTAssertEqual(m.pendingGlobals.count, 1, "同时只留一个快照调用")
         let c = try XCTUnwrap(m.pendingGlobals.first)
         XCTAssertEqual(c.write.message, OSCMessage("/snapshot/load/3", [.float(1)]))
-        await m.commitIfQuick()
-        XCTAssertTrue(m.showConfirm, "调用快照一律确认")
         let applied = await applyAll(m)
         let batch = try XCTUnwrap(applied)
         XCTAssertEqual(batch.outcomes[c.id], .verified)

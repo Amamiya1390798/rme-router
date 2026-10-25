@@ -71,11 +71,7 @@ final class StereoSyncTests: XCTestCase {
         let c = try XCTUnwrap(m.pendingStrips.first)
         XCTAssertEqual(c.write.message, OSCMessage("/input/68/stereo", [.float(0)]))
         XCTAssertTrue(c.isLayoutChange)
-        XCTAssertTrue(m.needsExplicitConfirmation)
-        m.confirmMode = .quick
-        await m.commitIfQuick()
-        XCTAssertTrue(m.showConfirm, "快速方式下改配对也要确认")
-        XCTAssertTrue(fake.lastWrites.isEmpty)
+        XCTAssertFalse(m.needsExplicitConfirmation, "第 7.4 节：快速方式下改配对直接发")
         let applied = await m.applyPending(confirmation: ConfirmationGate.userConfirmed(m.allPendingOperations))
         XCTAssertEqual(try XCTUnwrap(applied).outcomes[c.id], .verified)
         XCTAssertEqual(fake.value("/input/68/stereo"), 0)

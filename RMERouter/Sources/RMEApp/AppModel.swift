@@ -172,6 +172,8 @@ public final class AppModel {
     private static let settingsKey = "osc.settings"
     private static let twelveMicKey = "12mic.url"
     static let xtcKey = "xtc.settings"
+    /// 一次抬高超过这么多 dB，快速方式下也要确认（第 7.4 节）。
+    nonisolated public static let largeJumpDB = 20.0
 
     /// makeAdapter / makeTwelveMic：测试时注入假设备；默认走 UDP / HTTP。
     public init(defaults: UserDefaults = .standard, snapshot: SystemSnapshot? = nil,

@@ -41,6 +41,7 @@ final class ConfirmModeTests: XCTestCase {
         XCTAssertTrue(model.pending.isEmpty)
     }
 
+    /// 第 7.4 节（2026-10-26）：快速方式下只有切换 48V、一次抬高超过 20 dB 要确认。
     func testQuickModeStillConfirmsPhantomAndLargeJumps() async {
         let model = await loadedModel(mode: .quick)
         model.stagePreamp(deviceID: "xt", input: mic1, field: .phantom, value: .flag(true))
@@ -50,10 +51,16 @@ final class ConfirmModeTests: XCTestCase {
         XCTAssertEqual(model.pendingPreamps.count, 1)
 
         model.discardAll(); model.showConfirm = false
-        model.stagePreamp(deviceID: "xt", input: mic1, field: .gain, value: .gain(35))   // 20 → 35，抬高 15 dB
+        model.stagePreamp(deviceID: "xt", input: mic1, field: .gain, value: .gain(45))   // 20 → 45，抬高 25 dB
         await model.commitIfQuick()
-        XCTAssertTrue(model.showConfirm, "大幅抬高仍须确认")
+        XCTAssertTrue(model.showConfirm, "抬高超过 20 dB 仍须确认")
         XCTAssertEqual(fakeTM.lastWrites, [])
+
+        model.discardAll(); model.showConfirm = false
+        model.stagePreamp(deviceID: "xt", input: mic1, field: .gain, value: .gain(35))   // 抬高 15 dB：直接发
+        await model.commitIfQuick()
+        XCTAssertFalse(model.showConfirm)
+        XCTAssertEqual(fakeTM.lastWrites.count, 1)
     }
 
     func testAlwaysModeNeverAutoSends() async {

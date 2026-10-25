@@ -23,7 +23,7 @@ public struct PendingGlobalChange: Identifiable, Equatable, Sendable {
     public var changeText: String { isSnapshot ? "整套混音换成快照里的" : "\(control.text(old)) → \(newText)" }
     public var wireText: String { "OSC：" + write.message.description }
 
-    /// 必须明确确认：调用快照（整套替换），或取消全局静音（会突然出声）。
+    /// 值得提醒：调用快照（整套替换），或取消全局静音（会突然出声）。只在确认框里标出，快速方式下不拦（第 7.4 节）。
     public var needsExplicit: Bool { isSnapshot || (control == .globalMute && !on && (old ?? 0) >= 0.5) }
 }
 

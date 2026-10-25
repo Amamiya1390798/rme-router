@@ -50,7 +50,7 @@ struct OnboardingSheet: View {
             VStack(alignment: .leading, spacing: Tokens.Space.xs) {
                 Text("• 读取不会改动任何设备。")
                 Text("• 任何改动都先让你看清要发什么；默认要确认后才发送。")
-                Text("• 打开 48V、一次抬高超过 10 dB 总是要再确认。")
+                Text("• 切换 48V、一次抬高超过 20 dB 总是要再确认。")
                 Text("• 读不到的状态一律显示“未知”，不显示假数据。")
             }
             Text("接下来几步帮你连上设备，大约一分钟。").foregroundStyle(Tokens.Palette.textMuted)
@@ -126,7 +126,7 @@ struct OnboardingSheet: View {
                 ForEach(ConfirmMode.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
-            Text("每次确认：改动先进底部“待应用”栏，确认后才发送（推荐刚开始用）。\n快速：点下改动就发送；打开 48V、一次抬高超过 10 dB 仍会确认。\n之后在“连接”页随时可以改。")
+            Text("每次确认：改动先进底部“待应用”栏，确认后才发送（推荐刚开始用）。\n快速：点下改动就发送；切换 48V、一次抬高超过 20 dB 仍会确认。\n之后在“连接”页随时可以改。")
                 .font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
         }
     }

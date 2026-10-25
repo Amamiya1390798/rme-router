@@ -170,7 +170,7 @@ struct ConnectionView: View {
                     .labelsHidden()
                     .frame(width: 240)
                     Text(model.confirmMode == .quick
-                         ? "快速：点下改动就发送并回读核对，可撤销。打开 48V、一次抬高超过 10 dB 仍会弹确认框。"
+                         ? "快速：点下改动就发送并回读核对，可撤销。切换 48V、一次抬高超过 20 dB 仍会弹确认框。"
                          : "每次确认：改动先进底部“待应用”栏，点“应用…”并在确认框里确认后才发送。")
                         .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
