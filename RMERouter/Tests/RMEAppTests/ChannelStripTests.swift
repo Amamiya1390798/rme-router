@@ -25,6 +25,8 @@ final class ChannelStripTests: XCTestCase {
             "/mix/in/0/4/fader": .float(-6.9), "/mix/in/0/4/balpan": .float(0),
             "/mix/in/68/4/fader": .float(-5.4), "/mix/in/68/4/balpan": .float(0),
             "/status/connection": .float(0),
+            "/controlroom/dim": .float(0), "/controlroom/mainmono": .float(0), "/globalmute": .float(1),
+            "/snapshot/load/1": .float(2), "/snapshot/load/2": .float(0), "/snapshot/load/3": .float(0),
         ]
 
         init() { transport.respond = { [unowned self] m, t in self.handle(m, t) } }
@@ -48,7 +50,14 @@ final class ChannelStripTests: XCTestCase {
             } else if !a.hasPrefix("/send") {
                 lock.withLock {
                     writes.append(m)
-                    if !ignoreWrites, let v = m.arguments.first { params[a] = v }
+                    guard !ignoreWrites, let v = m.arguments.first else { return }
+                    if a.hasPrefix("/snapshot/load/") {
+                        // 真 TotalMix：调用的快照变为“当前”（2），其余变 0
+                        for k in params.keys where k.hasPrefix("/snapshot/load/") { params[k] = .float(0) }
+                        params[a] = .float(2)
+                    } else {
+                        params[a] = v
+                    }
                 }
             }
         }

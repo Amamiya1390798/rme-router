@@ -148,9 +148,10 @@ public struct AppliedBatch: Identifiable, Equatable, Sendable {
     public var routes: [PendingRouteChange] = []
     public var xtcRoutes: [PendingXTCRouteChange] = []
     public var strips: [PendingStripChange] = []
+    public var globals: [PendingGlobalChange] = []
     public var outcomes: [UUID: VerifyOutcome]
 
-    public var count: Int { changes.count + preamps.count + routes.count + xtcRoutes.count + strips.count }
+    public var count: Int { changes.count + preamps.count + routes.count + xtcRoutes.count + strips.count + globals.count }
     public var verifiedCount: Int { outcomes.values.filter { $0 == .verified }.count }
 }
 
@@ -236,7 +237,7 @@ extension AppModel {
     public func discard(_ id: UUID) { pending.removeAll { $0.id == id } }
     public func discardAll() {
         pending.removeAll(); pendingPreamps.removeAll(); pendingRoutes.removeAll(); pendingXTCRoutes.removeAll()
-        pendingStrips.removeAll()
+        pendingStrips.removeAll(); pendingGlobals.removeAll()
     }
 
     static func same(_ a: Double?, _ b: Double?) -> Bool {
@@ -304,17 +305,18 @@ extension AppModel {
 
     public var hasPending: Bool {
         !pending.isEmpty || !pendingPreamps.isEmpty || !pendingRoutes.isEmpty || !pendingXTCRoutes.isEmpty
-            || !pendingStrips.isEmpty
+            || !pendingStrips.isEmpty || !pendingGlobals.isEmpty
     }
 
     public var pendingCount: Int {
         pending.count + pendingPreamps.count + pendingRoutes.count + pendingXTCRoutes.count + pendingStrips.count
+            + pendingGlobals.count
     }
 
     /// 待应用改动对应的全部计划操作（确认凭证按它签发）。
     public var allPendingOperations: [PlannedOperation] {
         pending.map(\.operation) + pendingPreamps.map(\.operation) + pendingRoutes.map(\.operation)
-            + pendingXTCRoutes.map(\.operation) + pendingStrips.map(\.operation)
+            + pendingXTCRoutes.map(\.operation) + pendingStrips.map(\.operation) + pendingGlobals.map(\.operation)
     }
 
     // MARK: 12Mic 路由暂存（第 7.3 节）
@@ -378,6 +380,7 @@ extension AppModel {
     public var needsExplicitConfirmation: Bool {
         pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.needsPhantomAck || $0.isLargeJump }
             || pendingStrips.contains { $0.isUnmute || $0.isLargeJump || $0.isLayoutChange }
+            || pendingGlobals.contains(where: \.needsExplicit)
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。
@@ -397,11 +400,12 @@ extension AppModel {
         isApplying = true
         defer { isApplying = false }
 
-        let changes = pending, preamps = pendingPreamps, strips = pendingStrips
+        let changes = pending, preamps = pendingPreamps, strips = pendingStrips, globals = pendingGlobals
         var outcomes: [UUID: VerifyOutcome] = [:]
 
         // 1. XT：发送电平与 XT 前级都经 TotalMix
         var sentSends: [PendingChange] = [], sentXT: [PendingPreampChange] = [], sentStrips: [PendingStripChange] = []
+        var sentGlobals: [PendingGlobalChange] = []
         let xtPreamps = preamps.filter { $0.deviceID == "xt" }
         if let adapter {
             for c in changes {
@@ -417,9 +421,10 @@ extension AppModel {
                 } catch { outcomes[p.id] = .failed("\(error)") }
             }
             sentStrips = await applyStrips(strips, adapter: adapter, confirmation: confirmation, outcomes: &outcomes)
+            sentGlobals = await applyGlobals(globals, adapter: adapter, confirmation: confirmation, outcomes: &outcomes)
             if !sentSends.isEmpty { _ = try? await adapter.client.refreshSubmixes(sentSends.map(\.tmOutput)) }
             if !sentXT.isEmpty { _ = try? await adapter.client.refreshChannels(sentXT.compactMap(\.tmInput)) }
-            if !sentSends.isEmpty || !sentXT.isEmpty || !sentStrips.isEmpty {
+            if !sentSends.isEmpty || !sentXT.isEmpty || !sentStrips.isEmpty || !sentGlobals.isEmpty {
                 await captureTotalMixState(from: adapter)
                 apply(xt: TotalMixOSCAdapter.makeSnapshot(
                     deviceID: "xt", state: tmState, map: adapter.channelMap,
@@ -431,8 +436,10 @@ extension AppModel {
             for c in changes { outcomes[c.id] = .failed("TotalMix 未连接") }
             for p in xtPreamps { outcomes[p.id] = .failed("TotalMix 未连接") }
             for c in strips { outcomes[c.id] = .failed("TotalMix 未连接") }
+            for c in globals { outcomes[c.id] = .failed("TotalMix 未连接") }
         }
         for c in sentStrips { outcomes[c.id] = verify(c) }
+        for c in sentGlobals { outcomes[c.id] = verify(c) }
         for c in sentSends {
             let readBack = currentGain(source: c.tmSource, output: c.tmOutput)
             let hasNode = tmState.nodes[.init(source: c.tmSource, output: c.tmOutput)] != nil
@@ -502,13 +509,14 @@ extension AppModel {
                        confirmation: confirmation, outcomes: &outcomes)
 
         let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, routes: routes, xtcRoutes: xtcRoutes,
-                                 strips: strips, outcomes: outcomes)
+                                 strips: strips, globals: globals, outcomes: outcomes)
         history.insert(batch, at: 0)
         pending.removeAll()
         pendingPreamps.removeAll()
         pendingRoutes.removeAll()
         pendingXTCRoutes.removeAll()
         pendingStrips.removeAll()
+        pendingGlobals.removeAll()
         return batch
     }
 
@@ -538,6 +546,11 @@ extension AppModel {
         for c in batch.strips {
             if case .failed = batch.outcomes[c.id] { continue }
             stageUndo(c)
+        }
+        // 开关可撤销；快照调用不可撤销（之前的整套状态没有保存）
+        for c in batch.globals where !c.isSnapshot {
+            if case .failed = batch.outcomes[c.id] { continue }
+            stageGlobal(c.control, on: !c.on)
         }
         for r in batch.xtcRoutes {
             if case .failed = batch.outcomes[r.id] { continue }

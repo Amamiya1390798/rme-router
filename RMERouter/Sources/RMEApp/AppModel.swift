@@ -113,6 +113,8 @@ public final class AppModel {
     public internal(set) var pendingXTCRoutes: [PendingXTCRouteChange] = []
     /// TotalMix 通道条改动（第 7.8 节）。
     public internal(set) var pendingStrips: [PendingStripChange] = []
+    /// 控制室 / 全局静音 / 快照改动（第 7.9 节）。
+    public internal(set) var pendingGlobals: [PendingGlobalChange] = []
     /// XTC（文档第 6.3 节）：设置全部默认关。
     public var xtcSettings: XTCSettings {
         didSet {

@@ -60,9 +60,11 @@ final class GlobalOSCTests: XCTestCase {
                        .status(key: "device", value: .string("MADIface XT")))
         // 输出不能做混音节点来源；无值、未知地址都归入 other
         for m in [OSCMessage("/mix/out/0/1/fader", [.float(0)]), OSCMessage("/input/0/mute"),
-                  OSCMessage("/controlroom/dim", [.float(1)]), OSCMessage("/input/-1/mute", [.float(1)])] {
+                  OSCMessage("/reverb/enable", [.float(1)]), OSCMessage("/input/-1/mute", [.float(1)])] {
             XCTAssertEqual(TotalMixEvent.parse(m), .other(m))
         }
+        // 控制室（第 7.9 节）单独解析
+        XCTAssertEqual(TotalMixEvent.parse(OSCMessage("/controlroom/dim", [.float(1)])), .global(key: "controlroom/dim", value: .float(1)))
     }
 
     // MARK: 发送白名单（安全规则 2、3）

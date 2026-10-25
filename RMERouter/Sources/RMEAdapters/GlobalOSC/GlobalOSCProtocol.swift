@@ -94,7 +94,9 @@ public enum TotalMixEvent: Equatable, Sendable {
     case level(TotalMixChannel, dB: Double)
     /// `/status/<键>`：device（s）、connection（f）、dsp（f）。
     case status(key: String, value: OSCValue)
-    /// 其余地址（控制室、混响、快照等），本 App 暂不解析。
+    /// 控制室、全局静音、快照状态（第 7.9 节），键为去掉开头 “/” 的地址，如 "controlroom/dim"、"snapshot/load/2"。
+    case global(key: String, value: OSCValue)
+    /// 其余地址（混响、回声等），本 App 暂不解析。
     case other(OSCMessage)
 
     public static func parse(_ m: OSCMessage) -> TotalMixEvent {
@@ -122,6 +124,8 @@ public enum TotalMixEvent: Equatable, Sendable {
         case "status":
             guard parts.count == 2 else { return .other(m) }
             return .status(key: parts[1], value: value)
+        case "controlroom", "globalmute", "globalsolo", "snapshot":
+            return .global(key: parts.joined(separator: "/"), value: value)
         default:
             return .other(m)
         }
@@ -199,7 +203,39 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
     }
 }
 
-/// 写入类消息（文档第 7.1、7.2、7.8 节）：混音节点电平与声像、输入通道的前级三项、通道条参数。
+/// 控制室与快照（第 7.9 节）。只有这几项可写。
+public enum TotalMixGlobal: Equatable, Hashable, Sendable {
+    case dim, mainMono, globalMute
+    /// 快照 1…8：调用
+    case snapshot(Int)
+
+    public var key: String {
+        switch self {
+        case .dim: return "controlroom/dim"
+        case .mainMono: return "controlroom/mainmono"
+        case .globalMute: return "globalmute"
+        case let .snapshot(n): return "snapshot/load/\(n)"
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .dim: return "Dim"
+        case .mainMono: return "Main 单声道"
+        case .globalMute: return "全局静音"
+        case let .snapshot(n): return "调用快照 \(n)"
+        }
+    }
+
+    /// 开关项的文字；快照是动作，没有开 / 关。
+    public func text(_ v: Double?) -> String {
+        guard let v else { return "?" }
+        if case .snapshot = self { return v >= 1.5 ? (v >= 2.5 ? "已改动" : "当前") : "未用" }
+        return v >= 0.5 ? "开" : "关"
+    }
+}
+
+/// 写入类消息（文档第 7.1、7.2、7.8、7.9 节）：混音节点电平与声像、输入通道的前级三项、通道条参数。
 /// 只能经 `TotalMixGlobalOSCClient.write` 发出，那里要求用户确认（`UserConfirmation`）。
 public enum TotalMixWrite: Equatable, Sendable {
     /// 节点电平；dB 为 nil 表示关（发送 -300 dB）。超过 +6 dB 截到 +6，低于 -65 dB 视为关。
@@ -210,6 +246,8 @@ public enum TotalMixWrite: Equatable, Sendable {
     case sendPan(source: TotalMixChannel, output: TotalMixChannel, pan: Double)
     /// 通道条参数（第 7.8 节）。
     case strip(channel: TotalMixChannel, param: TotalMixStripParam, value: Double)
+    /// 控制室开关、全局静音、快照调用（第 7.9 节）。快照只发 1.0。
+    case global(TotalMixGlobal, on: Bool)
 
     public static let offDB: Float = -300
     public static let maxDB = 6.0
@@ -236,6 +274,9 @@ public enum TotalMixWrite: Equatable, Sendable {
         case let .strip(ch, param, value):
             precondition(param.applies(to: ch.bus), "\(ch.bus) 没有 \(param.rawValue)")
             return OSCMessage("/\(ch.bus.rawValue)/\(ch.wireIndex)/\(param.rawValue)", [.float(Float(param.clamp(value)))])
+        case let .global(g, on):
+            if case .snapshot = g { return OSCMessage("/\(g.key)", [.float(1)]) }
+            return OSCMessage("/\(g.key)", [.float(on ? 1 : 0)])
         }
     }
 

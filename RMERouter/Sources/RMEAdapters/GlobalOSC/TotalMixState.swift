@@ -131,6 +131,8 @@ public struct TotalMixState: Sendable, Equatable {
     public private(set) var nodes: [NodeKey: [String: OSCValue]] = [:]
     public private(set) var channels: [TotalMixChannel: [String: OSCValue]] = [:]
     public private(set) var status: [String: OSCValue] = [:]
+    /// 控制室、全局静音、快照状态（第 7.9 节）。
+    public private(set) var globals: [String: OSCValue] = [:]
     public private(set) var levels: [TotalMixChannel: Double] = [:]
     public private(set) var unparsedCount = 0
     /// 除电平以外的内容每变一次加 1（App 据此判断要不要重建快照，第 6.4.3 节“与 TotalMix 同步”）。
@@ -153,6 +155,9 @@ public struct TotalMixState: Sendable, Equatable {
             // 只有“连没连上”算变化；DSP 负载等状态 TotalMix 大约每秒发一个，不触发重建
             if key == "connection", status[key] != value { revision += 1 }
             status[key] = value
+        case let .global(key, value):
+            if globals[key] != value { revision += 1 }
+            globals[key] = value
         case .other:
             unparsedCount += 1
         }
@@ -170,6 +175,9 @@ public struct TotalMixState: Sendable, Equatable {
     public func isStereo(_ ch: TotalMixChannel) -> Bool? {
         channels[ch]?["stereo"]?.number.map { $0 >= 0.5 }
     }
+
+    /// 控制室 / 快照的当前值；没收到为 nil。
+    public func globalValue(_ g: TotalMixGlobal) -> Double? { globals[g.key]?.number }
 
     /// 节点声像（-1…+1）；没收到为 nil。
     public func nodePan(_ key: NodeKey) -> Double? { nodes[key]?["balpan"]?.number }

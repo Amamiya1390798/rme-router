@@ -22,6 +22,7 @@ struct DevicesView: View {
                 VStack(alignment: .leading, spacing: Tokens.Space.l) {
                     header
                     RackView(model: model, face: face, selected: $selected)
+                    ControlRoomBar(model: model)
                     XTStripsView(model: model, onlySignal: onlySignal)
                 }
                 .padding(Tokens.Space.xl)
