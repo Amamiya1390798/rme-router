@@ -5,6 +5,9 @@ import RMEEngine
 /// 跨设备“送一路声音”（文档第 7.5 节）：选来源与去处 → 算路径 → 看每一步 → 加入待应用。
 struct SendAcrossSheet: View {
     @Bindable var model: AppModel
+    /// 从设备页拖线打开时预先填好（第 6.4.4 节）。
+    var initialSource: ChannelRef? = nil
+    var initialDest: ChannelRef? = nil
     var close: () -> Void
 
     @State private var sourcePort = ""
@@ -62,8 +65,11 @@ struct SendAcrossSheet: View {
         .frame(width: 640)
         .background(Tokens.Palette.bg)
         .onAppear {
+            if let s = initialSource { sourcePort = s.portID; sourceChannel = s.channel }
+            if let d = initialDest { destPort = d.portID; destChannel = d.channel }
             if sourcePort.isEmpty { sourcePort = model.sendSourcePorts.first?.id ?? "" }
             if destPort.isEmpty { destPort = model.sendDestinationPorts.first?.id ?? "" }
+            if initialSource != nil, initialDest != nil { DispatchQueue.main.async { compute() } }
         }
         .onChange(of: [sourcePort, destPort]) { result = nil; errors = [] }
         .onChange(of: [sourceChannel, destChannel]) { result = nil; errors = [] }

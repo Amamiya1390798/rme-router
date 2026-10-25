@@ -9,6 +9,12 @@ struct DevicesView: View {
     @State private var selected: String?
     @State private var onlySignal = false
     @State private var identifying = false
+    /// 看路径（第 6.4.4 节）：选中的通道。
+    @State private var pathTarget: ChannelRef?
+    /// 拖线的结果（第 6.4.4 节）。
+    @State private var linkProposal: (from: String, to: String)?
+    @State private var sendPreset: (from: ChannelRef, to: ChannelRef)?
+    @State private var dragMessage: String?
 
     private var selectedConnector: (DevicePanel, PanelConnector)? {
         guard let id = selected else { return nil }
@@ -21,7 +27,19 @@ struct DevicesView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.l) {
                     header
-                    RackView(model: model, face: face, selected: $selected)
+                    if let t = pathTarget { pathBar(model.signalPath(for: t)) }
+                    if let dragMessage {
+                        Text(dragMessage).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
+                    }
+                    RackView(model: model, face: face, selected: $selected,
+                             path: pathTarget.map(model.signalPath), showPath: { pathTarget = $0 }) { a, b in
+                        dragMessage = nil
+                        switch model.dragIntent(from: a, to: b) {
+                        case let .addLink(f, t): linkProposal = (f, t)
+                        case let .send(f, t): sendPreset = (f, t)
+                        case let .rejected(why): dragMessage = "拖不上：\(why)"
+                        }
+                    }
                     ControlRoomBar(model: model)
                     XTStripsView(model: model, onlySignal: onlySignal)
                 }
@@ -30,11 +48,49 @@ struct DevicesView: View {
             }
             if let (panel, c) = selectedConnector {
                 Divider()
-                ConnectorDetail(model: model, panel: panel, connector: c) { selected = nil }
-                    .frame(width: 280)
+                ConnectorDetail(model: model, panel: panel, connector: c, showPath: { pathTarget = $0 }) {
+                    selected = nil; pathTarget = nil
+                }
+                .frame(width: 280)
             }
         }
         .background(Tokens.Palette.bg)
+        .onExitCommand { pathTarget = nil; selected = nil }
+        .confirmationDialog(linkProposal.map { "在接线表里加一根线：\(name($0.from)) ⇒ \(name($0.to))？" } ?? "",
+                            isPresented: Binding(get: { linkProposal != nil }, set: { if !$0 { linkProposal = nil } })) {
+            Button("加这根线") {
+                if let p = linkProposal { dragMessage = model.addLink(from: p.from, to: p.to).map { "没加上：\($0)" } }
+                linkProposal = nil
+            }
+            Button("取消", role: .cancel) { linkProposal = nil }
+        } message: {
+            Text("只改接线表（记录实物怎么接的），不会向设备发送任何东西。接好后可以用“信号核对”确认。")
+        }
+        .sheet(isPresented: Binding(get: { sendPreset != nil }, set: { if !$0 { sendPreset = nil } })) {
+            if let p = sendPreset {
+                SendAcrossSheet(model: model, initialSource: p.from, initialDest: p.to) { sendPreset = nil }
+            }
+        }
+    }
+
+    private func name(_ portID: String) -> String {
+        let topo = model.snapshot.topology
+        return topo.port(portID).map { "\(topo.device($0.deviceID)?.name ?? $0.deviceID) \($0.name)" } ?? portID
+    }
+
+    /// 路径模式顶部一行：完整链条的文字。
+    private func pathBar(_ p: SignalPathInfo) -> some View {
+        HStack(spacing: Tokens.Space.s) {
+            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").foregroundStyle(Tokens.Palette.accent)
+            Text(verbatim: p.text).font(Tokens.Font.body).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            if p.segments.contains(where: { !$0.verified }) {
+                Text("虚线 = 未核对").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+            Spacer()
+            Button("退出路径") { pathTarget = nil }.keyboardShortcut(.cancelAction)
+        }
+        .padding(Tokens.Space.s)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.accent.opacity(0.12)))
     }
 
     private var header: some View {
@@ -42,7 +98,7 @@ struct DevicesView: View {
             ViewHeader(title: "设备", subtitle: "实物接口与线缆。点一个接口只看它自己的线；下面是 XT 的通道条，用法同 TotalMix。")
             Picker("面", selection: $face) { ForEach(PanelFace.allCases) { Text($0.title).tag($0) } }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 160)
-                .onChange(of: face) { selected = nil }
+                .onChange(of: face) { selected = nil }   // 路径模式在两面都能看，不清
             Button("信号核对…") { identifying = true }
                 .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
                 .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
@@ -67,9 +123,22 @@ struct RackView: View {
     var model: AppModel
     var face: PanelFace
     @Binding var selected: String?
+    /// 路径模式（第 6.4.4 节）：非 nil 时只亮路径上的线和接口。
+    var path: SignalPathInfo? = nil
+    var showPath: (ChannelRef?) -> Void = { _ in }
+    /// 从一个接口拖到另一个接口。
+    var drop: (PanelConnector, PanelConnector) -> Void = { _, _ in }
+
+    /// 路径经过的接口锚点。
+    private var pathAnchors: Set<String> {
+        guard let path else { return [] }
+        let refs = path.segments.flatMap { [$0.from] + ($0.to.map { [$0] } ?? []) } + [path.target]
+        return Set(refs.compactMap { model.pathAnchor($0, face: face)?.key })
+    }
 
     /// 选中接口时：与它有线相连的接口（这些不变暗）。
     private var linked: Set<String> {
+        if path != nil { return pathAnchors }
         guard let s = selected else { return [] }
         let key = "conn:\(s)"
         return Set(model.cables(face: face).flatMap { c in c.from == key || c.to == key ? [c.from, c.to] : [] })
@@ -92,8 +161,12 @@ struct RackView: View {
         .padding(.top, Tokens.Space.l)
         .overlayPreferenceValue(RackAnchorKey.self) { anchors in
             GeometryReader { g in
-                CableLayer(cables: model.cables(face: face), anchors: anchors.mapValues { g[$0] },
-                           selected: selected.map { "conn:\($0)" })
+                let points = anchors.mapValues { g[$0] }
+                CableLayer(cables: model.cables(face: face), anchors: points,
+                           selected: path == nil ? selected.map { "conn:\($0)" } : nil,
+                           highlight: path.map { p in Set(p.segments.compactMap { s in
+                               if case let .cable(id) = s.kind { return id } else { return nil } }) })
+                if let path { PathLayer(model: model, path: path, face: face, anchors: points) }
             }
             .allowsHitTesting(false)
         }
@@ -106,8 +179,21 @@ struct RackView: View {
                     Text(model.snapshot.topology.device(deviceID)?.name ?? deviceID).font(Tokens.Font.cardTitle)
                     if model.isDemo(deviceID) { Badge(text: "演示数据", color: Tokens.Palette.unknown) }
                 }
-                PanelView(panel: panel, selected: selected, linked: linked, signal: { model.hasSignal(port: $0) }) { c in
-                    selected = selected == c.id ? nil : c.id
+                PanelView(panel: panel, selected: path == nil ? selected : nil, linked: linked,
+                          signal: { model.hasSignal(port: $0) },
+                          drop: { id, target in
+                              guard let src = PanelLayout.all.flatMap(\.connectors).first(where: { "conn:\($0.id)" == id }) else { return false }
+                              drop(src, target)
+                              return true
+                          }) { c in
+                    // 单通道接口（如麦克风）：直接看它的路径；整口接口：打开详情
+                    if let ch = c.channel, let port = c.ports.first {
+                        let ref = ChannelRef(port, ch)
+                        showPath(path?.target == ref ? nil : ref)
+                        selected = c.id
+                    } else {
+                        selected = selected == c.id ? nil : c.id
+                    }
                 }
             }
         }
@@ -120,7 +206,9 @@ struct PanelView: View {
     var selected: String?
     var linked: Set<String>
     var signal: (String) -> Bool?
+    var drop: (String, PanelConnector) -> Bool = { _, _ in false }
     var onSelect: (PanelConnector) -> Void
+    @State private var dropTarget: String?
 
     var body: some View {
         Group {
@@ -131,6 +219,7 @@ struct PanelView: View {
                     .overlay(Text("面板图缺失").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted))
             }
         }
+        .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["edge:\(panel.deviceID)"] = $1 }
         .overlay {
             GeometryReader { g in
                 ForEach(panel.connectors) { c in
@@ -145,7 +234,8 @@ struct PanelView: View {
         let isSel = selected == c.id
         let hasSig = c.ports.contains { signal($0) == true }
         return Circle()
-            .strokeBorder(isSel ? Tokens.Palette.accent : (linked.contains("conn:\(c.id)") ? Tokens.Palette.accent.opacity(0.5) : .clear), lineWidth: 2)
+            .strokeBorder(isSel || dropTarget == c.id ? Tokens.Palette.accent
+                          : (linked.contains("conn:\(c.id)") ? Tokens.Palette.accent.opacity(0.5) : .clear), lineWidth: 2)
             .background(Circle().fill(Color.white.opacity(0.001)))
             .overlay(alignment: .topTrailing) {
                 if hasSig { Circle().fill(Tokens.Palette.ok).frame(width: 7, height: 7).shadow(color: Tokens.Palette.ok, radius: 3) }
@@ -154,7 +244,14 @@ struct PanelView: View {
             .contentShape(Circle())
             .anchorPreference(key: RackAnchorKey.self, value: .bounds) { ["conn:\(c.id)": $0] }
             .onTapGesture { onSelect(c) }
-            .help(c.routes ? c.name : "\(c.name)（不参与路由）")
+            .draggable("conn:\(c.id)") {
+                Text(c.name).font(Tokens.Font.caption).padding(6).background(RoundedRectangle(cornerRadius: 4).fill(Tokens.Palette.surface))
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let id = items.first, id.hasPrefix("conn:") else { return false }
+                return drop(id, c)
+            } isTargeted: { dropTarget = $0 ? c.id : (dropTarget == c.id ? nil : dropTarget) }
+            .help(c.routes ? "\(c.name)\n点：看路径或详情；拖到另一个接口：接线或送一路声音" : "\(c.name)（不参与路由）")
     }
 }
 
@@ -187,6 +284,8 @@ struct CableLayer: View {
     var cables: [CableSpec]
     var anchors: [String: CGRect]
     var selected: String?
+    /// 路径模式：只亮这些线（接线表 id）。
+    var highlight: Set<String>? = nil
 
     static func color(_ t: PortType) -> Color {
         switch t {
@@ -203,7 +302,7 @@ struct CableLayer: View {
         let routed = Self.route(cables, anchors: anchors, rows: rows)
         ZStack {
             ForEach(routed, id: \.cable.id) { r in
-                let on = selected == nil || r.cable.from == selected || r.cable.to == selected
+                let on = highlight.map { $0.contains(r.cable.id) } ?? (selected == nil || r.cable.from == selected || r.cable.to == selected)
                 // 未核对（只是接线表里的声明）画虚线
                 Self.path(r.points)
                     .stroke(Self.color(r.cable.type).opacity(on ? 0.95 : 0.12),
@@ -259,6 +358,7 @@ struct ConnectorDetail: View {
     var model: AppModel
     var panel: DevicePanel
     var connector: PanelConnector
+    var showPath: (ChannelRef) -> Void = { _ in }
     var close: () -> Void
 
     var body: some View {
@@ -334,8 +434,8 @@ struct ConnectorDetail: View {
                 let ref = ChannelRef(port.id, ch)
                 let sig = model.hasSignal(ref) == true
                 Button {
+                    showPath(ref)
                     model.inspect(ref)
-                    model.showInspector = true
                 } label: {
                     Text("\(ch)").font(.system(size: 9, design: .monospaced))
                         .frame(maxWidth: .infinity, minHeight: 18)
@@ -344,7 +444,7 @@ struct ConnectorDetail: View {
                         .foregroundStyle(routed.contains(ch) || sig ? Tokens.Palette.text : Tokens.Palette.textMuted)
                 }
                 .buttonStyle(.plain)
-                .help("\(ref.description)：点开看完整去向")
+                .help("\(ref.description)：点了在面板上画出它的完整路径")
             }
         }
     }
