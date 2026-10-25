@@ -11,7 +11,7 @@ public struct OutputsView: View {
         GeometryReader { geo in
             ScrollView {
                 OutputsContent(outputs: model.outputs, status: model.xtStatus, lastLoaded: model.lastLoaded,
-                               demoDevices: demoNames, showPlayback: $model.showPlayback,
+                               demoDevices: demoNames, twelveMic: model.twelveMicStatus, showPlayback: $model.showPlayback,
                                columns: max(1, Int((geo.size.width - 48) / 300)), actions: actions)
                 .padding(Tokens.Space.xl)
             }
@@ -44,16 +44,18 @@ public struct OutputsContent: View {
     var status: XTStatus
     var lastLoaded: Date?
     var demoDevices: [String]
+    var twelveMic: TwelveMicStatus
     @Binding var showPlayback: Bool
     var columns: Int
     var actions: OutputActions
 
     public init(outputs: [DeviceOutputs], status: XTStatus, lastLoaded: Date?, demoDevices: [String],
-                showPlayback: Binding<Bool>, columns: Int, actions: OutputActions = OutputActions()) {
+                twelveMic: TwelveMicStatus = .notLoaded, showPlayback: Binding<Bool>, columns: Int, actions: OutputActions = OutputActions()) {
         self.outputs = outputs
         self.status = status
         self.lastLoaded = lastLoaded
         self.demoDevices = demoDevices
+        self.twelveMic = twelveMic
         self._showPlayback = showPlayback
         self.columns = columns
         self.actions = actions
@@ -66,7 +68,7 @@ public struct OutputsContent: View {
                 Toggle("显示电脑回放", isOn: $showPlayback).toggleStyle(.switch).controlSize(.small)
                     .font(Tokens.Font.body).fixedSize()
             }
-            StatusStrip(status: status, lastLoaded: lastLoaded, demoDevices: demoDevices)
+            StatusStrip(status: status, lastLoaded: lastLoaded, demoDevices: demoDevices, twelveMic: twelveMic)
             ForEach(outputs) { group in
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     HStack(spacing: Tokens.Space.s) {

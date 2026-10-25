@@ -47,6 +47,7 @@ struct StatusStrip: View {
     var status: XTStatus
     var lastLoaded: Date?
     var demoDevices: [String]
+    var twelveMic: TwelveMicStatus = .notLoaded
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xs) {
@@ -58,6 +59,12 @@ struct StatusStrip: View {
                         .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                 }
             }
+            if let note = twelveMicNote {
+                HStack(spacing: Tokens.Space.s) {
+                    EvidenceDot(twelveMic == .live ? .confirmed : (twelveMic == .loading ? .inferred : .conflict))
+                    Text(note).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                }
+            }
             if !demoDevices.isEmpty {
                 Text("\(demoDevices.joined(separator: "、")) 还没有接入，显示的是演示数据（灰色虚线点）。")
                     .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
@@ -65,6 +72,15 @@ struct StatusStrip: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
+    }
+
+    private var twelveMicNote: String? {
+        switch twelveMic {
+        case .notLoaded: return nil
+        case .loading: return "正在读取 12Mic…"
+        case .live: return "12Mic 已连接，显示的是实时配置"
+        case let .unreachable(reason): return reason
+        }
     }
 
     private var text: String {

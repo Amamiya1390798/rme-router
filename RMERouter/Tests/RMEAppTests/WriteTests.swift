@@ -55,10 +55,21 @@ final class WriteTests: XCTestCase {
     let phonesL = ChannelRef("xt.phones.out", 1)
     let madi1in9 = ChannelRef("xt.madi1.in", 9)
 
+    /// 12Mic 一律立刻失败：测试不碰网络。
+    final class No12Mic: URLProtocol {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost)) }
+        override func stopLoading() {}
+    }
+
     func loadedModel(_ fake: FakeTotalMix) async -> AppModel {
-        let model = AppModel(defaults: UserDefaults(suiteName: "rme.write.\(UUID())")!) { s in
-            TotalMixOSCAdapter(port: s.port, transport: fake.transport)
-        }
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.protocolClasses = [No12Mic.self]
+        let session = URLSession(configuration: cfg)
+        let model = AppModel(defaults: UserDefaults(suiteName: "rme.write.\(UUID())")!,
+                             makeAdapter: { TotalMixOSCAdapter(port: $0.port, transport: fake.transport) },
+                             makeTwelveMic: { TwelveMicJSONAdapter(baseURL: $0, session: session) })
         await model.refresh()
         return model
     }

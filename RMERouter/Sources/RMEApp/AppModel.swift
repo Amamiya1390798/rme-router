@@ -39,6 +39,14 @@ public enum XTStatus: Equatable, Sendable {
     case unreachable(String)  // TotalMix 没回话
 }
 
+/// 12Mic 读取状态。读不到时“输出”等视图继续显示演示数据并注明。
+public enum TwelveMicStatus: Equatable, Sendable {
+    case notLoaded
+    case loading
+    case live
+    case unreachable(String)
+}
+
 /// App 的全部状态。只读：不向任何设备发送写入类消息（写入在“待应用”栏完成后再接）。
 @MainActor
 @Observable
@@ -56,6 +64,9 @@ public final class AppModel {
     public private(set) var snapshot: SystemSnapshot
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
+    /// 12Mic HTTP 地址（文档第 6.2 节）：网络 http://12mic.local，USB 直连 http://172.20.0.1。
+    public var twelveMicURL: String { didSet { defaults.set(twelveMicURL, forKey: Self.twelveMicKey) } }
+    public private(set) var twelveMicStatus: TwelveMicStatus = .notLoaded
     /// 信号流视图当前查看的通道。
     public var traceTarget: ChannelRef?
 
@@ -72,15 +83,20 @@ public final class AppModel {
     @ObservationIgnored private var retired: [TotalMixOSCAdapter] = []
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
+    @ObservationIgnored private let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
     private static let settingsKey = "osc.settings"
+    private static let twelveMicKey = "12mic.url"
 
-    /// makeAdapter：测试时注入假 TotalMix 传输；默认走 UDP。
+    /// makeAdapter / makeTwelveMic：测试时注入假设备；默认走 UDP / HTTP。
     public init(defaults: UserDefaults = .standard, snapshot: SystemSnapshot? = nil,
                 makeAdapter: @escaping (OSCSettings) -> TotalMixOSCAdapter = {
                     TotalMixOSCAdapter(host: $0.host, port: $0.port, localPort: $0.listenPort)
-                }) {
+                },
+                makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) }) {
         self.defaults = defaults
         self.makeAdapter = makeAdapter
+        self.makeTwelveMic = makeTwelveMic
+        twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
         if let data = defaults.data(forKey: Self.settingsKey),
            let saved = try? JSONDecoder().decode(OSCSettings.self, from: data) {
             settings = saved
@@ -94,8 +110,40 @@ public final class AppModel {
         if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.settingsKey) }
     }
 
-    /// 从 TotalMix 读取一次（/sendstate + /sendall 2，只读请求）。
+    /// 读取全部设备（只读）：TotalMix 与 12Mic 同时进行。
     public func refresh() async {
+        async let mic: Void = refreshTwelveMic()
+        await refreshTotalMix()
+        await mic
+    }
+
+    /// 从 12Mic 读取一次（JSON，请求体全为 null）。读不到时保留演示数据。
+    public func refreshTwelveMic() async {
+        guard let url = URL(string: twelveMicURL.trimmingCharacters(in: .whitespaces)), url.host != nil else {
+            twelveMicStatus = .unreachable("12Mic 地址无效：\(twelveMicURL)")
+            return
+        }
+        twelveMicStatus = .loading
+        do {
+            let snap = try await makeTwelveMic(url).snapshot()
+            apply(twelveMic: snap)
+        } catch {
+            twelveMicStatus = .unreachable("12Mic（\(url.absoluteString)）没有回应：检查网线或 USB、地址，以及设备 STATE → remote 的 HTTP Remote 是否打开。")
+        }
+    }
+
+    /// 用读到的 12Mic 快照替换演示数据。
+    public func apply(twelveMic: DeviceSnapshot) {
+        var devices = snapshot.devices
+        devices["12mic"] = twelveMic
+        snapshot = SystemSnapshot(topology: snapshot.topology, devices: devices, capabilities: snapshot.capabilities,
+                                  terminals: snapshot.terminals, concurrency: snapshot.concurrency,
+                                  expectations: snapshot.expectations, auxDeviceFirstChannel: snapshot.auxDeviceFirstChannel)
+        twelveMicStatus = .live
+    }
+
+    /// 从 TotalMix 读取一次（/sendstate + /sendall 2，只读请求）。
+    public func refreshTotalMix() async {
         xtStatus = .loading
         for old in retired { await old.client.stop() }
         retired = []

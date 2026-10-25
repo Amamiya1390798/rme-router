@@ -33,10 +33,10 @@ public struct RootView: View {
                 Button {
                     Task { await model.refresh() }
                 } label: {
-                    Label("从 TotalMix 读取", systemImage: "arrow.clockwise")
+                    Label("读取设备", systemImage: "arrow.clockwise")
                 }
-                .disabled(model.xtStatus == .loading)
-                .help("只读：发送 /sendstate 与 /sendall，不改动 TotalMix")
+                .disabled(model.xtStatus == .loading || model.twelveMicStatus == .loading)
+                .help("只读：读取 TotalMix（/sendstate、/sendall）与 12Mic（JSON，全部为 null），不改动设备")
             }
         }
         .task { if model.xtStatus == .notLoaded { await model.refresh() } }
@@ -54,6 +54,14 @@ public struct RootView: View {
             case .offlineSaved: return .inferred
             case .unreachable: return .conflict
             default: return .unknown
+            }
+        }
+        if id == "12mic" {
+            switch model.twelveMicStatus {
+            case .live: return .confirmed
+            case .unreachable: return .conflict
+            case .loading: return .inferred
+            case .notLoaded: return .unknown
             }
         }
         return model.isDemo(id) ? .unknown : .confirmed
@@ -101,7 +109,7 @@ struct ConnectionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "连接", subtitle: "本 App 只读取 TotalMix，不会改动任何设置。")
+                ViewHeader(title: "连接", subtitle: "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("TotalMix FX（Global OSC）").font(Tokens.Font.cardTitle)
                     Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.s) {
@@ -122,6 +130,22 @@ struct ConnectionView: View {
                     Button("用这些设置读取") { Task { await model.refresh() } }
                         .disabled(model.xtStatus == .loading)
                 }
+                .card()
+                VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                    Text("12Mic（HTTP JSON）").font(Tokens.Font.cardTitle)
+                    Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.s) {
+                        GridRow {
+                            Text("12Mic 地址").foregroundStyle(Tokens.Palette.textMuted)
+                            TextField("http://12mic.local", text: $model.twelveMicURL).frame(width: 240)
+                        }
+                    }
+                    .font(Tokens.Font.body)
+                    Button("读取 12Mic") { Task { await model.refreshTwelveMic() } }
+                        .disabled(model.twelveMicStatus == .loading)
+                    Text(verbatim: "网线连接用 http://12mic.local（有的系统要写成 12mic.local.）；USB 直连用 http://172.20.0.1。设备上需打开 STATE → remote → HTTP Remote。12Mic 没有密码保护，本 App 只发读取请求。")
+                        .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     Text("TotalMix 里需要的设置").font(Tokens.Font.cardTitle)
