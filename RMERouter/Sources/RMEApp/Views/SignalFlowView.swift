@@ -13,7 +13,7 @@ public struct SignalFlowView: View {
             // 只在值真的变了才写：@Observable 对同值写入也会通知观察者，避免无谓的重建。
             CandidateList(groups: groupedCandidates,
                           selection: Binding(get: { model.traceTarget },
-                                             set: { if model.traceTarget != $0 { model.traceTarget = $0 } }))
+                                             set: { if model.traceTarget != $0 { model.traceTarget = $0; model.inspected = nil } }))
                 .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
 
             ScrollView {

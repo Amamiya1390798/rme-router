@@ -36,6 +36,7 @@ public struct OutputsView: View {
         a.stageRoute = { dst, src in model.stageTwelveMicRoute(destination: dst, source: src).map(\.text) ?? quick() }
         a.routeSources = { model.twelveMicRouteSources }
         a.routeOutputs = { model.twelveMicRouteOutputs }
+        a.inspect = { model.inspect($0) }
         return a
     }
 
@@ -129,6 +130,8 @@ public struct OutputActions {
     public var stageRoute: (ChannelRef, ChannelRef?) -> String? = { _, _ in nil }
     public var routeSources: () -> [ChannelRef] = { [] }
     public var routeOutputs: () -> [ChannelRef] = { [] }
+    /// 在检查器里打开某个通道。
+    public var inspect: (ChannelRef) -> Void = { _ in }
     public init() {}
 }
 
@@ -144,7 +147,11 @@ struct OutputCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).font(Tokens.Font.cardTitle).foregroundStyle(Tokens.Palette.text)
+                Button { actions.inspect(destination) } label: {
+                    Text(title).font(Tokens.Font.cardTitle).foregroundStyle(Tokens.Palette.text)
+                }
+                .buttonStyle(.plain)
+                .help("在检查器里查看这个输出")
                 Spacer(minLength: Tokens.Space.s)
                 EvidenceDot(card.evidence)
             }

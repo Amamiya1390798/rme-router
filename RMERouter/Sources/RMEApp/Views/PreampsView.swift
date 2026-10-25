@@ -56,6 +56,7 @@ public struct PreampsView: View {
             device == "xt" ? (model.xtStatus == .live || model.xtStatus == .offlineSaved) : model.twelveMicStatus == .live
         }
         a.pending = { device, input, field in model.pendingPreamp(deviceID: device, input: input, field: field) }
+        a.inspect = { model.inspect($0) }
         a.stage = { device, input, field, value in
             if let e = model.stagePreamp(deviceID: device, input: input, field: field, value: value) { return e.text }
             Task { await model.commitIfQuick() }   // 快速方式下立即发送（第 7.4 节）
@@ -183,6 +184,7 @@ public struct PreampActions {
     public var pending: (String, ChannelRef, PreampField) -> PreampValue? = { _, _, _ in nil }
     /// 返回错误说明；nil 表示已加入待应用。
     public var stage: (String, ChannelRef, PreampField, PreampValue) -> String? = { _, _, _, _ in nil }
+    public var inspect: (ChannelRef) -> Void = { _ in }
     public init() {}
 }
 
@@ -202,6 +204,8 @@ struct PreampCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(title).font(Tokens.Font.cardTitle).foregroundStyle(Tokens.Palette.text).lineLimit(1)
                 Spacer(minLength: Tokens.Space.xs)
+                Button { actions.inspect(preamp.input) } label: { Image(systemName: "info.circle") }
+                    .buttonStyle(.plain).foregroundStyle(Tokens.Palette.textMuted).help("在检查器里查看")
                 if hasLabel {   // 没有标签时标题已经是 “Mic n”，不重复
                     Text("Mic \(preamp.input.channel)").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                 }

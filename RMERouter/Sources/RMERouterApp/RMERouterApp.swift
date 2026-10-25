@@ -21,7 +21,9 @@ struct RMERouterApp: App {
         // 只有一个主窗口（Window 而不是 WindowGroup）：Cmd+N 不会再开出共享同一模型的第二个窗口。
         Window("RME Router", id: "main") {
             RootView(model: model)
-                .frame(minWidth: 900, minHeight: 600)
+                // 打开检查器时放宽最小宽度：侧边栏 + 内容 + 检查器放得下，窗口会自动变宽。
+                .frame(minWidth: model.showInspector ? 1200 : 900, minHeight: 600)
         }
+        .windowResizability(.contentMinSize)
     }
 }

@@ -88,6 +88,9 @@ public final class AppModel {
     public private(set) var twelveMicStatus: TwelveMicStatus = .notLoaded
     /// 信号流视图当前查看的通道。
     public var traceTarget: ChannelRef?
+    /// 检查器（阶段 B2）：显式选中的通道与是否显示。
+    public var inspected: ChannelRef?
+    public var showInspector = false
 
     // 写入（文档第 7.1 节）：待应用的改动、应用历史、确认框状态。
     public internal(set) var pending: [PendingChange] = []

@@ -28,6 +28,9 @@ public struct RootView: View {
                 case .connection: ConnectionView(model: model)
                 }
             }
+            .inspector(isPresented: $model.showInspector) {
+                InspectorPanel(model: model).inspectorColumnWidth(min: 260, ideal: 300, max: 420)
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
             }
@@ -35,6 +38,10 @@ public struct RootView: View {
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .toolbar {
             ToolbarItem { SendAcrossButton(model: model) }
+            ToolbarItem {
+                Button { model.showInspector.toggle() } label: { Label("检查器", systemImage: "sidebar.right") }
+                    .help("显示或隐藏右侧检查器")
+            }
             ToolbarItem {
                 Button {
                     Task { await model.refresh() }
