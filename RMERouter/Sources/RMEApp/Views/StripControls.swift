@@ -33,6 +33,8 @@ struct StripControls: View {
     var actions: StripActions
     @State private var editingVolume = false
     @State private var editingBalance = false
+    @State private var editingFX: TotalMixStripParam?
+    @State private var editingWidth = false
     @State private var error: String?
 
     var body: some View {
@@ -46,6 +48,18 @@ struct StripControls: View {
                     if has.contains(.balpan) { balanceChip }
                     if has.contains(.loopback) { loopbackChip }
                     Spacer(minLength: 0)
+                }
+                // 第二行：E10（送效果、效果返回、宽度、M/S、自动增益、收对讲；第 7.8 节）
+                if !has.filter(Self.secondRow.contains).isEmpty {
+                    HStack(spacing: Tokens.Space.s) {
+                        if has.contains(.fxsend) { fxChip(.fxsend) }
+                        if has.contains(.fxreturn) { fxChip(.fxreturn) }
+                        if has.contains(.width) { widthChip }
+                        if has.contains(.msproc) { toggleChip(.msproc, on: "M/S 开", off: "M/S 关", help: "M/S 处理：单声道信息送左、立体声信息送右") }
+                        if has.contains(.autoset) { toggleChip(.autoset, on: "自动增益 开", off: "自动增益 关", help: "自动降增益防过载，保持约 6 dB 余量") }
+                        if has.contains(.talkbacksel) { toggleChip(.talkbacksel, on: "收对讲", off: "不收对讲", help: "这个输出是否接收对讲信号") }
+                        Spacer(minLength: 0)
+                    }
                 }
                 if let error {
                     Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem)
@@ -68,6 +82,43 @@ struct StripControls: View {
             stage(.loopback, on ? 0 : 1)
         }
         .help(on ? "关掉：录音通道恢复为原来的硬件输入" : "把这个输出的混音送进电脑同号录音通道（顶替那一路硬件输入，需要确认）")
+    }
+
+    static let secondRow: [TotalMixStripParam] = [.fxsend, .fxreturn, .width, .msproc, .autoset, .talkbacksel]
+
+    private func toggleChip(_ p: TotalMixStripParam, on onText: String, off offText: String, help: String) -> some View {
+        let v = value(p), on = (v.shown ?? 0) >= 0.5
+        return chip(on ? onText : offText, color: on ? Tokens.Palette.accent : Tokens.Palette.textMuted, pending: v.pending) {
+            stage(p, on ? 0 : 1)
+        }
+        .help(help)
+    }
+
+    /// 送效果 / 效果返回：dB，用发送电平同款编辑框。
+    private func fxChip(_ p: TotalMixStripParam) -> some View {
+        let v = value(p)
+        return chip("\(p.label) \(p.text(v.shown))", color: Tokens.Palette.text, pending: v.pending) { editingFX = p }
+            .help(p == .fxsend ? "送到效果总线（混响、回声）的量" : "效果混进这个输出的量")
+            .popover(isPresented: Binding(get: { editingFX == p }, set: { if !$0 { editingFX = nil } }), arrowEdge: .leading) {
+                let on = v.now.flatMap { $0 > TotalMixFader.offThresholdDB ? $0 : nil }
+                let initial = v.shown.flatMap { $0 > TotalMixFader.offThresholdDB ? $0 : nil }
+                GainEditor(current: on, initial: initial, title: "\(ref) \(p.label)") { dB in
+                    if !Self.sameVolume(dB, on) || v.pending { stage(p, dB ?? -300) }
+                    editingFX = nil
+                }
+            }
+    }
+
+    private var widthChip: some View {
+        let v = value(.width)
+        return chip("宽度 \(TotalMixStripParam.width.text(v.shown))", color: Tokens.Palette.text, pending: v.pending) { editingWidth = true }
+            .help("立体声宽度：+1 全立体声，0 单声道，-1 左右互换")
+            .popover(isPresented: $editingWidth, arrowEdge: .leading) {
+                WidthEditor(title: "\(ref) 宽度", current: v.now ?? 1, initial: v.shown ?? 1) { w in
+                    if let w { stage(.width, w) }
+                    editingWidth = false
+                }
+            }
     }
 
     private var muteChip: some View {
@@ -174,5 +225,45 @@ struct PanEditor: View {
         }
         .padding(Tokens.Space.l)
         .frame(width: 320)
+    }
+}
+
+/// 立体声宽度编辑：-1（左右互换）… 0（单声道）… +1（全立体声）。结果只进待应用栏。
+struct WidthEditor: View {
+    var title: String
+    var current: Double
+    var onDone: (Double?) -> Void
+    @State private var value: Double
+
+    init(title: String, current: Double, initial: Double, onDone: @escaping (Double?) -> Void) {
+        self.title = title
+        self.current = current
+        self.onDone = onDone
+        _value = State(initialValue: initial)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Text(title).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack {
+                Text(String(format: "%+.2f", value)).font(Tokens.Font.cardTitle).monospacedDigit()
+                Spacer()
+                Text(String(format: "当前 %+.2f", current)).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+            HStack(spacing: Tokens.Space.s) {
+                Text("互换").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                Slider(value: $value, in: -1 ... 1, step: 0.01)
+                Text("全宽").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+            HStack {
+                Button("单声道 0") { value = 0 }
+                Button("全宽 +1") { value = 1 }
+                Spacer()
+                Button("取消") { onDone(nil) }
+                Button(ConfirmMode.current.applyLabel) { onDone(value) }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(Tokens.Space.l)
+        .frame(width: 340)
     }
 }

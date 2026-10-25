@@ -164,12 +164,16 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
     case stereo
     /// 输出送进电脑录音同号通道（1）/ 关（0）；会顶替那一路原来的硬件输入（第 7.8 节）。
     case loopback
+    /// E10（第 7.8 节）：送效果（dB）、效果返回（dB）、立体声宽度（-1…+1）、M/S 处理、自动增益、输出收对讲。
+    case fxsend, fxreturn, width, msproc, autoset, talkbacksel
 
     /// 这一总线上有没有这个参数（协议表 + 实测：输入、回放没有 volume / balpan）。
     public func applies(to bus: TotalMixBus) -> Bool {
         switch self {
-        case .volume, .balpan, .loopback: return bus == .output
+        case .volume, .balpan, .loopback, .fxreturn, .talkbacksel: return bus == .output
         case .mute, .phase, .stereo: return true
+        case .fxsend, .width, .msproc: return bus != .output
+        case .autoset: return bus == .input
         }
     }
 
@@ -181,6 +185,12 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .volume: return "音量"; case .balpan: return "平衡"; case .mute: return "静音"; case .phase: return "相位"
         case .stereo: return "立体声配对"
         case .loopback: return "送电脑录音"
+        case .fxsend: return "送效果"
+        case .fxreturn: return "效果返回"
+        case .width: return "宽度"
+        case .msproc: return "M/S 处理"
+        case .autoset: return "自动增益"
+        case .talkbacksel: return "收对讲"
         }
     }
 
@@ -189,7 +199,10 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         switch self {
         case .volume: return v <= TotalMixFader.offThresholdDB ? Double(TotalMixWrite.offDB) : min(v, TotalMixWrite.maxDB)
         case .balpan: return min(max(v, -1), 1)
-        case .mute, .phase, .stereo, .loopback: return v >= 0.5 ? 1 : 0
+        case .mute, .phase, .stereo, .loopback, .msproc, .autoset, .talkbacksel: return v >= 0.5 ? 1 : 0
+        case .fxsend: return v <= TotalMixFader.offThresholdDB ? Double(TotalMixWrite.offDB) : min(v, TotalMixWrite.maxDB)
+        case .fxreturn: return v <= TotalMixFader.offThresholdDB ? TotalMixFader.offThresholdDB : min(v, TotalMixWrite.maxDB)
+        case .width: return min(max(v, -1), 1)
         }
     }
 
@@ -203,6 +216,9 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .phase: return v >= 0.5 ? "反相" : "正相"
         case .stereo: return v >= 0.5 ? "立体声" : "单声道"
         case .loopback: return v >= 0.5 ? "送录音" : "关"
+        case .fxsend, .fxreturn: return v > TotalMixFader.offThresholdDB ? String(format: "%.1f dB", v) : "关"
+        case .width: return String(format: "%+.2f", v)
+        case .msproc, .autoset, .talkbacksel: return v >= 0.5 ? "开" : "关"
         }
     }
 }

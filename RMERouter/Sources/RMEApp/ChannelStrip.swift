@@ -87,7 +87,11 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
         switch p {
         case .volume: return (!TotalMixFader.isOn(a) && !TotalMixFader.isOn(b)) || abs(a - b) < 0.05
         case .balpan: return abs(a - b) < 0.005
-        case .mute, .phase, .stereo, .loopback: return (a >= 0.5) == (b >= 0.5)
+        case .mute, .phase, .stereo, .loopback, .msproc, .autoset, .talkbacksel: return (a >= 0.5) == (b >= 0.5)
+        case .fxsend, .fxreturn:
+            let off = TotalMixFader.offThresholdDB
+            return (a <= off && b <= off) || abs(a - b) < 0.05
+        case .width: return abs(a - b) < 0.005
         }
     }
 }
