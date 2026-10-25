@@ -1,4 +1,4 @@
-// 生成 App 图标：陶土色渐变底上一个白色旋钮（细刻度弧、圆点指针），只保留一个形状。
+// 生成 App 图标：陶土色渐变底上一个白色旋钮（细刻度弧、圆点指针），右下角小字 total。
 // 用法：swift scripts/make-icon.swift <输出目录>   → <输出目录>/AppIcon.icns
 import AppKit
 
@@ -8,6 +8,34 @@ try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories
 
 func color(_ hex: UInt32) -> NSColor {
     NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+}
+
+/// 手绘 “total”：x 高为 1 的字形单位，线宽 0.2，圆头。
+func drawTotal(rightX: CGFloat, baseline: CGFloat, xHeight h: CGFloat) {
+    let w: CGFloat = 0.2, gap: CGFloat = 0.3
+    let widths: [CGFloat] = [0.6, 0.9, 0.6, 0.9, 0]
+    let total = widths.reduce(0, +) + gap * CGFloat(widths.count - 1)
+    var x = rightX / h - total
+    let y0 = baseline / h
+    let path = NSBezierPath()
+    func line(_ x1: CGFloat, _ y1: CGFloat, _ x2: CGFloat, _ y2: CGFloat) {
+        path.move(to: NSPoint(x: x1 * h, y: y1 * h)); path.line(to: NSPoint(x: x2 * h, y: y2 * h))
+    }
+    func bowl(_ x: CGFloat) {
+        path.append(NSBezierPath(roundedRect: NSRect(x: x * h, y: y0 * h, width: 0.9 * h, height: h),
+                                 xRadius: 0.36 * h, yRadius: 0.36 * h))
+    }
+    for (i, ch) in "total".enumerated() {
+        switch ch {
+        case "t": line(x + 0.2, y0 + 1.4, x + 0.2, y0); line(x, y0 + 1, x + 0.6, y0 + 1)
+        case "o": bowl(x)
+        case "a": bowl(x); line(x + 0.9, y0 + 1, x + 0.9, y0)
+        default: line(x, y0 + 1.4, x, y0)
+        }
+        x += widths[i] + gap
+    }
+    path.lineWidth = w * h; path.lineCapStyle = .round; path.lineJoinStyle = .round
+    NSColor.white.withAlphaComponent(0.9).setStroke(); path.stroke()
 }
 
 func draw(size: CGFloat) -> Data {
@@ -54,6 +82,9 @@ func draw(size: CGFloat) -> Data {
     let dot = NSPoint(x: center.x + 118 * s * cos(rad), y: center.y + 118 * s * sin(rad))
     color(0xD06A4A).setFill()
     NSBezierPath(ovalIn: NSRect(x: dot.x - r, y: dot.y - r, width: 2 * r, height: 2 * r)).fill()
+
+    // 右下角小字 “total”：等粗圆头线条、方中带圆的字形（参考 TotalMix 图标上的字样风格），右对齐
+    drawTotal(rightX: 806 * s, baseline: 168 * s, xHeight: 46 * s)
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
 }
