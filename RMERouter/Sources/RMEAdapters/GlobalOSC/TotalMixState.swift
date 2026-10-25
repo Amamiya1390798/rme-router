@@ -2,8 +2,9 @@ import Foundation
 import RMECore
 
 /// TotalMix 通道 ↔ `xt.<接口>.<方向>:<通道>` 的对照表（文档第 7 节安全规则 7）。
-/// 不用公式按序号推算硬件口：要么由用户确认，要么从 TotalMix 回读的硬件默认名解析。
-/// 唯一按定义映射的是回放：TotalMix 回放 n 就是电脑回放第 n 路，即 `<设备>.playback.in:n`。
+/// 来源（文档第 7 节规则 7，2026-10-26 改）：用户确认 > 按 XT 固定的通道顺序（位置）> 硬件默认名。
+/// 名字可以被改成任何东西（实测有 TotalMix 把 MADI 命名为连续数字），所以名字只用来核对位置。
+/// 回放按定义映射：TotalMix 回放 n 就是电脑回放第 n 路，即 `<设备>.playback.in:n`。
 public struct TotalMixChannelMap: Sendable, Equatable {
     public struct Entry: Sendable, Equatable {
         public var ref: ChannelRef
@@ -34,20 +35,52 @@ public struct TotalMixChannelMap: Sendable, Equatable {
     /// 2. 立体声对的右声道 TotalMix 不发名字：左声道为 `:c` 时右声道记为 `:c+1`。
     public mutating func infer(from state: TotalMixState) {
         let names = state.names
-        var inferred: [TotalMixChannel: ChannelRef] = [:]
+        var byName: [TotalMixChannel: ChannelRef] = [:]
         for (ch, name) in names where ch.bus != .playback {
             let fallback = ch.bus == .output ? names[TotalMixChannel(.playback, ch.number)] : nil
             guard let ref = Self.parseHardwareName(name, bus: ch.bus, deviceID: deviceID)
                 ?? fallback.flatMap({ Self.parseHardwareName($0, bus: ch.bus, deviceID: deviceID) }) else { continue }
-            inferred[ch] = ref
+            byName[ch] = ref
         }
-        for (ch, ref) in inferred where state.isStereo(ch) == true {
+        for (ch, ref) in byName where state.isStereo(ch) == true {
             let right = TotalMixChannel(ch.bus, ch.number + 1)
-            if inferred[right] == nil { inferred[right] = ChannelRef(ref.portID, ref.channel + 1) }
+            if byName[right] == nil { byName[right] = ChannelRef(ref.portID, ref.channel + 1) }
         }
-        for (ch, ref) in inferred where entries[ch]?.evidence != .confirmed {
-            entries[ch] = Entry(ref: ref, evidence: .inferred)
+        var inferred: [TotalMixChannel: Entry] = [:]
+        for bus in [TotalMixBus.input, .output] {
+            let maxNumber = state.channels.keys.filter { $0.bus == bus }.map(\.number).max() ?? 0
+            guard let layout = Self.layout(bus: bus, maxNumber: maxNumber, deviceID: deviceID) else { continue }
+            for (n, ref) in layout.enumerated() {
+                let ch = TotalMixChannel(bus, n + 1)
+                // 名字能解析：一致记 confirmed，矛盾记 conflict（仍按位置）；解析不出只按位置
+                let evidence: Evidence = byName[ch].map { $0 == ref ? .confirmed : .conflict } ?? .inferred
+                inferred[ch] = Entry(ref: ref, evidence: evidence)
+            }
         }
+        for (ch, ref) in byName where inferred[ch] == nil { inferred[ch] = Entry(ref: ref, evidence: .inferred) }
+        for (ch, e) in inferred where entries[ch]?.evidence != .confirmed || e.evidence == .conflict {
+            entries[ch] = e
+        }
+    }
+
+    /// XT 的 TotalMix 通道顺序（硬件决定）：每个序号对应的接口通道。MADI 每口路数按最大序号推出，
+    /// 只接受 64 / 32 / 16（单速 / 双速 / 四速）；推不出时返回 nil。
+    public static func layout(bus: TotalMixBus, maxNumber: Int, deviceID: String = "xt") -> [ChannelRef]? {
+        let fixed: [(String, Int)]
+        let dir: String
+        switch bus {
+        case .input: fixed = [("mic", 2), ("aes", 2)]; dir = "in"
+        case .output: fixed = [("an", 2), ("aes", 2), ("phones", 2)]; dir = "out"
+        case .playback: return nil
+        }
+        let head = fixed.reduce(0) { $0 + $1.1 }
+        guard maxNumber > head, (maxNumber - head) % 3 == 0 else { return nil }
+        let perPort = (maxNumber - head) / 3
+        guard [64, 32, 16].contains(perPort) else { return nil }
+        var out: [ChannelRef] = []
+        for (iface, n) in fixed { out += (1 ... n).map { ChannelRef("\(deviceID).\(iface).\(dir)", $0) } }
+        for k in 1 ... 3 { out += (1 ... perPort).map { ChannelRef("\(deviceID).madi\(k).\(dir)", $0) } }
+        return out
     }
 
     /// 只认 XT 的硬件默认名（2026-10-25 从 TotalMix 读回，见文档第 7 节规则 7）：

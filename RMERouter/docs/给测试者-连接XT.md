@@ -7,7 +7,9 @@
 
 - macOS 14 或更新；
 - Xcode，或命令行工具：终端运行 `xcode-select --install`；
+- RME 的 MADIface XT 驱动（没装过的话去 RME 官网 Downloads 下载 MADIface XT 的 macOS 驱动安装，装完重启）；
 - TotalMix FX 2.1 或更新，MADIface XT 已用 USB（或 PCIe）连上，TotalMix 里看得到设备；
+- 跑 `swift test` 需要完整的 Xcode（只有命令行工具会报 `no such module 'XCTest'`）；第一次用 Xcode 可能要先接受许可：`sudo xcodebuild -license`；
 - 仓库主人已在 GitHub 上把你加为协作者（私有仓库）。
 
 ## 2. 下载与编译
@@ -47,6 +49,16 @@ open .build/RMERouter.app
 | 6 | 在 TotalMix 里把一对立体声输入拆开，再合回去 | App 一秒内跟着变（不用按读取） | 有没有跟上 |
 | 7 | 在 TotalMix 里改一个发送的推子 | App 里对应电平一秒内更新 | 有没有跟上 |
 | 8 | 活动监视器里看 RME Router 的 CPU | 平时应在几个百分点以内 | 数字 |
+
+## 4b. 第二轮复测（2026-10-26 修复后）
+
+| # | 做什么 | 预期 |
+| --- | --- | --- |
+| A | 设备页 XT 通道条往右滚到 MADI 通道（名字是 1、2、5/6 …） | 每条都有“无信号”或电平，点上面的数字能改发送（不再是“—”或“?”） |
+| B | 输出页 | 送到 MADI 输出的发送都出现在对应卡片上 |
+| C | 再拆一次 AES 3/4 | App 出现两条：AES、AES 2（右声道），合回后变回一条 |
+| D | 活动监视器看 RME Router 的 CPU，放着 1 分钟后记 3 次 | 比上次的 29–42% 明显低 |
+| E | 有麦克风时：对着 XT Mic 1 说话 + 信号核对 | 电平动；核对结果“一致” |
 
 ## 5. 不要做的事
 

@@ -20,7 +20,7 @@ final class StereoSyncTests: XCTestCase {
 
     /// TotalMix 那边改了东西（这里模拟它主动发来的消息），App 不用按“读取”就跟上。
     func injectFromTotalMix(_ messages: [OSCMessage]) async {
-        fake.transport.inject(messages)
+        fake.changeInTotalMix(messages)
         try? await Task.sleep(for: .milliseconds(50))
     }
 

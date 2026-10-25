@@ -33,12 +33,31 @@ public struct CableSpec: Identifiable, Equatable, Sendable {
 
 extension AppModel {
     /// TotalMix 某一行的通道条：按序号排列，立体声右声道并进左声道，没名字的（隐藏通道）不列。
+    /// 按 TotalMix 读到的全部通道号列出（没名字的也列，例如拆开后的右声道），用位置给出名字。
     public func xtStrips(_ bus: TotalMixBus) -> [XTStrip] {
-        let names = tmState.names.filter { $0.key.bus == bus }
-        return names.keys.sorted().compactMap { ch in
-            if ch.number % 2 == 0, tmState.isStereo(TotalMixChannel(bus, ch.number - 1)) == true { return nil }
-            let ref: ChannelRef? = bus == .playback ? ChannelRef("xt.playback.in", ch.number) : xtMap[ch]?.ref
-            return XTStrip(tm: ch, ref: ref, name: names[ch] ?? "\(ch)", stereo: tmState.isStereo(ch) == true)
+        let names = tmState.names
+        let numbers = Set(tmState.channels.keys.filter { $0.bus == bus }.map(\.number))
+        guard let maxN = numbers.max() else { return [] }
+        return (1 ... maxN).compactMap { n in
+            let ch = TotalMixChannel(bus, n)
+            if n % 2 == 0, tmState.isStereo(TotalMixChannel(bus, n - 1)) == true { return nil }
+            let ref: ChannelRef? = bus == .playback ? ChannelRef("xt.playback.in", n) : xtMap[ch]?.ref
+            guard numbers.contains(n) || (bus != .playback && ref != nil) else { return nil }
+            let name = names[ch] ?? ref.map(positionName) ?? "\(n)"
+            return XTStrip(tm: ch, ref: ref, name: name, stereo: tmState.isStereo(ch) == true)
+        }
+    }
+
+    /// 没有名字时按接口给名字：“AES 2”“MADI 1·10”“Mic 2”。
+    func positionName(_ ref: ChannelRef) -> String {
+        let iface = ref.portID.split(separator: ".").dropFirst().first.map(String.init) ?? ref.portID
+        switch iface {
+        case "mic": return "Mic \(ref.channel)"
+        case "aes": return "AES \(ref.channel)"
+        case "an": return "AN \(ref.channel)"
+        case "phones": return "PH \(ref.channel)"
+        case "playback": return "回放 \(ref.channel)"
+        default: return iface.hasPrefix("madi") ? "MADI \(iface.dropFirst(4))·\(ref.channel)" : ref.description
         }
     }
 

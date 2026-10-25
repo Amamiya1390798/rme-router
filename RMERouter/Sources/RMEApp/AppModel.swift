@@ -287,6 +287,13 @@ public final class AppModel {
         guard let adapter, lastLoaded != nil else { return false }
         let state = await adapter.client.state
         guard state.revision != tmState.revision else { return false }
+        // 立体声配对变了：TotalMix 不一定重发名字，主动把这一对读回来（只读请求）
+        let changed = state.channels.keys.filter { ch in
+            ch.number % 2 == 1 && state.isStereo(ch) != tmState.isStereo(ch) && tmState.isStereo(ch) != nil
+        }
+        if !changed.isEmpty {
+            _ = try? await adapter.client.refreshChannels(changed.flatMap { [$0, TotalMixChannel($0.bus, $0.number + 1)] })
+        }
         await captureTotalMixState(from: adapter)
         apply(xt: TotalMixOSCAdapter.makeSnapshot(
             deviceID: "xt", state: tmState, map: adapter.channelMap,

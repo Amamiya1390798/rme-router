@@ -3,6 +3,14 @@ import Observation
 import RMECore
 import RMEAdapters
 
+/// 一个通道的电平格：每个电平条只观察自己的格，别的通道变了它不重画。
+@MainActor
+@Observable
+public final class MeterCell {
+    public internal(set) var dB: Double?
+    init(_ dB: Double?) { self.dB = dB }
+}
+
 /// 电平（文档第 7.7 节）。单独的可观察对象：每 100 ms 更新时只让电平条重绘，不重绘整页。
 @MainActor
 @Observable
@@ -21,6 +29,16 @@ public final class MeterStore {
     public private(set) var active: Set<ChannelRef> = []
     public private(set) var live = false
     private var activeUpdatedAt: Date?
+    /// 界面正在显示的通道的电平格（按需创建）。
+    @ObservationIgnored private var cells: [ChannelRef: MeterCell] = [:]
+
+    /// 某通道的电平格（电平条用）。
+    public func cell(_ ref: ChannelRef) -> MeterCell {
+        if let c = cells[ref] { return c }
+        let c = MeterCell(levels[ref])
+        cells[ref] = c
+        return c
+    }
 
     public init() {}
 
@@ -44,6 +62,8 @@ public final class MeterStore {
         if new != levels {
             levels = new
             lastUpdate = now
+            // 只动值变了的格：每次刷新只重画电平真的变了的那几条
+            for (ref, c) in cells where c.dB != new[ref] { c.dB = new[ref] }
         }
         guard activeUpdatedAt.map({ now.timeIntervalSince($0) >= 1 }) ?? true else { return }
         activeUpdatedAt = now

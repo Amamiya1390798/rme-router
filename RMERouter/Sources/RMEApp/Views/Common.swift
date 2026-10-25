@@ -120,7 +120,7 @@ struct MeterBar: View {
     var width: CGFloat = 70
 
     var body: some View {
-        if store.live, let dB = store.levels[ref] {
+        if store.live, let dB = store.cell(ref).dB {
             let fraction = min(max((dB + 60) / 60, 0), 1)
             HStack(spacing: Tokens.Space.xs) {
                 ZStack(alignment: .leading) {

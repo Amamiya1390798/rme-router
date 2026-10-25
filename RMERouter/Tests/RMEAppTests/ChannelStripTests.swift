@@ -54,6 +54,12 @@ final class ChannelStripTests: XCTestCase {
         }
 
         var lastWrites: [OSCMessage] { lock.withLock { writes } }
+
+        /// 模拟用户在 TotalMix 里改了东西：自己的状态跟着变，并把变化主动发给 App。
+        func changeInTotalMix(_ messages: [OSCMessage]) {
+            lock.withLock { for m in messages { if let v = m.arguments.first { params[m.address] = v } } }
+            transport.inject(messages)
+        }
     }
 
     var fake: FakeTM!
