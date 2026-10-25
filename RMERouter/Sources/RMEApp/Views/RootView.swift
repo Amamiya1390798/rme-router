@@ -58,7 +58,9 @@ public struct RootView: View {
                 model.showOnboarding = false
             }
         }
+        .modifier(TransparentToolbar())
         .toolbar {
+            ToolbarItem(placement: .principal) { StatusPill(model: model) }
             ToolbarItem { SendAcrossButton(model: model) }
             ToolbarItem {
                 Button { model.showInspector.toggle() } label: { Label("检查器", systemImage: "sidebar.right") }
@@ -148,6 +150,7 @@ struct Sidebar: View, Equatable {
 
     var body: some View {
         List(selection: $selection) {
+            BrandHeader().selectionDisabled()
             Section("页面") {
                 ForEach(AppSection.allCases) { s in
                     Label(s.title, systemImage: s.symbol).tag(s)
@@ -375,5 +378,63 @@ struct AppearanceCard: View {
         }
         .buttonStyle(.plain)
         .help("切换到“\(t.title)”")
+    }
+}
+
+/// 侧边栏顶部：App 图标 + 名字（代替标题栏文字，第 5.1 节）。
+struct BrandHeader: View {
+    var body: some View {
+        HStack(spacing: Tokens.Space.s) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("RME Router").font(.system(size: 14, weight: .semibold))
+                Text("路由与监听").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
+            }
+        }
+        .padding(.vertical, Tokens.Space.xs)
+    }
+}
+
+/// 工具栏中间的状态胶囊：XT 连接与采样率；点了去“设置 → 连接”（第 5.1 节）。
+struct StatusPill: View {
+    var model: AppModel
+
+    var body: some View {
+        let (dot, text) = summary
+        Button {
+            model.settingsTab = .connection
+            model.section = .settings
+        } label: {
+            HStack(spacing: 6) {
+                Circle().fill(dot).frame(width: 7, height: 7)
+                Text(text).font(.system(size: 11, weight: .medium)).lineLimit(1)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 3)
+            .background(Capsule().fill(Tokens.Palette.border.opacity(0.55)))
+        }
+        .buttonStyle(.plain)
+        .help("设备连接状态；点了打开“设置 → 连接”")
+    }
+
+    private var summary: (Color, String) {
+        let rate = model.xtAudio?.sampleRate.map(AppModel.rateText)
+        switch model.xtStatus {
+        case .live: return (Tokens.Palette.ok, "XT 已连接" + (rate.map { " · \($0)" } ?? ""))
+        case .offlineSaved: return (Tokens.Palette.warn, "XT 未连接 · 显示保存的配置")
+        case .loading: return (Tokens.Palette.warn, "正在读取…")
+        case .unreachable: return (Tokens.Palette.problem, "TotalMix 没有回应")
+        case .notLoaded: return (Tokens.Palette.unknown, "还没读取")
+        }
+    }
+}
+
+/// macOS 15 起工具栏底色透明，和内容连成一片；更早的系统保持默认。
+struct TransparentToolbar: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        } else {
+            content
+        }
     }
 }
