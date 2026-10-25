@@ -10,7 +10,8 @@ public struct ClockView: View {
 
     public var body: some View {
         ScrollView {
-            ClockContent(rows: ClockReport.build(model.snapshot), summary: ClockReport.summary(model.snapshot))
+            ClockContent(rows: ClockReport.build(model.snapshot), summary: model.checkupResults.filter { ClockReport.summaryRules.contains($0.id) }
+                .sorted { ClockReport.summaryRules.firstIndex(of: $0.id)! < ClockReport.summaryRules.firstIndex(of: $1.id)! })
                 .padding(Tokens.Space.xl)
         }
         .background(Tokens.Palette.bg)

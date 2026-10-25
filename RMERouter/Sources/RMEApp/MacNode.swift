@@ -9,8 +9,12 @@ extension AppModel {
     public func refreshAudio() {
         let info = audioSystem.device(nameContains: "MADIface XT")
         if info != xtAudio { xtAudio = info }
-        let logic = LogicAudioSettings.read(logicPrefsURL)
-        if logic != logicSettings { logicSettings = logic }
+        let modified = (try? logicPrefsURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        if modified == nil || modified != logicPrefsReadAt {
+            let logic = LogicAudioSettings.read(logicPrefsURL)
+            if logic != logicSettings { logicSettings = logic }
+            logicPrefsReadAt = modified
+        }
         audioChecked = true
         mergeAudioIntoXT()
     }

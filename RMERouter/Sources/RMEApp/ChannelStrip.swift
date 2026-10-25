@@ -225,10 +225,17 @@ extension AppModel {
 
 extension AppModel {
     /// 打开了送电脑录音、占用录音通道 n 的输出（第 7.8 节）；没有则为 nil。
+    /// 按 TotalMix 状态版本缓存：每条输入条都要问一次，不能每次都重建输出列表。
     public func loopbackSource(recording n: Int) -> XTStrip? {
-        xtStrips(.output).first { o in
-            guard let ref = o.ref, (stripValue(ref, .loopback) ?? 0) >= 0.5 else { return false }
-            return o.tm.number == n || (o.stereo && o.tm.number + 1 == n)
+        if loopbackCache?.revision != tmState.revision || loopbackCache?.version != snapshotVersion {
+            var map: [Int: XTStrip] = [:]
+            for o in xtStrips(.output) {
+                guard let ref = o.ref, (stripValue(ref, .loopback) ?? 0) >= 0.5 else { continue }
+                map[o.tm.number] = o
+                if o.stereo { map[o.tm.number + 1] = o }
+            }
+            loopbackCache = (tmState.revision, snapshotVersion, map)
         }
+        return loopbackCache?.map[n]
     }
 }

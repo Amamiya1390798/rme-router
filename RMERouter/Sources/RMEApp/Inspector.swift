@@ -69,7 +69,7 @@ extension AppModel {
         let origins = Array(Set(trace.upstream(to: ref).compactMap { $0.first?.hop.from })).sorted()
 
         // 体检里主题提到这个端口或这个通道的结论。
-        let findings = CheckupReport.build(snapshot).flatMap { r in
+        let findings = checkupResults.flatMap { r in
             (r.failures + r.undetermined).filter { $0.subject.contains(ref.portID) || $0.subject == ref.description }
                 .map { f -> String in
                     switch f.verdict {

@@ -9,20 +9,11 @@ struct ControlRoomBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            // 栏窄时快照换到第二行（设备页右栏，第 6.8 节）
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Tokens.Space.m) {
-                    toggles; Divider().frame(height: 18); monitors; Divider().frame(height: 18); snapshots; Spacer(minLength: 0)
-                }
-                VStack(alignment: .leading, spacing: Tokens.Space.s) {
-                    HStack(spacing: Tokens.Space.m) { toggles; Divider().frame(height: 18); monitors; Spacer(minLength: 0) }
-                    HStack(spacing: Tokens.Space.m) { snapshots; Spacer(minLength: 0) }
-                }
-                VStack(alignment: .leading, spacing: Tokens.Space.s) {
-                    HStack(spacing: Tokens.Space.m) { toggles; Spacer(minLength: 0) }
-                    HStack(spacing: Tokens.Space.m) { monitors; Spacer(minLength: 0) }
-                    HStack(spacing: Tokens.Space.m) { snapshots; Spacer(minLength: 0) }
-                }
+            // 三组（开关、监听、快照）放不下就换行：每组只建一次（以前三种排法都建一遍，下拉菜单被建 9 次，切页变慢）
+            FlowLayout(spacing: Tokens.Space.l, lineSpacing: Tokens.Space.s) {
+                HStack(spacing: Tokens.Space.m) { toggles }.fixedSize()
+                HStack(spacing: Tokens.Space.m) { monitors }.fixedSize()
+                HStack(spacing: Tokens.Space.m) { snapshots }.fixedSize()
             }
             if let error {
                 Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem)
@@ -44,17 +35,17 @@ struct ControlRoomBar: View {
     }
 
     @ViewBuilder private var monitors: some View {
-        monitorMenu(.mainOut)
-        monitorMenu(.phones(1))
-        monitorMenu(.phones(2))
+        let outputs = model.xtStrips(.output)
+        monitorMenu(.mainOut, outputs)
+        monitorMenu(.phones(1), outputs)
+        monitorMenu(.phones(2), outputs)
     }
 
     /// 主输出 / 耳机选哪一对硬件输出（第 7.9 节）。读不到这一项时不显示。
-    @ViewBuilder private func monitorMenu(_ g: TotalMixGlobal) -> some View {
+    @ViewBuilder private func monitorMenu(_ g: TotalMixGlobal, _ outputs: [XTStrip]) -> some View {
         if model.globalValue(g) != nil {
             let pend = model.pendingGlobal(g)
             let current = pend?.output ?? model.monitorOutput(g)
-            let outputs = model.xtStrips(.output)
             let name = current.map { c in outputs.first { $0.tm == c }?.name ?? "输出 \(c.number)" } ?? "未指定"
             Menu {
                 ForEach(outputs) { o in
@@ -117,5 +108,49 @@ struct ControlRoomBar: View {
         }
         .buttonStyle(.plain)
         .help(current ? (changed ? "当前快照（已改动，未保存）" : "当前快照") : "调用快照 \(n)：整套混音会被替换，需要确认，不能撤销")
+    }
+}
+
+/// 从左到右排，一行放不下就换到下一行。
+struct FlowLayout: Layout {
+    var spacing: CGFloat
+    var lineSpacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews)
+        let w = rows.map { $0.width }.max() ?? 0
+        let h = rows.reduce(0) { $0 + $1.height } + lineSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? w, height: h)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews) {
+            var x = bounds.minX
+            for i in row.items {
+                let size = subviews[i].sizeThatFits(.unspecified)
+                subviews[i].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: .unspecified)
+                x += size.width + spacing
+            }
+            y += row.height + lineSpacing
+        }
+    }
+
+    private struct Row { var items: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, _ subviews: Subviews) -> [Row] {
+        var rows: [Row] = [Row()]
+        for (i, v) in subviews.enumerated() {
+            let size = v.sizeThatFits(.unspecified)
+            if !rows[rows.count - 1].items.isEmpty, rows[rows.count - 1].width + spacing + size.width > width {
+                rows.append(Row())
+            }
+            var r = rows[rows.count - 1]
+            r.width += (r.items.isEmpty ? 0 : spacing) + size.width
+            r.height = max(r.height, size.height)
+            r.items.append(i)
+            rows[rows.count - 1] = r
+        }
+        return rows
     }
 }

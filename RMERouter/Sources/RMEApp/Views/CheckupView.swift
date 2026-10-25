@@ -10,7 +10,7 @@ public struct CheckupView: View {
 
     public var body: some View {
         ScrollView {
-            CheckupContent(results: CheckupReport.build(model.snapshot), status: model.xtStatus,
+            CheckupContent(results: model.checkupResults, status: model.xtStatus,
                            lastLoaded: model.lastLoaded, demoDevices: demoNames, twelveMic: model.twelveMicStatus)
                 .padding(Tokens.Space.xl)
         }

@@ -130,6 +130,8 @@ public final class AppModel {
     }
     static let hiddenStripsKey = "strips.hidden"
     @ObservationIgnored var outputsCache: (key: [Int], groups: [DeviceOutputs])?
+    @ObservationIgnored var checkupCache: (version: Int, results: [RuleResult])?
+    @ObservationIgnored var loopbackCache: (revision: Int, version: Int, map: [Int: XTStrip])?
     @ObservationIgnored var focusCache: (key: [AnyHashable], focus: StripFocus)?
     /// 线缆核对结果（第 6.5 节），按两端端口记，存在 UserDefaults。
     public internal(set) var linkVerifications: [String: LinkVerification] = [:] {
@@ -146,6 +148,8 @@ public final class AppModel {
     /// Logic 设定的音频设备（第 6.7 节）；没装 Logic 为 nil。
     public internal(set) var logicSettings: LogicAudioSettings?
     @ObservationIgnored public var logicPrefsURL = LogicAudioSettings.defaultURL
+    /// Logic 偏好文件上次读取时的修改时间：没变就不重读（文件约 0.5 MB，每 2 秒在主线程读一次会让界面周期性顿一下）。
+    @ObservationIgnored var logicPrefsReadAt: Date?
     @ObservationIgnored let audioSystem: AudioSystem
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
@@ -202,7 +206,7 @@ public final class AppModel {
     public var confirmMode: ConfirmMode { didSet { defaults.set(confirmMode.rawValue, forKey: ConfirmMode.defaultsKey) } }
     public internal(set) var isApplying = false
     /// 最近一次从 TotalMix 读回的原始状态与对照表（写入时用来反查 TotalMix 通道）。
-    public internal(set) var tmState = TotalMixState() { didSet { outputsCache = nil; focusCache = nil } }
+    public internal(set) var tmState = TotalMixState() { didSet { outputsCache = nil; focusCache = nil; loopbackCache = nil } }
     public internal(set) var xtMap = TotalMixChannelMap()
 
     @ObservationIgnored var adapter: TotalMixOSCAdapter?

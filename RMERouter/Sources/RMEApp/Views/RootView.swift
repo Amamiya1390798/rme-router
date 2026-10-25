@@ -7,6 +7,7 @@ public struct RootView: View {
     @Bindable var model: AppModel
 
     @State private var devicesBuilt = false
+    @State private var outputsBuilt = false
 
     public init(model: AppModel) { self.model = model }
 
@@ -28,9 +29,19 @@ public struct RootView: View {
                         .accessibilityHidden(!onDevices)
                         .environment(\.pageActive, onDevices)
                 }
-                if !onDevices { otherPage }
+                // 输出页同样常驻（卡片多，重建一次约 0.15 秒）
+                if outputsBuilt {
+                    OutputsView(model: model)
+                        .opacity(onOutputs ? 1 : 0)
+                        .allowsHitTesting(onOutputs)
+                        .accessibilityHidden(!onOutputs)
+                }
+                if !onDevices && !onOutputs { otherPage }
             }
-            .onChange(of: model.section, initial: true) { if onDevices { devicesBuilt = true } }
+            .onChange(of: model.section, initial: true) {
+                if onDevices { devicesBuilt = true }
+                if onOutputs { outputsBuilt = true }
+            }
             .inspector(isPresented: $model.showInspector) {
                 InspectorPanel(model: model).inspectorColumnWidth(min: 260, ideal: 300, max: 420)
             }
@@ -68,11 +79,12 @@ public struct RootView: View {
     }
 
     private var onDevices: Bool { (model.section ?? .devices) == .devices }
+    private var onOutputs: Bool { model.section == .outputs }
 
     @ViewBuilder private var otherPage: some View {
         switch model.section ?? .devices {
         case .devices: EmptyView()
-        case .outputs: OutputsView(model: model)
+        case .outputs: EmptyView()
         case .preamps: PreampsView(model: model)
         case .checkup:
             PageTabs(selection: $model.checkupTab) {

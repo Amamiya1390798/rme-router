@@ -73,3 +73,13 @@ public enum CheckupReport {
          results.filter { $0.status == .pass }.count)
     }
 }
+
+extension AppModel {
+    /// 体检结果，按快照版本缓存（体检页、时钟页、检查器都用；每次重绘都全跑一遍会拖慢切页）。
+    public var checkupResults: [RuleResult] {
+        if let c = checkupCache, c.version == snapshotVersion { return c.results }
+        let r = CheckupReport.build(snapshot)
+        checkupCache = (snapshotVersion, r)
+        return r
+    }
+}
