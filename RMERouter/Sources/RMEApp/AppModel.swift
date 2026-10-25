@@ -102,6 +102,12 @@ public final class AppModel {
     public internal(set) var scenes: [StudioScene] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
+    /// 首次使用向导（阶段 D2）：没走完过就在启动时打开。
+    public var showOnboarding = false
+    public var onboardingDone: Bool {
+        get { defaults.bool(forKey: "onboarding.done") }
+        set { defaults.set(newValue, forKey: "onboarding.done") }
+    }
     /// 确认方式（第 7.4 节）。
     public var confirmMode: ConfirmMode { didSet { defaults.set(confirmMode.rawValue, forKey: ConfirmMode.defaultsKey) } }
     public internal(set) var isApplying = false

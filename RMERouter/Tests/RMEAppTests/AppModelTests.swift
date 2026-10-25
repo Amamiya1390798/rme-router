@@ -69,6 +69,14 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.xtStatus, .live)
     }
 
+    /// 首次使用向导（阶段 D2）：走完一次就不再自动打开。
+    func testOnboardingShownOnlyUntilDone() {
+        let defaults = UserDefaults(suiteName: "rme.test.\(UUID())")!
+        XCTAssertFalse(AppModel(defaults: defaults).onboardingDone)
+        AppModel(defaults: defaults).onboardingDone = true
+        XCTAssertTrue(AppModel(defaults: defaults).onboardingDone)
+    }
+
     func testSettingsPersist() {
         let defaults = UserDefaults(suiteName: "rme.test.\(UUID())")!
         let a = AppModel(defaults: defaults)

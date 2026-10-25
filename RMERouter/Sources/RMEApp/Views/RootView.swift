@@ -37,6 +37,12 @@ public struct RootView: View {
             }
         }
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
+        .sheet(isPresented: $model.showOnboarding) {
+            OnboardingSheet(model: model) {
+                model.onboardingDone = true
+                model.showOnboarding = false
+            }
+        }
         .toolbar {
             ToolbarItem { SendAcrossButton(model: model) }
             ToolbarItem {
@@ -53,7 +59,10 @@ public struct RootView: View {
                 .help("只读：读取 TotalMix（/sendstate、/sendall）与 12Mic（JSON，全部为 null），不改动设备")
             }
         }
-        .task { if model.xtStatus == .notLoaded { await model.refresh() } }
+        .task {
+            if !model.onboardingDone { model.showOnboarding = true }
+            if model.xtStatus == .notLoaded { await model.refresh() }
+        }
     }
 
     private var deviceRows: [Sidebar.DeviceRow] {
@@ -183,6 +192,7 @@ struct ConnectionView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
+                Button("重新打开首次设置向导") { model.showOnboarding = true }
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("备份").font(Tokens.Font.cardTitle)
                     HStack {
