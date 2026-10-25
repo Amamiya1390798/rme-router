@@ -54,6 +54,32 @@ public struct ControlPath: Codable, Sendable, Hashable {
     }
 }
 
+/// 一路话放（前级）的状态（文档第 6.2 节）。读不到的字段为 unknown，不猜默认值。
+public struct PreampChannel: Codable, Sendable, Equatable, Identifiable {
+    public var input: ChannelRef          // 例如 12mic.analog.in:1
+    public var label: Fact<String>
+    public var gainDB: Fact<Double>
+    public var phantom: Fact<Bool>        // 48V
+    public var phase: Fact<Bool>          // 相位反转
+    public var hiZ: Fact<Bool>            // 乐器输入
+    public var autoGain: Fact<Bool>       // AutoSet
+    public var gainGroup: Fact<String>
+
+    public var id: ChannelRef { input }
+
+    public init(input: ChannelRef, label: Fact<String>, gainDB: Fact<Double>, phantom: Fact<Bool>, phase: Fact<Bool>,
+                hiZ: Fact<Bool>, autoGain: Fact<Bool>, gainGroup: Fact<String>) {
+        self.input = input
+        self.label = label
+        self.gainDB = gainDB
+        self.phantom = phantom
+        self.phase = phase
+        self.hiZ = hiZ
+        self.autoGain = autoGain
+        self.gainGroup = gainGroup
+    }
+}
+
 /// 每台设备一份只读快照。
 public struct DeviceSnapshot: Codable, Sendable {
     public var deviceID: String
@@ -67,11 +93,13 @@ public struct DeviceSnapshot: Codable, Sendable {
     public var settings: [String: Fact<String>]
     /// 目标输出的静音/电平（R13），键为输出通道描述。
     public var outputMuted: [ChannelRef: Fact<Bool>]
+    /// 话放（前级），按输入通道排序。
+    public var preamps: [PreampChannel]
 
     public init(deviceID: String, reachable: Bool, clock: ClockState,
                 portFormats: [String: Fact<StreamFormat>] = [:], routes: [Route] = [],
                 controlPaths: [ControlPath] = [], settings: [String: Fact<String>] = [:],
-                outputMuted: [ChannelRef: Fact<Bool>] = [:]) {
+                outputMuted: [ChannelRef: Fact<Bool>] = [:], preamps: [PreampChannel] = []) {
         self.deviceID = deviceID
         self.reachable = reachable
         self.clock = clock
@@ -80,6 +108,7 @@ public struct DeviceSnapshot: Codable, Sendable {
         self.controlPaths = controlPaths
         self.settings = settings
         self.outputMuted = outputMuted
+        self.preamps = preamps
     }
 }
 

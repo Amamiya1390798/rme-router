@@ -95,6 +95,7 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
             "clock": NSNull(),
             "routing": NSNull(),
             "output": ["madi": NSNull()],
+            "input": ["analog": NSNull()],
         ])
         return Self.parseSnapshot(reply, deviceID: deviceID, portMap: portMap, inputPortMap: inputPortMap,
                                   controlPath: ControlPath(controller: "this-app", transport: .http(baseURL: baseURL.absoluteString),
@@ -171,9 +172,38 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
             settings["12mic.unknownInputPorts"] = .confirmed(text, src("routing"))
         }
 
+        let analog = (reply["input"] as? [String: Any])?["analog"] as? [String: Any] ?? [:]
+        let preamps = parsePreamps(analog, inputPortID: inputPortMap["analog"] ?? "\(deviceID).analog.in", src: src)
+
         return DeviceSnapshot(deviceID: deviceID, reachable: true, clock: clockState, portFormats: formats,
                               routes: routes.sorted { $0.destination < $1.destination },
-                              controlPaths: [controlPath], settings: settings)
+                              controlPaths: [controlPath], settings: settings, preamps: preamps)
+    }
+
+    /// `input/analog/<n>` → 前级状态。手册未写字段的确切类型：布尔也接受 0/1；读不到的字段记 unknown。
+    static func parsePreamps(_ analog: [String: Any], inputPortID: String,
+                             src: (String) -> FactSource) -> [PreampChannel] {
+        analog.compactMap { key, value -> PreampChannel? in
+            guard let n = Int(key), let ch = value as? [String: Any] else { return nil }
+            let path = "input/analog/\(n)"
+            func bool(_ k: String) -> Fact<Bool> {
+                let v = ch[k]
+                if let b = v as? Bool { return .confirmed(b, src("\(path)/\(k)")) }
+                if let i = v as? Int, i == 0 || i == 1 { return .confirmed(i == 1, src("\(path)/\(k)")) }
+                return .unknown(src("\(path)/\(k)"))
+            }
+            func string(_ k: String) -> Fact<String> {
+                if let t = ch[k] as? String { return .confirmed(t, src("\(path)/\(k)")) }
+                if let i = ch[k] as? Int { return .confirmed(String(i), src("\(path)/\(k)")) }
+                return .unknown(src("\(path)/\(k)"))
+            }
+            let gain: Fact<Double> = (ch["gain"] as? NSNumber).map { .confirmed($0.doubleValue, src("\(path)/gain")) }
+                ?? .unknown(src("\(path)/gain"))
+            return PreampChannel(input: ChannelRef(inputPortID, n), label: string("label"), gainDB: gain,
+                                 phantom: bool("p48"), phase: bool("phase"), hiZ: bool("hiz"),
+                                 autoGain: bool("gain_autoset"), gainGroup: string("gain_group"))
+        }
+        .sorted { $0.input < $1.input }
     }
 
     public func plan(_ change: RouteChange, current: DeviceSnapshot) -> [PlannedOperation] {

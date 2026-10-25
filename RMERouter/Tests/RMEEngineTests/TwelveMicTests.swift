@@ -54,6 +54,11 @@ final class TwelveMicTests: XCTestCase {
             "soundness": ["state": "Good"],
         ],
         "output": ["madi": ["mode": 64, "framesize": 48]],
+        "input": ["analog": [
+            "1": ["label": "Kick", "gain": 32.5, "p48": false, "phase": true, "hiz": false, "gain_autoset": false, "gain_group": "0", "type": "combo"],
+            "2": ["label": "", "gain": 40, "p48": 1, "phase": 0],            // 布尔以 0/1 给出；其余字段缺失
+            "3": ["label": "Vox"],                                           // 只有标签
+        ]],
         "routing": [
             "madi_optical": ["9": ["analog", 1], "10": ["analog", 2], "1": ["unrouted", 1], "40": ["avb1", 3]],
             "phones": ["1": ["madi_optical", 33], "2": ["madi_optical", 34]],
@@ -111,6 +116,26 @@ final class TwelveMicTests: XCTestCase {
         XCTAssertEqual(snap.settings["12mic.clock.soundness"]?.knownValue, "Good")
         XCTAssertEqual(snap.settings["12mic.unknownInputPorts"]?.knownValue, "avb1×1")      // 未登记的输入口计数
         XCTAssertEqual(snap.controlPaths.first?.state, .online)
+    }
+
+    func testPreampsParsed() async throws {
+        let snap = try await adapter.snapshot()
+        XCTAssertEqual((Fake12Mic.bodies.last?["input"] as? [String: Any])?["analog"] as? NSNull, NSNull())
+        XCTAssertEqual(snap.preamps.map(\.input.description), ["12mic.analog.in:1", "12mic.analog.in:2", "12mic.analog.in:3"])
+        let kick = snap.preamps[0], two = snap.preamps[1], vox = snap.preamps[2]
+        XCTAssertEqual(kick.label.knownValue, "Kick")
+        XCTAssertEqual(kick.gainDB.knownValue, 32.5)
+        XCTAssertEqual(kick.phantom.knownValue, false)
+        XCTAssertEqual(kick.phase.knownValue, true)
+        XCTAssertEqual(kick.gainGroup.knownValue, "0")
+        XCTAssertEqual(two.gainDB.knownValue, 40)
+        XCTAssertEqual(two.phantom.knownValue, true)
+        XCTAssertEqual(two.phase.knownValue, false)
+        XCTAssertNil(two.hiZ.knownValue)                    // 缺失 → unknown，不猜 false
+        XCTAssertEqual(two.hiZ.evidence, .unknown)
+        XCTAssertEqual(vox.label.knownValue, "Vox")
+        XCTAssertNil(vox.gainDB.knownValue)
+        XCTAssertNil(vox.phantom.knownValue)
     }
 
     func testProbeUsesDocumentedKey() async {
