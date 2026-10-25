@@ -32,6 +32,11 @@ struct ControlRoomBar: View {
         if model.talkbackReady {
             toggle(.talkback, onColor: Tokens.Palette.accent)
         }
+        if model.globalValue(.muteFX) != nil { toggle(.muteFX, onColor: Tokens.Palette.warn) }
+        // 外部输入：TotalMix 里指定了外部输入通道（extinchannel ≥ 0）才有意义
+        if model.globalValue(.externalIn) != nil, (model.tmState.globals["controlroom/extinchannel"]?.number ?? -1) >= 0 {
+            toggle(.externalIn, onColor: Tokens.Palette.warn)
+        }
     }
 
     @ViewBuilder private var monitors: some View {

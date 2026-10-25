@@ -20,6 +20,7 @@ final class MonitorTests: XCTestCase {
             OSCMessage("/controlroom/mainout", [.float(0)]), OSCMessage("/controlroom/phones1", [.float(4)]),
             OSCMessage("/controlroom/phones2", [.float(-1)]), OSCMessage("/controlroom/talkchannel", [.float(-1)]),
             OSCMessage("/controlroom/talkback", [.float(0)]), OSCMessage("/snapshot/load/1", [.float(2)]),
+            OSCMessage("/controlroom/mutefx", [.float(0)]), OSCMessage("/controlroom/externalin", [.float(0)]),
         ])
         try? await Task.sleep(for: .milliseconds(50))
         _ = await m.syncFromTotalMix()
@@ -77,6 +78,17 @@ final class MonitorTests: XCTestCase {
         XCTAssertNil(m.stageMonitor(.phones(2), output: TotalMixChannel(.output, 7)))
         XCTAssertFalse(m.needsExplicitConfirmation)
         XCTAssertNotNil(m.stageMonitor(.phones(1), output: TotalMixChannel(.input, 1)), "只能选硬件输出")
+    }
+
+    /// 静音效果：开关，写入回读。
+    func testMuteFX() async throws {
+        let m = await model()
+        XCTAssertEqual(m.globalValue(.muteFX), 0)
+        XCTAssertNil(m.stageGlobal(.muteFX, on: true))
+        XCTAssertEqual(m.pendingGlobals.first?.wireText, "OSC：/controlroom/mutefx 1.0")
+        let applied = await apply(m); let batch = try XCTUnwrap(applied)
+        XCTAssertTrue(batch.outcomes.values.allSatisfy { $0 == .verified })
+        XCTAssertEqual(fake.value("/controlroom/mutefx"), 1)
     }
 
     /// 修正：调用快照在快速方式下也要确认。

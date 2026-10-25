@@ -228,6 +228,8 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
     case dim, mainMono, globalMute
     /// 对讲开关（需 TotalMix 里已指定对讲话筒 talkchannel）。
     case talkback
+    /// 主输出静音效果返回；外部立体声输入替换主输出（第 7.9 节）。
+    case muteFX, externalIn
     /// 主输出、耳机 1/2：取值是输出通道序号（从 0 起，立体声写左声道），-1 未指定（第 7.9 节）。
     case mainOut
     case phones(Int)
@@ -240,6 +242,8 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
         case .mainMono: return "controlroom/mainmono"
         case .globalMute: return "globalmute"
         case .talkback: return "controlroom/talkback"
+        case .muteFX: return "controlroom/mutefx"
+        case .externalIn: return "controlroom/externalin"
         case .mainOut: return "controlroom/mainout"
         case let .phones(n): return "controlroom/phones\(n)"
         case let .snapshot(n): return "snapshot/load/\(n)"
@@ -257,6 +261,8 @@ public enum TotalMixGlobal: Equatable, Hashable, Sendable {
         case .mainMono: return "Main 单声道"
         case .globalMute: return "全局静音"
         case .talkback: return "对讲"
+        case .muteFX: return "静音效果"
+        case .externalIn: return "外部输入"
         case .mainOut: return "主输出"
         case let .phones(n): return "耳机 \(n)"
         case let .snapshot(n): return "调用快照 \(n)"
