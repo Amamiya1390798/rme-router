@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import RMECore
 
 /// 主窗口：左侧视图与设备列表，中间是当前视图。
@@ -118,6 +119,10 @@ struct Sidebar: View, Equatable {
 /// “连接”视图：TotalMix Global OSC 的端口设置与说明。
 struct ConnectionView: View {
     @Bindable var model: AppModel
+    @State private var exporting = false
+    @State private var importing = false
+    @State private var backupDoc: BackupDocument?
+    @State private var backupMessage: String?
 
     var body: some View {
         ScrollView {
@@ -178,6 +183,41 @@ struct ConnectionView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
+                VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                    Text("备份").font(Tokens.Font.cardTitle)
+                    HStack {
+                        Button("导出…") {
+                            do { backupDoc = BackupDocument(data: try model.exportBackup()); exporting = true }
+                            catch { backupMessage = "导出失败：\(error)" }
+                        }
+                        Button("导入…") { importing = true }
+                    }
+                    Text("包含连接设置、确认方式、接线和全部场景。导入会替换当前设置与接线，场景合并。")
+                        .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    if let backupMessage {
+                        Text(backupMessage).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.text)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card()
+                .fileExporter(isPresented: $exporting, document: backupDoc, contentType: .json,
+                              defaultFilename: "RME Router 备份 \(Date().formatted(.iso8601.year().month().day()))") { result in
+                    if case let .failure(e) = result { backupMessage = "导出失败：\(e.localizedDescription)" }
+                    else { backupMessage = "已导出。" }
+                }
+                .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+                    switch result {
+                    case let .success(url):
+                        let access = url.startAccessingSecurityScopedResource()
+                        defer { if access { url.stopAccessingSecurityScopedResource() } }
+                        do { backupMessage = try model.importBackup(Data(contentsOf: url)).text }
+                        catch let e as BackupError { backupMessage = e.text }
+                        catch { backupMessage = "导入失败：\(error.localizedDescription)" }
+                    case let .failure(e):
+                        backupMessage = "导入失败：\(e.localizedDescription)"
+                    }
+                }
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     Text("TotalMix 里需要的设置").font(Tokens.Font.cardTitle)
                     ForEach(Self.steps, id: \.self) { Text($0).font(Tokens.Font.body) }
