@@ -9,29 +9,45 @@ final class SignalPathTests: XCTestCase {
     func model() -> AppModel { AppModel(defaults: UserDefaults(suiteName: "path-\(UUID())")!) }
     func conn(_ id: String) -> PanelConnector { PanelLayout.all.flatMap(\.connectors).first { $0.id == id }! }
 
-    func testPathOfTwelveMicMic() {
-        let m = model()
-        let p = m.signalPath(for: ChannelRef("12mic.analog.in", 3))
-        // 12Mic 路由（演示）→ 接线 L1 → XT MADI 1 输入 11 → 录音
-        XCTAssertTrue(p.segments.contains { $0.kind == .route("3 → 11") && $0.verified == false })
-        XCTAssertTrue(p.segments.contains { $0.kind == .cable(linkID: "L1") && $0.verified == false })
-        XCTAssertTrue(p.segments.contains { if case .recording = $0.kind { return $0.from == ChannelRef("xt.madi1.in", 11) }; return false })
-        XCTAssertTrue(p.text.hasPrefix("12Mic Mic 3 → "), p.text)
-        XCTAssertTrue(p.text.contains("电脑录音"))
+    var fake: ChannelStripTests.FakeTM!
+
+    func loaded() async -> AppModel {
+        let fake = ChannelStripTests.FakeTM()
+        self.fake = fake
+        let m = AppModel(defaults: UserDefaults(suiteName: "focus-\(UUID())")!,
+                         makeAdapter: { TotalMixOSCAdapter(port: $0.port, transport: fake.transport) },
+                         makeTwelveMic: { TwelveMicJSONAdapter(baseURL: $0, session: XTCAppTests.offlineSession) })
+        await m.refresh()
+        return m
     }
 
-    func testPathFromMiddleIncludesUpstream() {
-        let p = model().signalPath(for: ChannelRef("xt.madi1.in", 11))
-        XCTAssertTrue(p.text.hasPrefix("12Mic Mic 3 → MADIface XT"), p.text)
+    /// 选 XT Mic 1：高亮 Mic 1 与它送达的耳机，画一条线。
+    func testFocusMic() async {
+        let m = await loaded()
+        let f = m.stripFocus(connector: conn("xt.mic.1"))
+        XCTAssertEqual(f.inputs, [TotalMixChannel(.input, 1)])
+        XCTAssertEqual(f.outputs, [TotalMixChannel(.output, 5)])
+        XCTAssertEqual(f.edges.map(\.to), [TotalMixChannel(.output, 5)])
+        XCTAssertEqual(f.edges.first?.dB ?? 0, -6.9, accuracy: 0.01)
     }
 
-    func testAnchorOnOtherFaceBecomesTag() {
-        let m = model()
-        XCTAssertEqual(m.pathAnchor(ChannelRef("12mic.analog.in", 3), face: .front)?.key, "conn:12mic.mic.3")
-        let rear = m.pathAnchor(ChannelRef("12mic.analog.in", 3), face: .rear)
-        XCTAssertEqual(rear?.key, "edge:12mic")
-        XCTAssertEqual(rear?.offFace, "前 · Mic/Line 3（可接乐器 Hi-Z）")
-        XCTAssertEqual(m.pathAnchor(ChannelRef("p16i.adat_a.in", 1), face: .rear)?.key, "node:p16i")
+    /// 选耳机输出口：往上游找到两条来源（Mic 1、M2-1/2 立体声并成一条）。
+    func testFocusOutputFindsSources() async {
+        let m = await loaded()
+        let f = m.stripFocus(connector: conn("xt.phones"))
+        XCTAssertEqual(f.inputs, [TotalMixChannel(.input, 1), TotalMixChannel(.input, 69)])
+        XCTAssertEqual(f.edges.count, 2)
+    }
+
+    /// 选整个 MADI 2 输入口：高亮它的通道条，面板上只亮接进来的线（XTC → XT，L4）。
+    func testFocusWholeMadiPort() async {
+        let m = await loaded()
+        let f = m.stripFocus(connector: conn("xt.madi2.in"))
+        XCTAssertTrue(f.inputs.contains(TotalMixChannel(.input, 69)))
+        XCTAssertFalse(f.inputs.contains(TotalMixChannel(.input, 70)), "立体声右声道并进左声道")
+        XCTAssertTrue(f.links.contains("L4"))
+        // 只选其中第 1 路
+        XCTAssertEqual(m.stripFocus(connector: conn("xt.madi2.in"), channel: 1).inputs, [TotalMixChannel(.input, 69)])
     }
 
     func testDragIntents() {

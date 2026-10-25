@@ -11,6 +11,8 @@ import RMEAdapters
 struct XTStripsView: View {
     @Bindable var model: AppModel
     var onlySignal: Bool
+    /// 在面板上选中接口时：要高亮的通道条和它们之间的线（第 6.4.4 节）。
+    var focus: StripFocus? = nil
     @State private var output: TotalMixChannel?
     @State private var source: TotalMixChannel?
 
@@ -29,21 +31,24 @@ struct XTStripsView: View {
                 Text("还没有从 TotalMix 读到通道。在“连接”页确认端口后点“读取设备”。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
             } else {
-                row("硬件输入", sub: "= 电脑录音") {
-                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }) }
+                row("硬件输入", sub: "= 电脑录音", ids: inputs.map(\.tm)) {
+                    ForEach(inputs) { s in strip(s, origin: s.ref.flatMap { origins[$0] }).id(s.tm) }
                 }
-                row("软件回放", sub: "DAW 送来") {
-                    if let s = selectedSource, s.tm.bus == .input { RecordingGhost(strip: s) }
-                    ForEach(playbacks) { s in strip(s, origin: nil) }
+                row("软件回放", sub: "DAW 送来", ids: playbacks.map(\.tm)) {
+                    if focus == nil, let s = selectedSource, s.tm.bus == .input { RecordingGhost(strip: s) }
+                    ForEach(playbacks) { s in strip(s, origin: nil).id(s.tm) }
                 }
-                row("硬件输出", sub: nil) {
+                row("硬件输出", sub: nil, ids: outputs.map(\.tm)) {
                     ForEach(outputs) { s in
-                        OutputStrip(model: model, strip: s, selected: selectedSource == nil && s.tm == current?.tm,
-                                    routedDB: selectedSource == nil ? nil : sends.first { $0.output == s.tm }?.dB) {
+                        let lit = focus.map { $0.outputs.contains(s.tm) }
+                        OutputStrip(model: model, strip: s, selected: focus == nil && selectedSource == nil && s.tm == current?.tm,
+                                    routedDB: focus == nil && selectedSource != nil ? sends.first { $0.output == s.tm }?.dB : nil,
+                                    lit: lit) {
                             output = s.tm
                             source = nil
                         }
                         .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["out:\(s.tm.number)"] = $1 }
+                        .id(s.tm)
                     }
                 }
             }
@@ -51,7 +56,14 @@ struct XTStripsView: View {
         .padding(Tokens.Space.m)
         .overlayPreferenceValue(StripAnchorKey.self) { anchors in
             GeometryReader { g in
-                if let s = selectedSource, let from = anchors["src"].map({ g[$0] }) {
+                if let focus {
+                    // 选中接口：画链上每条“来源条 → 输出条”的线
+                    ForEach(Array(focus.edges.prefix(StripFocus.maxEdges).enumerated()), id: \.offset) { _, e in
+                        if let a = anchors["src:\(e.from.bus.rawValue):\(e.from.number)"], let b = anchors["out:\(e.to.number)"] {
+                            RouteLines(from: g[a], targets: [(g[b], e.dB)])
+                        }
+                    }
+                } else if let s = selectedSource, let from = anchors["src"].map({ g[$0] }) {
                     RouteLines(from: from, targets: sends.compactMap { t in anchors["out:\(t.output.number)"].map { (g[$0], t.dB) } }
                                + (s.tm.bus == .input ? (anchors["rec"].map { [(g[$0], Double?.none)] } ?? []) : []))
                 }
@@ -81,10 +93,14 @@ struct XTStripsView: View {
     }
 
     private func strip(_ s: XTStrip, origin: OriginLabel?) -> some View {
-        SourceStrip(model: model, strip: s, output: current, origin: origin, selected: source == s.tm) {
+        SourceStrip(model: model, strip: s, output: current, origin: origin,
+                    selected: focus == nil ? source == s.tm : false, lit: focus.map { $0.contains(s.tm) }) {
             source = source == s.tm ? nil : s.tm
         }
-        .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { if source == s.tm { $0["src"] = $1 } }
+        .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) {
+            $0["src:\(s.tm.bus.rawValue):\(s.tm.number)"] = $1
+            if source == s.tm { $0["src"] = $1 }
+        }
     }
 
     private func filtered(_ s: [XTStrip]) -> [XTStrip] {
@@ -92,15 +108,23 @@ struct XTStripsView: View {
         return s.filter { $0.ref.map { model.hasSignal($0) == true } ?? false }
     }
 
-    private func row<C: View>(_ title: String, sub: String?, @ViewBuilder content: () -> C) -> some View {
+    private func row<C: View>(_ title: String, sub: String?, ids: [TotalMixChannel], @ViewBuilder content: @escaping () -> C) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.s) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Tokens.Font.caption.weight(.semibold))
                 if let sub { Text(sub).font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted) }
             }
             .frame(width: 66, alignment: .leading)
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 4) { content() }.padding(.bottom, 6)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 4) { content() }.padding(.bottom, 6)
+                }
+                // 选中接口后自动滚到这一行第一条高亮的通道条
+                .onChange(of: focus) {
+                    if let first = ids.first(where: { focus?.contains($0) == true }) {
+                        withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(first, anchor: .leading) }
+                    }
+                }
             }
         }
         .padding(.bottom, 14)   // 给线留出空间
@@ -170,6 +194,8 @@ struct SourceStrip: View {
     var output: XTStrip?
     var origin: OriginLabel?
     var selected: Bool
+    /// 面板上选了接口时：true 高亮、false 变淡、nil 照常。
+    var lit: Bool? = nil
     var select: () -> Void
     @State private var editing = false
 
@@ -220,8 +246,8 @@ struct SourceStrip: View {
         .padding(5)
         .frame(width: 72)
         .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
-        .opacity(strip.ref.flatMap { model.hasSignal($0) } == false && !selected ? 0.55 : 1)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .opacity(lit == false ? 0.3 : (strip.ref.flatMap { model.hasSignal($0) } == false && !selected && lit != true ? 0.55 : 1))
         .draggable(strip.ref?.description ?? "") {
             Text(strip.name).font(Tokens.Font.caption).padding(6).background(Tokens.Palette.surface)
         }
@@ -235,6 +261,7 @@ struct OutputStrip: View {
     var selected: Bool
     /// 选中某个来源时：它送到这里的电平（nil = 没送到）。
     var routedDB: Double?
+    var lit: Bool? = nil
     var select: () -> Void
     @State private var dropTarget = false
     @State private var message: String?
@@ -252,7 +279,8 @@ struct OutputStrip: View {
         .padding(5)
         .frame(width: 72)
         .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.bg))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(dropTarget || selected || routedDB != nil ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(dropTarget || selected || routedDB != nil || lit == true ? Tokens.Palette.accent : .clear, lineWidth: 1.5))
+        .opacity(lit == false ? 0.3 : 1)
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
         .help(message ?? "点选：上两行显示送到这里的电平；把来源拖到这里新建发送")
