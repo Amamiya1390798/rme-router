@@ -4,17 +4,18 @@ import RMECore
 
 /// 设计 token（文档第 5 节）：暖白纸色底、单一陶土色强调、细线代替阴影。
 public enum Tokens {
+    /// 颜色随主题（第 5.1 节）和系统浅色 / 深色变化：绘制时按当前主题取值。
     public enum Palette {
-        public static let bg = Color(light: 0xF5F3EE, dark: 0x262624)
-        public static let surface = Color(light: 0xFBFAF7, dark: 0x2F2F2C)
-        public static let border = Color(light: 0xE4E0D6, dark: 0x3E3D39)
-        public static let text = Color(light: 0x1F1E1C, dark: 0xF1EFE8)
-        public static let textMuted = Color(light: 0x6E6B63, dark: 0xA3A097)
-        public static let accent = Color(light: 0xB5552F, dark: 0xD9805E)
-        public static let ok = Color(light: 0x5B8A68, dark: 0x7FAE8B)
-        public static let warn = Color(light: 0xB7862E, dark: 0xD3A452)
-        public static let problem = Color(light: 0xB23A2E, dark: 0xE0675A)
-        public static let unknown = Color(light: 0xA8A49A, dark: 0x6F6C65)
+        public static let bg = Color(token: .bg)
+        public static let surface = Color(token: .surface)
+        public static let border = Color(token: .border)
+        public static let text = Color(token: .text)
+        public static let textMuted = Color(token: .textMuted)
+        public static let accent = Color(token: .accent)
+        public static let ok = Color(token: .ok)
+        public static let warn = Color(token: .warn)
+        public static let problem = Color(token: .problem)
+        public static let unknown = Color(token: .unknown)
     }
 
     public enum Font {
@@ -34,7 +35,86 @@ public enum Tokens {
     }
 }
 
+/// 视觉主题（文档第 5.1 节）。只换颜色，状态色意义不变。
+public enum UITheme: String, CaseIterable, Identifiable, Sendable {
+    case warm, studio, contrast
+    public var id: String { rawValue }
+    public var title: String {
+        switch self { case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比" }
+    }
+    public static let defaultsKey = "ui.theme"
+
+    /// 当前主题。只在主线程改（设置页），颜色在绘制时读。
+    nonisolated(unsafe) public static var current: UITheme =
+        UserDefaults.standard.string(forKey: defaultsKey).flatMap(UITheme.init(rawValue:)) ?? .warm
+
+    public enum Token: CaseIterable { case bg, surface, border, text, textMuted, accent, ok, warn, problem, unknown }
+
+    /// (浅色, 深色)
+    public func value(_ t: Token) -> (UInt32, UInt32) {
+        switch self {
+        case .warm:
+            switch t {
+            case .bg: return (0xF5F3EE, 0x262624)
+            case .surface: return (0xFBFAF7, 0x2F2F2C)
+            case .border: return (0xE4E0D6, 0x3E3D39)
+            case .text: return (0x1F1E1C, 0xF1EFE8)
+            case .textMuted: return (0x6E6B63, 0xA3A097)
+            case .accent: return (0xB5552F, 0xD9805E)
+            case .ok: return (0x5B8A68, 0x7FAE8B)
+            case .warn: return (0xB7862E, 0xD3A452)
+            case .problem: return (0xB23A2E, 0xE0675A)
+            case .unknown: return (0xA8A49A, 0x6F6C65)
+            }
+        case .studio:
+            switch t {
+            case .bg: return (0xEEF1F4, 0x1E2227)
+            case .surface: return (0xF8FAFC, 0x272C33)
+            case .border: return (0xD8DEE5, 0x3A414B)
+            case .text: return (0x1A1F26, 0xE9EDF2)
+            case .textMuted: return (0x5F6873, 0x9AA4B0)
+            case .accent: return (0x2F6FB5, 0x5B9BE0)
+            case .ok: return (0x3F8A5E, 0x6CC08E)
+            case .warn: return (0xB07A1E, 0xE0B04E)
+            case .problem: return (0xC0392B, 0xEF6F61)
+            case .unknown: return (0x9AA3AD, 0x66707B)
+            }
+        case .contrast:
+            switch t {
+            case .bg: return (0xFFFFFF, 0x121212)
+            case .surface: return (0xFFFFFF, 0x1C1C1C)
+            case .border: return (0x8A8A8A, 0x6A6A6A)
+            case .text: return (0x000000, 0xFFFFFF)
+            case .textMuted: return (0x3D3D3D, 0xC8C8C8)
+            case .accent: return (0xA8401A, 0xFF8A5C)
+            case .ok: return (0x1E7A3C, 0x5FD38A)
+            case .warn: return (0x8F6200, 0xFFC94D)
+            case .problem: return (0xB0140A, 0xFF6B5E)
+            case .unknown: return (0x707070, 0x9A9A9A)
+            }
+        }
+    }
+}
+
+/// 外观：跟随系统 / 浅色 / 深色（第 5.1 节）。
+public enum UIAppearance: String, CaseIterable, Identifiable, Sendable {
+    case system, light, dark
+    public var id: String { rawValue }
+    public var title: String { self == .system ? "跟随系统" : self == .light ? "浅色" : "深色" }
+    public static let defaultsKey = "ui.appearance"
+    public var colorScheme: ColorScheme? { self == .system ? nil : self == .light ? .light : .dark }
+}
+
 extension Color {
+    /// 主题色：绘制时按当前主题与浅色 / 深色取值。
+    init(token: UITheme.Token) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let v = UITheme.current.value(token)
+            return NSColor(hex: isDark ? v.1 : v.0)
+        })
+    }
+
     /// 随系统浅色/深色切换的颜色。
     init(light: UInt32, dark: UInt32) {
         self.init(nsColor: NSColor(name: nil) { appearance in

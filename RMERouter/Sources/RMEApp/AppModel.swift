@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Observation
 import RMECore
 import RMEEngine
@@ -124,6 +125,19 @@ public final class AppModel {
     @ObservationIgnored var snapshotVersion = 0
     @ObservationIgnored var originCache: (version: Int, labels: [ChannelRef: OriginLabel])?
     /// 选接口看链路的结果缓存（第 6.4.4 节）：快照、TotalMix 状态、有信号的通道都没变就不重算。
+    /// 视觉主题与外观（第 5.1 节），存本机偏好。
+    public var theme: UITheme = UITheme.current {
+        didSet { UITheme.current = theme; defaults.set(theme.rawValue, forKey: UITheme.defaultsKey) }
+    }
+    public var appearance: UIAppearance = .system {
+        didSet { defaults.set(appearance.rawValue, forKey: UIAppearance.defaultsKey); Self.applyAppearance(appearance) }
+    }
+
+    /// 用 NSApp.appearance 切浅色 / 深色（比 preferredColorScheme 可靠：改回“跟随系统”时能恢复）。
+    public static func applyAppearance(_ a: UIAppearance) {
+        NSApplication.shared.appearance = a == .system ? nil : NSAppearance(named: a == .light ? .aqua : .darkAqua)
+    }
+
     /// 屏蔽的通道条（第 6.4.5 节）：只影响显示，存在本机偏好里。
     public internal(set) var hiddenStrips: Set<TotalMixChannel> = [] {
         didSet { if let d = try? JSONEncoder().encode(hiddenStrips) { defaults.set(d, forKey: Self.hiddenStripsKey) } }
@@ -263,6 +277,10 @@ public final class AppModel {
             settings = OSCSettings()
         }
         self.snapshot = snapshot ?? StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
+        // 主题、外观（init 里不触发 didSet：外观由 App 启动时调 applyAppearance）
+        theme = defaults.string(forKey: UITheme.defaultsKey).flatMap(UITheme.init(rawValue:)) ?? .warm
+        UITheme.current = theme
+        appearance = defaults.string(forKey: UIAppearance.defaultsKey).flatMap(UIAppearance.init(rawValue:)) ?? .system
     }
 
     private func saveSettings() {

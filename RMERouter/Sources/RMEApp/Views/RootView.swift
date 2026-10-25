@@ -18,6 +18,7 @@ public struct RootView: View {
                                        set: { if model.section != $0 { model.section = $0 } }),
                     devices: deviceRows)
                 .equatable()
+                .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）；只重建内容，不动窗口和工具栏
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             ZStack {
@@ -38,6 +39,7 @@ public struct RootView: View {
                 }
                 if !onDevices && !onOutputs { otherPage }
             }
+            .id(model.theme)
             .onChange(of: model.section, initial: true) {
                 if onDevices { devicesBuilt = true }
                 if onOutputs { outputsBuilt = true }
@@ -262,6 +264,7 @@ struct ConnectionView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
                 XTCConnectionCard(model: model)
+                AppearanceCard(model: model)
                 Button("重新打开首次设置向导") { model.showOnboarding = true }
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("备份").font(Tokens.Font.cardTitle)
@@ -319,4 +322,58 @@ struct ConnectionView: View {
         "3. Port (incoming) 与 Port (outgoing) 填上面两个端口；Remote Host 填 127.0.0.1。",
         "4. Compatibility (Mode) 选 Global OSC，关闭 Follow Submix。",
     ]
+}
+
+/// “外观”一节（第 5.1 节）：浅色 / 深色、主题。只换颜色。
+struct AppearanceCard: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Text("外观").font(Tokens.Font.cardTitle)
+            Picker("外观", selection: $model.appearance) {
+                ForEach(UIAppearance.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 260)
+            HStack(spacing: Tokens.Space.m) {
+                ForEach(UITheme.allCases) { t in swatch(t) }
+            }
+            Text("只换颜色，不改布局。绿 = 已确认、黄 = 推断、红 = 有问题，在每套主题里意义都一样。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
+    /// 主题样块：底色、卡片、强调色、三种状态色。
+    private func swatch(_ t: UITheme) -> some View {
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        func c(_ k: UITheme.Token) -> Color { let v = t.value(k); return Color(nsColor: NSColor(hex: dark ? v.1 : v.0)) }
+        return Button { model.theme = t } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 6).fill(c(.surface))
+                    .overlay(alignment: .topLeading) {
+                        HStack(spacing: 3) {
+                            Capsule().fill(c(.accent)).frame(width: 22, height: 6)
+                            Circle().fill(c(.ok)).frame(width: 6, height: 6)
+                            Circle().fill(c(.warn)).frame(width: 6, height: 6)
+                            Circle().fill(c(.problem)).frame(width: 6, height: 6)
+                        }
+                        .padding(6)
+                    }
+                    .overlay(alignment: .bottomLeading) {
+                        Text("Aa 通道").font(.system(size: 10)).foregroundStyle(c(.text)).padding(6)
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(c(.border)))
+                    .frame(width: 110, height: 56)
+                    .padding(6)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(c(.bg)))
+                Text(t.title).font(Tokens.Font.caption)
+            }
+            .padding(4)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(model.theme == t ? Tokens.Palette.accent : .clear, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+        .help("切换到“\(t.title)”")
+    }
 }

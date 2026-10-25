@@ -12,6 +12,7 @@ struct RMERouterApp: App {
     @State private var model: AppModel = {
         let m = AppModel(linkStore: .standard, sceneStore: .standard)
         m.startsMeters = true
+        AppModel.applyAppearance(m.appearance)
         if PerfProbe.enabled { PerfProbe.run(m) }
         return m
     }()
