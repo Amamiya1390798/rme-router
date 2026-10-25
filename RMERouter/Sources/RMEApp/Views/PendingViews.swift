@@ -10,7 +10,7 @@ struct PendingBar: View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
             if model.hasPending {
                 HStack {
-                    Text("待应用 \(model.pending.count + model.pendingPreamps.count) 项").font(Tokens.Font.cardTitle)
+                    Text("待应用 \(model.pending.count + model.pendingPreamps.count + model.pendingRoutes.count) 项").font(Tokens.Font.cardTitle)
                     Text("还没有发送任何消息").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                     Spacer()
                     Button("全部放弃") { model.discardAll() }
@@ -22,6 +22,11 @@ struct PendingBar: View {
                     row(title: "\(c.source.description) → \(c.destination.description)",
                         change: "\(PendingChange.format(c.oldDB)) → \(PendingChange.format(c.newDB))",
                         badges: c.isLargeJump ? [("大幅抬高", Tokens.Palette.warn)] : []) { model.discard(c.id) }
+                }
+                ForEach(model.pendingRoutes) { r in
+                    row(title: "12Mic 路由 \(r.destination.description)",
+                        change: "\(PendingRouteChange.text(r.old)) → \(PendingRouteChange.text(r.new))",
+                        badges: r.isPhones ? [("耳机：注意音量", Tokens.Palette.warn)] : []) { model.discardRoute(r.id) }
                 }
                 ForEach(model.pendingPreamps) { p in
                     row(title: "\(p.label)（\(p.input.description)）\(p.field.label)",
@@ -66,6 +71,7 @@ struct ConfirmSheet: View {
 
     private var sends: [PendingChange] { result?.changes ?? model.pending }
     private var preamps: [PendingPreampChange] { result?.preamps ?? model.pendingPreamps }
+    private var routes: [PendingRouteChange] { result?.routes ?? model.pendingRoutes }
     private var needsPhantomAck: Bool { result == nil && model.pendingPreamps.contains(where: \.needsPhantomAck) }
 
     var body: some View {
@@ -75,6 +81,7 @@ struct ConfirmSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     ForEach(sends) { c in sendRow(c) }
+                    ForEach(routes) { r in routeRow(r) }
                     ForEach(preamps) { p in preampRow(p) }
                 }
             }
@@ -119,8 +126,8 @@ struct ConfirmSheet: View {
                     Label("TotalMix 状态未知。", systemImage: "questionmark.circle").foregroundStyle(Tokens.Palette.textMuted)
                 }
             }
-            if preamps.contains(where: { $0.deviceID == "12mic" }) {
-                Label("12Mic 已连接：前级改动会立即生效。", systemImage: "exclamationmark.triangle")
+            if preamps.contains(where: { $0.deviceID == "12mic" }) || !routes.isEmpty {
+                Label("12Mic 已连接：改动会立即生效。", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(Tokens.Palette.warn)
             }
         }
@@ -141,6 +148,25 @@ struct ConfirmSheet: View {
                 if c.mapEvidence != .confirmed { Badge(text: "对照表为推断：请对照 TotalMix 屏幕", color: Tokens.Palette.warn) }
                 if c.isLargeJump { Badge(text: "大幅抬高", color: Tokens.Palette.problem) }
                 outcome(c.id)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
+    private func routeRow(_ r: PendingRouteChange) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+            HStack(spacing: Tokens.Space.s) {
+                Text(verbatim: "12Mic 路由 \(r.destination.description)").font(Tokens.Font.mono)
+                Spacer()
+                Text(verbatim: "\(PendingRouteChange.text(r.old)) → \(PendingRouteChange.text(r.new))")
+                    .font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.accent)
+            }
+            Text(verbatim: r.wireText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack(spacing: Tokens.Space.s) {
+                if r.old != nil { Badge(text: "替换原来的来源", color: Tokens.Palette.warn) }
+                if r.isPhones { Badge(text: "目标是耳机：注意音量", color: Tokens.Palette.problem) }
+                outcome(r.id)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -177,7 +203,7 @@ struct ConfirmSheet: View {
 
     /// 唯一签发 UserConfirmation 的地方。
     private func confirm() {
-        let ops = model.pending.map(\.operation) + model.pendingPreamps.map(\.operation)
+        let ops = model.pending.map(\.operation) + model.pendingPreamps.map(\.operation) + model.pendingRoutes.map(\.operation)
         let confirmation = ConfirmationGate.userConfirmed(ops)
         Task { result = await model.applyPending(confirmation: confirmation) }
     }

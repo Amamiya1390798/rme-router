@@ -30,6 +30,12 @@ public struct OutputsView: View {
         a.stage = { src, dst, dB in model.stageGain(source: src, destination: dst, dB: dB)?.text }
         a.stageNewSend = { src, dst in model.stageNewSend(source: src, destination: dst)?.text }
         a.sendCandidates = { model.sendSourceCandidates }
+        a.canEditRoute = { card in card.port.deviceID == "12mic" && model.twelveMicStatus == .live }
+        a.canAddRoute = { device in device == "12mic" && model.twelveMicStatus == .live }
+        a.pendingRoute = { dst in model.pendingTwelveMicRoute(dst) }
+        a.stageRoute = { dst, src in model.stageTwelveMicRoute(destination: dst, source: src)?.text }
+        a.routeSources = { model.twelveMicRouteSources }
+        a.routeOutputs = { model.twelveMicRouteOutputs }
         return a
     }
 
@@ -75,6 +81,7 @@ public struct OutputsContent: View {
                         Text(group.device.name).font(Tokens.Font.cardTitle).foregroundStyle(Tokens.Palette.text)
                         Text("\(group.cards.count) 个输出在用").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                         if demoDevices.contains(group.device.name) { Badge(text: "演示数据", color: Tokens.Palette.unknown) }
+                        if actions.canAddRoute(group.device.id) { NewRouteButton(actions: actions) }
                     }
                     Grid(alignment: .topLeading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.m) {
                         ForEach(Array(rows(group.cards).enumerated()), id: \.offset) { _, row in
@@ -108,6 +115,14 @@ public struct OutputActions {
     public var stage: (ChannelRef, ChannelRef, Double?) -> String? = { _, _, _ in nil }
     public var stageNewSend: (ChannelRef, ChannelRef) -> String? = { _, _ in nil }
     public var sendCandidates: () -> [ChannelRef] = { [] }
+    // 12Mic 路由（第 7.3 节）
+    public var canEditRoute: (OutputCard) -> Bool = { _ in false }
+    public var canAddRoute: (String) -> Bool = { _ in false }
+    /// 外层 nil = 没有待应用改动；内层 nil = 断开。
+    public var pendingRoute: (ChannelRef) -> ChannelRef?? = { _ in nil }
+    public var stageRoute: (ChannelRef, ChannelRef?) -> String? = { _, _ in nil }
+    public var routeSources: () -> [ChannelRef] = { [] }
+    public var routeOutputs: () -> [ChannelRef] = { [] }
     public init() {}
 }
 
@@ -130,7 +145,8 @@ struct OutputCardView: View {
             Text(card.address).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
             Rectangle().fill(Tokens.Palette.border).frame(height: 1)
             ForEach(Array(card.sources.prefix(Self.visibleSources).enumerated()), id: \.offset) { _, source in
-                SourceRow(source: source, destination: destination, editable: editable, actions: actions)
+                SourceRow(source: source, destination: destination, editable: editable,
+                          routeEditable: actions.canEditRoute(card), actions: actions)
             }
             if card.sources.count > Self.visibleSources {
                 Text("还有 \(card.sources.count - Self.visibleSources) 路")
@@ -169,11 +185,14 @@ struct SourceRow: View {
     var source: OutputCard.Source
     var destination: ChannelRef
     var editable: Bool
+    var routeEditable: Bool = false
     var actions: OutputActions
     @State private var editing = false
+    @State private var editingRoute = false
 
     var body: some View {
         let pending = actions.pendingGain(source.refs[0], destination)
+        let pendingRoute = actions.pendingRoute(destination)
         HStack(spacing: Tokens.Space.s) {
             Button { actions.selectSource(source.refs[0]) } label: {
                 HStack(spacing: Tokens.Space.s) {
@@ -201,6 +220,28 @@ struct SourceRow: View {
                                title: "\(source.label) → \(destination)") { dB in
                         _ = actions.stage(source.refs[0], destination, dB)
                         editing = false
+                    }
+                }
+            } else if routeEditable, source.kind == .passthrough {
+                Button { editingRoute = true } label: {
+                    Group {
+                        if let target = pendingRoute {
+                            Text("→ \(PendingRouteChange.text(target))").foregroundStyle(Tokens.Palette.accent)
+                        } else {
+                            Text("直通").foregroundStyle(Tokens.Palette.textMuted)
+                        }
+                    }
+                    .font(Tokens.Font.mono)
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Tokens.Palette.border.opacity(editingRoute ? 1 : 0.5)))
+                }
+                .buttonStyle(.plain)
+                .help("改这个输出通道的来源（先进待应用栏）")
+                .popover(isPresented: $editingRoute, arrowEdge: .leading) {
+                    RouteEditor(destination: destination, current: source.refs[0],
+                                initial: pendingRoute ?? source.refs[0], candidates: actions.routeSources()) { result in
+                        if let choice = result { _ = actions.stageRoute(destination, choice) }
+                        editingRoute = false
                     }
                 }
             } else {
@@ -300,4 +341,109 @@ struct AddSendEditor: View {
 enum TotalMixFaderUI {
     /// 滑块最左端 = 关（与 TotalMixFader.offThresholdDB 一致）。
     static let off = -65.0
+}
+
+/// 改 12Mic 一个输出通道的来源（第 7.3 节）。结果：nil = 取消；.some(nil) = 断开；.some(ref) = 新来源。
+struct RouteEditor: View {
+    var destination: ChannelRef
+    var current: ChannelRef?
+    var candidates: [ChannelRef]
+    var onDone: (ChannelRef??) -> Void
+    @State private var choice: ChannelRef?
+
+    init(destination: ChannelRef, current: ChannelRef?, initial: ChannelRef?, candidates: [ChannelRef],
+         onDone: @escaping (ChannelRef??) -> Void) {
+        self.destination = destination
+        self.current = current
+        self.candidates = candidates
+        self.onDone = onDone
+        _choice = State(initialValue: initial)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Text(verbatim: "\(destination.description) 的来源").font(Tokens.Font.cardTitle)
+            Text(verbatim: "当前：\(PendingRouteChange.text(current))").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            SourcePicker(choice: $choice, candidates: candidates)
+            HStack {
+                Spacer()
+                Button("取消") { onDone(nil) }
+                Button("加入待应用") { onDone(.some(choice)) }.keyboardShortcut(.defaultAction)
+            }
+            Text("12Mic 每个输出通道只有一个来源，改了会替换原来的来源。确认后才写入。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Tokens.Space.l)
+        .frame(width: 360)
+    }
+}
+
+/// 来源选择：按输入口分组，第一项是“断开”。
+struct SourcePicker: View {
+    @Binding var choice: ChannelRef?
+    var candidates: [ChannelRef]
+
+    var body: some View {
+        Picker("来源", selection: $choice) {
+            Text("断开（unrouted）").tag(ChannelRef?.none)
+            ForEach(groups, id: \.0) { port, refs in
+                Section(port) {
+                    ForEach(refs, id: \.self) { Text(verbatim: $0.description).tag(ChannelRef?.some($0)) }
+                }
+            }
+        }
+    }
+
+    private var groups: [(String, [ChannelRef])] {
+        var order: [String] = []
+        var map: [String: [ChannelRef]] = [:]
+        for r in candidates {
+            if map[r.portID] == nil { order.append(r.portID) }
+            map[r.portID, default: []].append(r)
+        }
+        return order.map { ($0, map[$0]!) }
+    }
+}
+
+/// 12Mic 分栏标题上的“新建路由”：选一个输出通道和来源。
+struct NewRouteButton: View {
+    var actions: OutputActions
+    @State private var open = false
+    @State private var output: ChannelRef?
+    @State private var source: ChannelRef?
+    @State private var error: String?
+
+    var body: some View {
+        Button { open = true } label: {
+            Label("新建 12Mic 路由", systemImage: "plus").font(Tokens.Font.caption)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Tokens.Palette.accent)
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                Text("新建 12Mic 路由").font(Tokens.Font.cardTitle)
+                Picker("输出通道", selection: $output) {
+                    Text("选择…").tag(ChannelRef?.none)
+                    ForEach(actions.routeOutputs(), id: \.self) { Text(verbatim: $0.description).tag(ChannelRef?.some($0)) }
+                }
+                SourcePicker(choice: $source, candidates: actions.routeSources())
+                if let error { Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
+                HStack {
+                    Spacer()
+                    Button("取消") { open = false }
+                    Button("加入待应用") {
+                        guard let output else { return }
+                        if let e = actions.stageRoute(output, source) { error = e } else { open = false }
+                    }
+                    .disabled(output == nil)
+                    .keyboardShortcut(.defaultAction)
+                }
+                Text("如果这个输出通道已有来源，会被替换；确认框里会显示原来的来源。")
+                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+            .padding(Tokens.Space.l)
+            .frame(width: 380)
+        }
+    }
 }

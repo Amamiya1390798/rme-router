@@ -70,7 +70,9 @@ public enum OutputCards {
     public static func isPlayback(_ ref: ChannelRef) -> Bool { ref.portID.hasSuffix(".playback.in") }
 
     static func pairSources(_ left: [Route], _ right: [Route]) -> [OutputCard.Source]? {
-        guard left.count == right.count else { return nil }
+        // 只合并混音发送：12Mic 直通是“每个输出通道一个来源”，合并后改来源就分不清对哪个通道（第 7.3 节）。
+        let allMix = (left + right).allSatisfy { if case .mixSend = $0.kind { return true } else { return false } }
+        guard allMix, left.count == right.count else { return nil }
         var remaining = right
         var out: [OutputCard.Source] = []
         for l in left {

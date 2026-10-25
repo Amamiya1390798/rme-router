@@ -86,6 +86,36 @@ public struct PendingPreampChange: Identifiable, Equatable, Sendable {
     var key: String { "\(deviceID)|\(input)|\(field.rawValue)" }
 }
 
+/// 一条待应用的 12Mic 路由改动（文档第 7.3 节）：一个输出通道换来源（nil = 断开）。
+public struct PendingRouteChange: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public var destination: ChannelRef   // 12mic.madi_optical.out:9
+    public var jsonOutPort: String       // madi_optical
+    public var old: ChannelRef?
+    public var new: ChannelRef?
+    public var newJSONInPort: String?    // analog
+
+    public var parameter: String { TwelveMicWriteGate.routeParameter(outPort: jsonOutPort, outChannel: destination.channel) }
+
+    public var operation: PlannedOperation {
+        PlannedOperation(id: id, deviceID: "12mic", parameter: parameter, oldValue: Self.text(old), newValue: Self.text(new),
+                         access: .readWrite)
+    }
+
+    /// 目标是耳机：直接影响监听音量。
+    public var isPhones: Bool { jsonOutPort == "phones" }
+
+    public var wireText: String {
+        let src = newJSONInPort.map { ($0, new?.channel ?? 1) }
+        guard let body = TwelveMicWriteGate.routeBody(outPort: jsonOutPort, outChannel: destination.channel, source: src),
+              let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "JSON：（无效）" }
+        return "JSON：" + text
+    }
+
+    public static func text(_ ref: ChannelRef?) -> String { ref?.description ?? "断开" }
+}
+
 public enum VerifyOutcome: Equatable, Sendable {
     case verified
     case mismatch(readBack: Double?)
@@ -109,9 +139,10 @@ public struct AppliedBatch: Identifiable, Equatable, Sendable {
     public var date: Date
     public var changes: [PendingChange]
     public var preamps: [PendingPreampChange] = []
+    public var routes: [PendingRouteChange] = []
     public var outcomes: [UUID: VerifyOutcome]
 
-    public var count: Int { changes.count + preamps.count }
+    public var count: Int { changes.count + preamps.count + routes.count }
     public var verifiedCount: Int { outcomes.values.filter { $0 == .verified }.count }
 }
 
@@ -191,7 +222,7 @@ extension AppModel {
     }
 
     public func discard(_ id: UUID) { pending.removeAll { $0.id == id } }
-    public func discardAll() { pending.removeAll(); pendingPreamps.removeAll() }
+    public func discardAll() { pending.removeAll(); pendingPreamps.removeAll(); pendingRoutes.removeAll() }
 
     static func same(_ a: Double?, _ b: Double?) -> Bool {
         switch (a, b) {
@@ -252,7 +283,60 @@ extension AppModel {
         }
     }
 
-    public var hasPending: Bool { !pending.isEmpty || !pendingPreamps.isEmpty }
+    public var hasPending: Bool { !pending.isEmpty || !pendingPreamps.isEmpty || !pendingRoutes.isEmpty }
+
+    // MARK: 12Mic 路由暂存（第 7.3 节）
+
+    /// 12Mic 某输出通道当前的来源（读回的路由）；nil = 没有路由。
+    public func twelveMicSource(of destination: ChannelRef) -> ChannelRef? {
+        snapshot.devices["12mic"]?.routes.first { $0.destination == destination }?.source
+    }
+
+    /// 把 12Mic 某输出通道改成 source（nil = 断开）。改回原值时移除。
+    @discardableResult
+    public func stageTwelveMicRoute(destination: ChannelRef, source: ChannelRef?) -> StageError? {
+        guard twelveMicStatus == .live else { return .notConnected("12Mic") }
+        let outMap = TwelveMicJSONAdapter.defaultPortMap, inMap = TwelveMicJSONAdapter.defaultInputPortMap
+        guard let outPort = outMap.first(where: { $0.value == destination.portID })?.key,
+              TwelveMicWriteGate.routeOutputs[outPort]?.contains(destination.channel) == true else { return .notMapped(destination) }
+        var inPort: String? = nil
+        if let source {
+            guard let p = inMap.first(where: { $0.value == source.portID })?.key,
+                  TwelveMicWriteGate.routeInputs[p]?.contains(source.channel) == true else { return .notMapped(source) }
+            inPort = p
+        }
+        if let i = pendingRoutes.firstIndex(where: { $0.destination == destination }) {
+            if pendingRoutes[i].old == source { pendingRoutes.remove(at: i) }
+            else { pendingRoutes[i].new = source; pendingRoutes[i].newJSONInPort = inPort }
+            return nil
+        }
+        let old = twelveMicSource(of: destination)
+        guard old != source else { return nil }
+        pendingRoutes.append(PendingRouteChange(id: UUID(), destination: destination, jsonOutPort: outPort,
+                                                old: old, new: source, newJSONInPort: inPort))
+        return nil
+    }
+
+    /// 某输出通道在待应用栏里的目标来源：外层 nil = 没有待应用改动；内层 nil = 断开。
+    public func pendingTwelveMicRoute(_ destination: ChannelRef) -> ChannelRef?? {
+        pendingRoutes.first { $0.destination == destination }.map(\.new)
+    }
+
+    public func discardRoute(_ id: UUID) { pendingRoutes.removeAll { $0.id == id } }
+
+    /// “送一路声音”在 12Mic 上可选的来源：已登记输入口的全部通道。
+    public var twelveMicRouteSources: [ChannelRef] {
+        TwelveMicJSONAdapter.defaultInputPortMap.sorted { $0.key < $1.key }.flatMap { json, portID in
+            (TwelveMicWriteGate.routeInputs[json] ?? 1 ... 0).map { ChannelRef(portID, $0) }
+        }
+    }
+
+    /// 可写的 12Mic 输出通道。
+    public var twelveMicRouteOutputs: [ChannelRef] {
+        TwelveMicJSONAdapter.defaultPortMap.sorted { $0.key < $1.key }.flatMap { json, portID in
+            (TwelveMicWriteGate.routeOutputs[json] ?? 1 ... 0).map { ChannelRef(portID, $0) }
+        }
+    }
 
     // MARK: 应用
 
@@ -308,8 +392,34 @@ extension AppModel {
         }
         for p in sentXT { outcomes[p.id] = verify(p) }
 
-        // 2. 12Mic 前级经 JSON
+        // 2. 12Mic 前级与路由经 JSON
         let micPreamps = preamps.filter { $0.deviceID == "12mic" }
+        let routes = pendingRoutes
+        if !routes.isEmpty {
+            if let url = URL(string: twelveMicURL), url.host != nil {
+                let mic = makeTwelveMic(url)
+                var sent: [PendingRouteChange] = []
+                for r in routes {
+                    do {
+                        try await mic.writeRoute(destination: r.destination, source: r.new, for: r.operation, confirmation: confirmation)
+                        sent.append(r)
+                    } catch { outcomes[r.id] = .failed("\(error)") }
+                }
+                if !sent.isEmpty, let readBack = try? await mic.readRoutes() {
+                    var devices = snapshot.devices
+                    devices["12mic"]?.routes = readBack
+                    replaceDevices(devices)
+                    for r in sent {
+                        let now = readBack.first { $0.destination == r.destination }?.source
+                        outcomes[r.id] = now == r.new ? .verified : .mismatchValue(readBack: PendingRouteChange.text(now))
+                    }
+                } else {
+                    for r in sent { outcomes[r.id] = .notReadBack }
+                }
+            } else {
+                for r in routes { outcomes[r.id] = .failed("12Mic 地址无效") }
+            }
+        }
         if !micPreamps.isEmpty {
             if let url = URL(string: twelveMicURL), url.host != nil {
                 let mic = makeTwelveMic(url)
@@ -332,10 +442,11 @@ extension AppModel {
             }
         }
 
-        let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, outcomes: outcomes)
+        let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, routes: routes, outcomes: outcomes)
         history.insert(batch, at: 0)
         pending.removeAll()
         pendingPreamps.removeAll()
+        pendingRoutes.removeAll()
         return batch
     }
 
@@ -357,6 +468,10 @@ extension AppModel {
             if case .failed = batch.outcomes[p.id] { continue }
             guard let old = p.old else { continue }
             stagePreamp(deviceID: p.deviceID, input: p.input, field: p.field, value: old)
+        }
+        for r in batch.routes {
+            if case .failed = batch.outcomes[r.id] { continue }
+            stageTwelveMicRoute(destination: r.destination, source: r.old)
         }
     }
 }

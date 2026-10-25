@@ -77,6 +77,7 @@ public final class AppModel {
     // 写入（文档第 7.1 节）：待应用的改动、应用历史、确认框状态。
     public internal(set) var pending: [PendingChange] = []
     public internal(set) var pendingPreamps: [PendingPreampChange] = []
+    public internal(set) var pendingRoutes: [PendingRouteChange] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
     public internal(set) var isApplying = false

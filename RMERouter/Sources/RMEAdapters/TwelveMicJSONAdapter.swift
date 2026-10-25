@@ -29,6 +29,28 @@ public enum TwelveMicWriteGate {
     public static func parameter(channel: Int, field: PreampField) -> String {
         "input/analog/\(channel)/\(field.twelveMicKey)"
     }
+
+    // MARK: 路由（第 7.3 节）
+
+    /// 允许写的输出口与通道范围。
+    public static let routeOutputs: [String: ClosedRange<Int>] = ["madi_optical": 1 ... 64, "madi_coaxial": 1 ... 64, "phones": 1 ... 2]
+    /// 允许作为来源的输入口与通道范围。
+    public static let routeInputs: [String: ClosedRange<Int>] = ["analog": 1 ... 12, "madi_optical": 1 ... 64, "madi_coaxial": 1 ... 64]
+
+    /// 一个输出通道的路由写入体；source 为 nil 表示断开（["unrouted", 1]）。不在白名单里返回 nil。
+    public static func routeBody(outPort: String, outChannel: Int, source: (port: String, channel: Int)?) -> [String: Any]? {
+        guard let outRange = routeOutputs[outPort], outRange.contains(outChannel) else { return nil }
+        let value: [Any]
+        if let source {
+            guard let inRange = routeInputs[source.port], inRange.contains(source.channel) else { return nil }
+            value = [source.port, source.channel]
+        } else {
+            value = ["unrouted", 1]
+        }
+        return ["routing": [outPort: [String(outChannel): value]]]
+    }
+
+    public static func routeParameter(outPort: String, outChannel: Int) -> String { "routing/\(outPort)/\(outChannel)" }
 }
 
 /// 12Mic：官方手册公开的 JSON(OSC) 远程接口（文档第 6.2 节）。
@@ -42,18 +64,20 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
     public let baseURL: URL
     let session: URLSession
 
-    /// 本 App 用的端口 ID 前缀与 12Mic JSON 端口名的对应。
-    public var portMap: [String: String] = [
+    /// 12Mic JSON 输出端口名 → 本 App 端口 ID。
+    public static let defaultPortMap: [String: String] = [
         "madi_coaxial": "12mic.madi_coaxial.out",
         "madi_optical": "12mic.madi_optical.out",
         "phones": "12mic.phones.out",
     ]
     /// JSON 输入端口名 → 本 App 端口 ID（手册未列全；读到未登记的名字时计数提示，见 snapshot 的 settings）。
-    public var inputPortMap: [String: String] = [
+    public static let defaultInputPortMap: [String: String] = [
         "analog": "12mic.analog.in",
         "madi_coaxial": "12mic.madi_coaxial.in",
         "madi_optical": "12mic.madi_optical.in",
     ]
+    public var portMap = defaultPortMap
+    public var inputPortMap = defaultInputPortMap
 
     public init(deviceID: String = "12mic", baseURL: URL, session: URLSession = .shared) {
         self.deviceID = deviceID
@@ -163,19 +187,8 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
         }
 
         // 路由：每个输出口 "1"..."64" → [inputport, channel]
-        var routes: [Route] = []
-        var unknownInputs: [String: Int] = [:]
-        let routing = reply["routing"] as? [String: Any] ?? [:]
-        for (jsonPort, outID) in portMap {
-            guard let table = routing[jsonPort] as? [String: Any] else { continue }
-            for (key, value) in table {
-                guard let outCh = Int(key), let pair = value as? [Any], pair.count == 2,
-                      let inName = pair[0] as? String, inName != "unrouted", let inCh = pair[1] as? Int else { continue }
-                guard let inID = inputPortMap[inName] else { unknownInputs[inName, default: 0] += 1; continue }
-                routes.append(Route(domain: .twelveMic, source: ChannelRef(inID, inCh),
-                                    destination: ChannelRef(outID, outCh), kind: .passthrough, evidence: .confirmed))
-            }
-        }
+        let (routes, unknownInputs) = parseRoutes(reply["routing"] as? [String: Any] ?? [:],
+                                                  portMap: portMap, inputPortMap: inputPortMap)
 
         var settings: [String: Fact<String>] = [:]
         if let name = (reply["device"] as? [String: Any])?["entity_name"] as? String {
@@ -194,8 +207,26 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
         let preamps = parsePreamps(analog, inputPortID: inputPortMap["analog"] ?? "\(deviceID).analog.in", src: src)
 
         return DeviceSnapshot(deviceID: deviceID, reachable: true, clock: clockState, portFormats: formats,
-                              routes: routes.sorted { $0.destination < $1.destination },
+                              routes: routes,
                               controlPaths: [controlPath], settings: settings, preamps: preamps)
+    }
+
+    /// `routing` → 路由；未登记的输入口按名字计数。
+    static func parseRoutes(_ routing: [String: Any], portMap: [String: String],
+                            inputPortMap: [String: String]) -> (routes: [Route], unknownInputs: [String: Int]) {
+        var routes: [Route] = []
+        var unknown: [String: Int] = [:]
+        for (jsonPort, outID) in portMap {
+            guard let table = routing[jsonPort] as? [String: Any] else { continue }
+            for (key, value) in table {
+                guard let outCh = Int(key), let pair = value as? [Any], pair.count == 2,
+                      let inName = pair[0] as? String, inName != "unrouted", let inCh = pair[1] as? Int else { continue }
+                guard let inID = inputPortMap[inName] else { unknown[inName, default: 0] += 1; continue }
+                routes.append(Route(domain: .twelveMic, source: ChannelRef(inID, inCh),
+                                    destination: ChannelRef(outID, outCh), kind: .passthrough, evidence: .confirmed))
+            }
+        }
+        return (routes.sorted { $0.destination < $1.destination }, unknown)
     }
 
     /// `input/analog/<n>` → 前级状态。手册未写字段的确切类型：布尔也接受 0/1；读不到的字段记 unknown。
@@ -233,6 +264,35 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
             throw AdapterError.notWritable("前级写入只允许 input/analog/<n>/gain|p48|phase，且增益在 0–60 dB")
         }
         _ = try await post(body)
+    }
+
+    /// 本 App 的端口 ID ↔ 12Mic JSON 端口名。
+    public func jsonOutputPort(_ portID: String) -> String? { portMap.first { $0.value == portID }?.key }
+    public func jsonInputPort(_ portID: String) -> String? { inputPortMap.first { $0.value == portID }?.key }
+
+    /// 写一个输出通道的路由（第 7.3 节）；source 为 nil 表示断开。
+    public func writeRoute(destination: ChannelRef, source: ChannelRef?, for op: PlannedOperation,
+                           confirmation: UserConfirmation) async throws {
+        try precheck(op, confirmation)
+        guard let outPort = jsonOutputPort(destination.portID),
+              op.parameter == TwelveMicWriteGate.routeParameter(outPort: outPort, outChannel: destination.channel) else {
+            throw AdapterError.notWritable("路由写入的目标与确认的操作不一致")
+        }
+        var src: (port: String, channel: Int)? = nil
+        if let source {
+            guard let inPort = jsonInputPort(source.portID) else { throw AdapterError.notWritable("来源 \(source) 不在 12Mic 输入口白名单里") }
+            src = (inPort, source.channel)
+        }
+        guard let body = TwelveMicWriteGate.routeBody(outPort: outPort, outChannel: destination.channel, source: src) else {
+            throw AdapterError.notWritable("路由写入只允许已登记的端口与通道范围")
+        }
+        _ = try await post(body)
+    }
+
+    /// 读回路由（全部为 null 的只读请求）。
+    public func readRoutes() async throws -> [Route] {
+        let reply = try await read(["routing": NSNull()])
+        return Self.parseRoutes(reply["routing"] as? [String: Any] ?? [:], portMap: portMap, inputPortMap: inputPortMap).routes
     }
 
     /// 读回前级（全部为 null 的只读请求）。
