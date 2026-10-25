@@ -87,6 +87,8 @@ public final class AppModel {
     public internal(set) var pending: [PendingChange] = []
     public internal(set) var pendingPreamps: [PendingPreampChange] = []
     public internal(set) var pendingRoutes: [PendingRouteChange] = []
+    /// 需要在设备上手动完成的步骤（跨设备“送一路声音”里的 XTC 等，第 7.5 节）。
+    public internal(set) var manualTasks: [ManualTask] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
     /// 确认方式（第 7.4 节）。

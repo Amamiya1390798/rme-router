@@ -69,7 +69,8 @@ public struct PathFinder {
         var dist: [State: Int] = [:]
         var prev: [State: (State, PathEdge)] = [:]
         var blocked = Set<String>()
-        var heap = MinHeap<(Int, State)>(by: { $0.0 < $1.0 })
+        // 代价相同时先展开通道号小的节点：结果确定，并且优先用靠前的通道/块（用户最自然的选择）。
+        var heap = MinHeap<(Int, State)>(by: { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1.node.channel < $1.1.node.channel })
 
         let start = State(node: source, domain: nil)
         dist[start] = 0

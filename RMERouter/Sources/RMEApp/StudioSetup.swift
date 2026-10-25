@@ -52,6 +52,25 @@ public enum StudioSetup {
         ])
     }
 
+    /// 各设备能做的内部路由（文档第 7.5 节），路径搜索据此生成候选边。
+    public static let capabilities = [
+        RoutingCapability(deviceID: "xt", domain: .totalMix,
+                          inputPorts: ["xt.mic.in", "xt.aes.in", "xt.madi1.in", "xt.madi2.in", "xt.madi3.in"],
+                          outputPorts: ["xt.an.out", "xt.aes.out", "xt.phones.out", "xt.madi1.out", "xt.madi2.out", "xt.madi3.out"],
+                          granularity: .channel, kindIsMix: true, access: .readWrite, grade: .a,
+                          reference: "TotalMix Global OSC /mix/…/fader（第 7.1 节）"),
+        RoutingCapability(deviceID: "12mic", domain: .twelveMic,
+                          inputPorts: ["12mic.analog.in", "12mic.madi_optical.in", "12mic.madi_coaxial.in"],
+                          outputPorts: ["12mic.madi_optical.out", "12mic.madi_coaxial.out", "12mic.phones.out"],
+                          granularity: .channel, kindIsMix: false, access: .readWrite, grade: .a,
+                          reference: "12Mic JSON /routing（第 7.3 节）"),
+        RoutingCapability(deviceID: "xtc", domain: .xtc,
+                          inputPorts: ["xtc.mic.in", "xtc.madi.in"],
+                          outputPorts: ["xtc.adat1.out", "xtc.adat2.out", "xtc.madi.out"],
+                          granularity: .block(size: 8), kindIsMix: false, access: .manual, grade: .a2,
+                          reference: "XTC Digital Routing，协议编号未知：只能在面板上设置"),
+    ]
+
     public static let terminals = [
         TerminalConstraint(deviceID: "p16i", allowedSampleRates: [44_100, 48_000], clockInputPort: "p16i.adat_a.in",
                            grade: .a, reference: "Behringer P16-I 产品资料"),
@@ -95,7 +114,7 @@ public enum StudioSetup {
     public static func snapshot(xt: DeviceSnapshot, others: [String: DeviceSnapshot] = demoDevices()) -> SystemSnapshot {
         var devices = others
         devices["xt"] = xt
-        return SystemSnapshot(topology: topology(), devices: devices, capabilities: [], terminals: terminals,
+        return SystemSnapshot(topology: topology(), devices: devices, capabilities: capabilities, terminals: terminals,
                               concurrency: concurrency)
     }
 }

@@ -26,11 +26,12 @@ public struct RootView: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if model.hasPending || !model.history.isEmpty { PendingBar(model: model) }
+                if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
             }
         }
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .toolbar {
+            ToolbarItem { SendAcrossButton(model: model) }
             ToolbarItem {
                 Button {
                     Task { await model.refresh() }

@@ -8,6 +8,21 @@ struct PendingBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
+            if !model.manualTasks.isEmpty {
+                HStack(spacing: Tokens.Space.s) {
+                    Image(systemName: "hand.raised").foregroundStyle(Tokens.Palette.warn)
+                    Text("需人工完成 \(model.manualTasks.count) 项").font(Tokens.Font.cardTitle)
+                    Text("在设备面板上做完后勾掉").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                }
+                ForEach(model.manualTasks) { t in
+                    HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
+                        Button { model.completeManualTask(t.id) } label: { Image(systemName: "square") }
+                            .buttonStyle(.plain).help("标记为已完成")
+                        Text(verbatim: t.text).font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if model.hasPending || !model.history.isEmpty { Divider() }
+            }
             if model.hasPending {
                 HStack {
                     Text("待应用 \(model.pending.count + model.pendingPreamps.count + model.pendingRoutes.count) 项").font(Tokens.Font.cardTitle)
