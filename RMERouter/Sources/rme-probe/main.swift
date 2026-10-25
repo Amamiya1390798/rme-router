@@ -60,6 +60,18 @@ if CommandLine.arguments.contains("--names") {
         print("\(bus.rawValue)（\(chans.count)）：" + items.joined(separator: " "))
     }
 }
+if let i = CommandLine.arguments.firstIndex(of: "--params"), i + 1 < CommandLine.arguments.count {
+    // 例：--params input:1,input:2  打印这些通道收到的全部参数原值（核对单位用）
+    for spec in CommandLine.arguments[i + 1].split(separator: ",") {
+        let parts = spec.split(separator: ":")
+        guard parts.count == 2, let bus = TotalMixBus(rawValue: String(parts[0])), let n = Int(parts[1]), n >= 1 else { continue }
+        let ch = TotalMixChannel(bus, n)
+        let params = state.channels[ch] ?? [:]
+        print("\n== \(ch)（\(names[ch] ?? "?")）参数原值 ==")
+        for (k, v) in params.sorted(by: { $0.key < $1.key }) { print("  \(k) = \(v)") }
+        if params.isEmpty { print("  （没有收到）") }
+    }
+}
 print("\n== TotalMix 原始混音节点（> -65 dB，与 TotalMix 屏幕逐条对照）==")
 let open = state.nodes.keys.compactMap { k in state.gainDB(k).map { (k, $0) } }
     .sorted { ($0.0.output, $0.0.source) < ($1.0.output, $1.0.source) }

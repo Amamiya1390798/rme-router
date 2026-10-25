@@ -100,7 +100,8 @@ public struct TotalMixOSCAdapter: DeviceAdapter {
             routes: routes.sorted { $0.destination == $1.destination ? $0.source < $1.source : $0.destination < $1.destination },
             controlPaths: [controlPath],
             settings: settings,
-            outputMuted: state.outputMuted(using: map, source: src("/output/N/mute")))
+            outputMuted: state.outputMuted(using: map, source: src("/output/N/mute")),
+            preamps: state.preamps(using: map, micPortID: "\(deviceID).mic.in", source: src("/input/N")))
     }
 
     public func plan(_ change: RouteChange, current: DeviceSnapshot) -> [PlannedOperation] {

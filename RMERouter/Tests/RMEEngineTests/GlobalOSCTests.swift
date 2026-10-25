@@ -165,6 +165,33 @@ final class GlobalOSCTests: XCTestCase {
         XCTAssertNil(map[TotalMixChannel(.input, 100)])          // 没收到名字（隐藏通道）
     }
 
+    /// XT 自带话放（第 7.0 节）：只取映射到 xt.mic.in 的输入；默认名视为无标签；gain 证据为 inferred。
+    func testXTPreampsFromTotalMix() {
+        var s = TotalMixState()
+        for m in [
+            OSCMessage("/input/0/name", [.string("Mic 1")]), OSCMessage("/input/0/48v", [.float(1)]),
+            OSCMessage("/input/0/gain", [.float(23.5)]), OSCMessage("/input/0/phase", [.float(0)]),
+            OSCMessage("/input/0/autoset", [.float(0)]),
+            OSCMessage("/input/1/name", [.string("Kick mic")]), OSCMessage("/input/1/48v", [.float(0)]),
+            OSCMessage("/input/12/name", [.string("M1-9")]), OSCMessage("/input/12/48v", [.float(1)]),   // MADI 通道：不算 XT 话放
+        ] { s.apply(m) }
+        var map = TotalMixChannelMap()
+        map.confirm(TotalMixChannel(.input, 2), ChannelRef("xt.mic.in", 2))   // 改了名，按用户确认的对照表
+        map.infer(from: s)
+        let p = s.preamps(using: map, micPortID: "xt.mic.in", source: FactSource(interface: "totalmix-osc"))
+        XCTAssertEqual(p.map(\.input.description), ["xt.mic.in:1", "xt.mic.in:2"])
+        XCTAssertEqual(p[0].label.knownValue, "")                 // 默认名 → 无标签
+        XCTAssertEqual(p[0].phantom.knownValue, true)
+        XCTAssertEqual(p[0].gainDB.knownValue, 23.5)
+        XCTAssertEqual(p[0].gainDB.evidence, .inferred)           // 单位未核对
+        XCTAssertEqual(p[0].phase.knownValue, false)
+        XCTAssertEqual(p[0].autoGain.knownValue, false)
+        XCTAssertNil(p[0].hiZ.knownValue)                         // XT 话放没有 instrument 参数
+        XCTAssertEqual(p[0].gainDB.source.reference, "/input/0/gain")
+        XCTAssertEqual(p[1].label.knownValue, "Kick mic")
+        XCTAssertNil(p[1].gainDB.knownValue)                      // 没收到 → unknown
+    }
+
     func testHardwareNameParserRejectsControlRoomNames() {
         for (n, bus) in [("Main", TotalMixBus.output), ("Phones 1", .output), ("Mic 1", .output), ("AN 1", .input),
                          ("PH", .input), ("M1-", .input), ("Mx-1", .input), ("M1-1", .playback)] {
