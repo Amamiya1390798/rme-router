@@ -8,3 +8,4 @@ DerivedData/
 # 打包文件与系统文件
 *.zip
 .DS_Store
+mockups/
