@@ -50,6 +50,29 @@ final class SignalPathTests: XCTestCase {
         XCTAssertEqual(m.stripFocus(connector: conn("xt.madi2.in"), channel: 1).inputs, [TotalMixChannel(.input, 69)])
     }
 
+    /// 整个 MADI 口超过 8 路：默认只看有发送的通道条；要全部时照旧。
+    func testFocusActiveOnly() async {
+        let m = await loaded()
+        let all = m.stripFocus(connector: conn("xt.madi2.in"), activeOnly: false)
+        let auto = m.stripFocus(connector: conn("xt.madi2.in"))
+        XCTAssertFalse(all.activeOnly)
+        XCTAssertTrue(auto.activeOnly)
+        XCTAssertEqual(auto.total, all.stripCount)
+        XCTAssertLessThanOrEqual(auto.stripCount, all.stripCount)
+        XCTAssertEqual(auto.edges, all.edges, "线不受影响")
+        for e in auto.edges {
+            XCTAssertTrue(auto.inputs.contains(e.from) || auto.playbacks.contains(e.from))
+            XCTAssertTrue(auto.outputs.contains(e.to))
+        }
+        // 单个麦克风只有 1 路：不过滤
+        XCTAssertFalse(m.stripFocus(connector: conn("xt.mic.1")).activeOnly)
+        // 一路都不在用（Mic 2 没有发送、没有信号）：强制只看在用的也照旧显示全部
+        let idle = m.stripFocus(connector: conn("xt.mic.2"), activeOnly: true)
+        XCTAssertTrue(idle.edges.isEmpty)
+        XCTAssertFalse(idle.activeOnly)
+        XCTAssertEqual(idle.stripCount, idle.total)
+    }
+
     func testDragIntents() {
         let m = model()
         // 输出口 → 另一台设备的输入口 = 接线（已有的拒绝）

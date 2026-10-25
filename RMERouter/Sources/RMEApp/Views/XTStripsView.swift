@@ -13,6 +13,10 @@ struct XTStripsView: View {
     var onlySignal: Bool
     /// 在面板上选中接口时：要高亮的通道条和它们之间的线（第 6.4.4 节）。
     var focus: StripFocus? = nil
+    /// 链路卡上鼠标停着的那条发送：加亮它，其余线变淡。
+    var highlightEdge: StripFocus.Edge? = nil
+    /// 选中接口时点了一条通道条：返回 true 表示已处理（缩小到这一路），false 则照常选中。
+    var onFocusPick: ((XTStrip) -> Bool)? = nil
     @State private var output: TotalMixChannel?
     @State private var source: TotalMixChannel?
 
@@ -60,7 +64,8 @@ struct XTStripsView: View {
                     // 选中接口：画链上每条“来源条 → 输出条”的线
                     ForEach(Array(focus.edges.prefix(StripFocus.maxEdges).enumerated()), id: \.offset) { _, e in
                         if let a = anchors["src:\(e.from.bus.rawValue):\(e.from.number)"], let b = anchors["out:\(e.to.number)"] {
-                            RouteLines(from: g[a], targets: [(g[b], e.dB)])
+                            RouteLines(from: g[a], targets: [(g[b], e.dB)],
+                                       opacity: highlightEdge == nil || highlightEdge == e ? 1 : 0.2)
                         }
                     }
                 } else if let s = selectedSource, let from = anchors["src"].map({ g[$0] }) {
@@ -95,6 +100,7 @@ struct XTStripsView: View {
     private func strip(_ s: XTStrip, origin: OriginLabel?) -> some View {
         SourceStrip(model: model, strip: s, output: current, origin: origin,
                     selected: focus == nil ? source == s.tm : false, lit: focus.map { $0.contains(s.tm) }) {
+            if focus != nil, onFocusPick?(s) == true { return }
             source = source == s.tm ? nil : s.tm
         }
         .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) {
@@ -144,6 +150,7 @@ struct StripAnchorKey: PreferenceKey {
 struct RouteLines: View {
     var from: CGRect
     var targets: [(CGRect, Double?)]
+    var opacity: Double = 1
 
     var body: some View {
         ZStack {
@@ -166,6 +173,7 @@ struct RouteLines: View {
             }
             Circle().fill(Tokens.Palette.accent).frame(width: 7, height: 7).position(x: from.midX, y: from.maxY)
         }
+        .opacity(opacity)
     }
 }
 

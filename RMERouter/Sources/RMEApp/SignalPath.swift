@@ -52,6 +52,14 @@ public struct StripFocus: Equatable, Sendable {
     }
 
     public static let maxEdges = 40
+    /// 选中的接口超过这么多路时，默认只看在用的通道条（第 6.4.4 节）。
+    public static let activeOnlyAbove = 8
+
+    /// 过滤前链上的通道条数；只看在用的时大于 stripCount。
+    public var total = 0
+    /// 这次是否只留了在用的（有发送或有信号）。
+    public var activeOnly = false
+    public var stripCount: Int { inputs.count + playbacks.count + outputs.count }
 
     public var isEmpty: Bool { inputs.isEmpty && playbacks.isEmpty && outputs.isEmpty }
     public func contains(_ ch: TotalMixChannel) -> Bool { inputs.contains(ch) || playbacks.contains(ch) || outputs.contains(ch) }
@@ -65,7 +73,8 @@ extension AppModel {
     }
 
     /// 选中一个接口（channel 为 nil 时是整个接口的全部通道）后，沿路由和接线追出的整条链在通道条上的样子。
-    public func stripFocus(connector c: PanelConnector, channel: Int? = nil) -> StripFocus {
+    /// activeOnly 为 nil 时自动：选中超过 `StripFocus.activeOnlyAbove` 路才只看在用的。
+    public func stripFocus(connector c: PanelConnector, channel: Int? = nil, activeOnly: Bool? = nil) -> StripFocus {
         let topo = snapshot.topology
         var refs: [ChannelRef] = []
         for portID in c.ports {
@@ -75,6 +84,7 @@ extension AppModel {
         }
         let name = channel.map { "\(c.name) 第 \($0) 路" } ?? c.name
         var focus = StripFocus(title: name)
+        var refOf: [TotalMixChannel: ChannelRef] = [:]
         let trace = SignalTrace(snapshot: snapshot)
         var chain: Set<ChannelRef> = []
         for ref in refs {
@@ -87,8 +97,13 @@ extension AppModel {
         }
         for ref in chain {
             guard let port = topo.port(ref.portID), port.deviceID == "xt" else { continue }
-            if ref.portID == "xt.playback.in" { focus.playbacks.insert(stripChannel(TotalMixChannel(.playback, ref.channel))); continue }
+            if ref.portID == "xt.playback.in" {
+                let tm = stripChannel(TotalMixChannel(.playback, ref.channel))
+                focus.playbacks.insert(tm); refOf[tm] = refOf[tm] ?? ref
+                continue
+            }
             guard let tm = tmChannel(for: ref) else { continue }
+            refOf[stripChannel(tm)] = refOf[stripChannel(tm)] ?? ref
             switch tm.bus {
             case .input: focus.inputs.insert(stripChannel(tm))
             case .output: focus.outputs.insert(stripChannel(tm))
@@ -104,6 +119,17 @@ extension AppModel {
             edges.insert(.init(from: s, to: o, dB: dB))
         }
         focus.edges = edges.sorted { ($0.from, $0.to) < ($1.from, $1.to) }
+        focus.total = focus.stripCount
+        // 只看在用的：有发送或有信号的来源条、有发送进来的输出条；一条都没有时照旧显示全部
+        if activeOnly ?? (refs.count > StripFocus.activeOnlyAbove) {
+            let froms = Set(edges.map(\.from)), tos = Set(edges.map(\.to))
+            func live(_ ch: TotalMixChannel) -> Bool { refOf[ch].map { hasSignal($0) == true } ?? false }
+            var f = focus
+            f.inputs = focus.inputs.filter { froms.contains($0) || live($0) }
+            f.playbacks = focus.playbacks.filter { froms.contains($0) || live($0) }
+            f.outputs = focus.outputs.filter { tos.contains($0) || live($0) }
+            if f.stripCount > 0 { f.activeOnly = true; focus = f }
+        }
         return focus
     }
 }
