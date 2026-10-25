@@ -34,7 +34,10 @@ public enum OutputCards {
     /// 立体声合并：通道 c（奇数）与 c+1 的每条来源都能一一对应（同源，或来源也是相邻一对），且类型相同。
     /// showPlayback 为 false 时隐藏电脑回放来源（TotalMix 默认每路回放直送同号输出，会淹没设备间路由）：
     /// 只有回放来源的卡不出现，其余卡记下隐藏了几路。
-    public static func build(_ snapshot: SystemSnapshot, showPlayback: Bool = true) -> [DeviceOutputs] {
+    /// stereo：设备自己报的立体声配对（XT 来自 TotalMix 的 `stereo`，第 6.4.3 节）。true 一定合并、false 一定拆开；
+    /// nil（没报）时才按“来源能一一配对”推断。
+    public static func build(_ snapshot: SystemSnapshot, showPlayback: Bool = true,
+                             stereo: (ChannelRef) -> Bool? = { _ in nil }) -> [DeviceOutputs] {
         let all = Dictionary(grouping: snapshot.allRoutes(), by: \.destination)
         let byDest = showPlayback ? all : all.mapValues { $0.filter { !isPlayback($0.source) } }.filter { !$0.value.isEmpty }
         func hidden(_ chans: [Int], _ portID: String) -> Int {
@@ -49,8 +52,15 @@ public enum OutputCards {
                 while i < used.count {
                     let c = used[i]
                     let left = byDest[ChannelRef(port.id, c)] ?? []
-                    if c % 2 == 1, i + 1 < used.count, used[i + 1] == c + 1,
-                       let pair = pairSources(left, byDest[ChannelRef(port.id, c + 1)] ?? []) {
+                    let right = byDest[ChannelRef(port.id, c + 1)] ?? []
+                    let declared = c % 2 == 1 ? stereo(ChannelRef(port.id, c)) : false
+                    let rightUsed = i + 1 < used.count && used[i + 1] == c + 1
+                    if declared == true {
+                        let pair = pairSources(left, right) ?? union(left, right)
+                        cards.append(OutputCard(port: port, channels: [c, c + 1], sources: pair,
+                                                hiddenPlayback: hidden([c, c + 1], port.id)))
+                        i += rightUsed ? 2 : 1
+                    } else if declared == nil, c % 2 == 1, rightUsed, let pair = pairSources(left, right) {
                         cards.append(OutputCard(port: port, channels: [c, c + 1], sources: pair,
                                                 hiddenPlayback: hidden([c, c + 1], port.id)))
                         i += 2
@@ -84,6 +94,15 @@ public enum OutputCards {
             out.append(.init(refs: r.source == l.source ? [l.source] : [l.source, r.source], kind: l.kind, evidence: weaker))
         }
         return out.sorted(by: sourceOrder)
+    }
+
+    /// 立体声输出但左右来源配不成对：两边的来源都列出（同一来源只列一次）。
+    static func union(_ left: [Route], _ right: [Route]) -> [OutputCard.Source] {
+        var seen: Set<ChannelRef> = []
+        return (left + right).compactMap { r -> OutputCard.Source? in
+            guard seen.insert(r.source).inserted else { return nil }
+            return .init(refs: [r.source], kind: r.kind, evidence: r.evidence)
+        }.sorted(by: sourceOrder)
     }
 
     /// 电平高的在前，其次按地址。

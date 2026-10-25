@@ -48,7 +48,8 @@ struct PendingBar: View {
                 }
                 ForEach(model.pendingStrips) { c in
                     row(title: c.title, change: c.changeText,
-                        badges: (c.isUnmute ? [("取消静音：会出声", Tokens.Palette.problem)] : [])
+                        badges: (c.isLayoutChange ? [("改通道布局", Tokens.Palette.warn)] : [])
+                            + (c.isUnmute ? [("取消静音：会出声", Tokens.Palette.problem)] : [])
                             + (c.isLargeJump ? [("大幅抬高", Tokens.Palette.warn)] : [])) { model.discardStrip(c.id) }
                 }
                 ForEach(model.pendingXTCRoutes) { r in
@@ -227,6 +228,7 @@ struct ConfirmSheet: View {
             Text(verbatim: c.wireText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
             HStack(spacing: Tokens.Space.s) {
                 if c.stereo { Badge(text: "立体声：作用于左右两声道", color: Tokens.Palette.textMuted) }
+                if c.isLayoutChange { Badge(text: "改通道布局：这一对的发送、名字会跟着变", color: Tokens.Palette.warn) }
                 if c.isUnmute { Badge(text: "取消静音：会突然出声", color: Tokens.Palette.problem) }
                 if c.isLargeJump { Badge(text: "大幅抬高", color: Tokens.Palette.problem) }
                 outcome(c.id)

@@ -100,18 +100,24 @@ public struct TotalMixState: Sendable, Equatable {
     public private(set) var status: [String: OSCValue] = [:]
     public private(set) var levels: [TotalMixChannel: Double] = [:]
     public private(set) var unparsedCount = 0
+    /// 除电平以外的内容每变一次加 1（App 据此判断要不要重建快照，第 6.4.3 节“与 TotalMix 同步”）。
+    public private(set) var revision = 0
 
     public init() {}
 
     public mutating func apply(_ event: TotalMixEvent) {
         switch event {
         case let .mixNode(src, out, parameter, value):
-            nodes[NodeKey(source: src, output: out), default: [:]][parameter] = value
+            let key = NodeKey(source: src, output: out)
+            if nodes[key]?[parameter] != value { revision += 1 }
+            nodes[key, default: [:]][parameter] = value
         case let .channel(ch, parameter, value):
+            if channels[ch]?[parameter] != value { revision += 1 }
             channels[ch, default: [:]][parameter] = value
         case let .level(ch, dB):
             levels[ch] = dB
         case let .status(key, value):
+            if status[key] != value { revision += 1 }
             status[key] = value
         case .other:
             unparsedCount += 1
@@ -141,6 +147,8 @@ public struct TotalMixState: Sendable, Equatable {
 
     /// 通道条参数写到哪个 TotalMix 通道：立体声右声道（偶数号、左声道是立体声）除 L/R 参数外改用左声道。
     public func stripTarget(_ ch: TotalMixChannel, _ param: TotalMixStripParam) -> TotalMixChannel {
+        // 配对一律写在奇数号（左）通道上
+        if param == .stereo { return ch.number % 2 == 0 ? TotalMixChannel(ch.bus, ch.number - 1) : ch }
         guard !param.isPerSide, ch.number % 2 == 0 else { return ch }
         let left = TotalMixChannel(ch.bus, ch.number - 1)
         return isStereo(left) == true ? left : ch

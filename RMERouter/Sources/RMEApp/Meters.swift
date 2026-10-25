@@ -64,8 +64,12 @@ extension AppModel {
     public func startMeterLoop() {
         meterTask?.cancel()
         meterTask = Task { [weak self] in
+            var tick = 0
             while !Task.isCancelled {
                 await self?.pollMetersOnce()
+                // 每秒一次：把 TotalMix 里的改动（立体声配对、名字、发送）同步过来
+                if tick % 10 == 0 { await self?.syncFromTotalMix() }
+                tick += 1
                 try? await Task.sleep(for: .milliseconds(100))
             }
         }

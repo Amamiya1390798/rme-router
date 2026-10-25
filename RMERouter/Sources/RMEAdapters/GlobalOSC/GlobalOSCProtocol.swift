@@ -156,12 +156,14 @@ public enum TotalMixFader {
 /// 通道条参数（文档第 7.8 节）。只有这四个可写。
 public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
     case volume, balpan, mute, phase
+    /// 立体声合并（1）/ 拆分（0）；写在奇数号（左）通道上，改变通道布局（第 7.8 节）。
+    case stereo
 
     /// 这一总线上有没有这个参数（协议表 + 实测：输入、回放没有 volume / balpan）。
     public func applies(to bus: TotalMixBus) -> Bool {
         switch self {
         case .volume, .balpan: return bus == .output
-        case .mute, .phase: return true
+        case .mute, .phase, .stereo: return true
         }
     }
 
@@ -169,7 +171,10 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
     public var isPerSide: Bool { self == .phase }
 
     public var label: String {
-        switch self { case .volume: return "音量"; case .balpan: return "平衡"; case .mute: return "静音"; case .phase: return "相位" }
+        switch self {
+        case .volume: return "音量"; case .balpan: return "平衡"; case .mute: return "静音"; case .phase: return "相位"
+        case .stereo: return "立体声配对"
+        }
     }
 
     /// 截到协议允许的范围；音量 -65 dB 及以下为“关”（-300）。
@@ -177,7 +182,7 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         switch self {
         case .volume: return v <= TotalMixFader.offThresholdDB ? Double(TotalMixWrite.offDB) : min(v, TotalMixWrite.maxDB)
         case .balpan: return min(max(v, -1), 1)
-        case .mute, .phase: return v >= 0.5 ? 1 : 0
+        case .mute, .phase, .stereo: return v >= 0.5 ? 1 : 0
         }
     }
 
@@ -189,6 +194,7 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .balpan: return TotalMixWrite.panText(v)
         case .mute: return v >= 0.5 ? "静音" : "开"
         case .phase: return v >= 0.5 ? "反相" : "正相"
+        case .stereo: return v >= 0.5 ? "立体声" : "单声道"
         }
     }
 }

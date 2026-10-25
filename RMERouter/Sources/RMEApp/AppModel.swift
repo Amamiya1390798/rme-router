@@ -266,6 +266,22 @@ public final class AppModel {
         if traceTarget == nil { traceTarget = traceCandidates.first }
     }
 
+    /// 与 TotalMix 同步（第 6.4.3 节）：客户端收到的状态有变化（不算电平）就重建对照表与 XT 快照，所有页面一起更新。
+    /// 返回是否有变化。
+    @discardableResult
+    public func syncFromTotalMix() async -> Bool {
+        guard let adapter, lastLoaded != nil else { return false }
+        let state = await adapter.client.state
+        guard state.revision != tmState.revision else { return false }
+        await captureTotalMixState(from: adapter)
+        apply(xt: TotalMixOSCAdapter.makeSnapshot(
+            deviceID: "xt", state: tmState, map: adapter.channelMap,
+            controlPath: ControlPath(controller: "this-app", transport: .osc(host: settings.host, port: settings.port),
+                                     state: .online, active: true),
+            observedAt: Date()))
+        return true
+    }
+
     /// 记下 TotalMix 原始状态与推断后的对照表。
     func captureTotalMixState(from adapter: TotalMixOSCAdapter) async {
         tmState = await adapter.client.state
@@ -287,7 +303,12 @@ public final class AppModel {
     /// “输出”视图是否列出电脑回放来源（默认不列）。
     public var showPlayback = false
 
-    public var outputs: [DeviceOutputs] { OutputCards.build(snapshot, showPlayback: showPlayback) }
+    public var outputs: [DeviceOutputs] {
+        OutputCards.build(snapshot, showPlayback: showPlayback) { [self] ref in
+            guard deviceID(of: ref) == "xt", let tm = tmChannel(for: ref) else { return nil }
+            return tmState.isStereo(tm)
+        }
+    }
 
     /// 可以追踪的起点：有路由送出的输入通道，按拓扑设备顺序。
     public var traceCandidates: [ChannelRef] {

@@ -377,7 +377,7 @@ extension AppModel {
     /// 待应用里有必须明确确认的改动：打开 48V，或一次抬高超过 10 dB。
     public var needsExplicitConfirmation: Bool {
         pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.needsPhantomAck || $0.isLargeJump }
-            || pendingStrips.contains { $0.isUnmute || $0.isLargeJump }
+            || pendingStrips.contains { $0.isUnmute || $0.isLargeJump || $0.isLayoutChange }
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。

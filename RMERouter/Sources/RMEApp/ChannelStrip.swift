@@ -52,6 +52,9 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
         }
     }
 
+    /// 合并或拆分立体声：改变通道布局。
+    public var isLayoutChange: Bool { param == .stereo }
+
     /// 取消静音：会突然出声。
     public var isUnmute: Bool { param == .mute && (old ?? 0) >= 0.5 && new < 0.5 }
 
@@ -75,7 +78,7 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
         switch p {
         case .volume: return (!TotalMixFader.isOn(a) && !TotalMixFader.isOn(b)) || abs(a - b) < 0.05
         case .balpan: return abs(a - b) < 0.005
-        case .mute, .phase: return (a >= 0.5) == (b >= 0.5)
+        case .mute, .phase, .stereo: return (a >= 0.5) == (b >= 0.5)
         }
     }
 }
@@ -130,10 +133,10 @@ extension AppModel {
         guard param.applies(to: tm0.bus) else { return .notSupported("\(ref) 没有\(param.label)（只有输出有）") }
         let tm = tmState.stripTarget(tm0, param)
         let target = param.clamp(value)
-        let stereo = tm != tm0 || (!param.isPerSide && tmState.isStereo(tm) == true)
+        let stereo = param != .stereo && (tm != tm0 || (!param.isPerSide && tmState.isStereo(tm) == true))
         let change = PendingStripChange(id: UUID(), target: .channel(ref: ref, tm: tm, param: param),
                                         tmName: tmState.names[tm], stereo: stereo, old: nil, new: target)
-        return stage(change) { tmState.stripValue(tm, param) }
+        return stage(change) { tmState.stripValue(tm, param) ?? (param == .stereo ? 0 : nil) }
     }
 
     /// 暂存一条发送的声像（-1…+1）。只能改已有的发送。
@@ -179,7 +182,9 @@ extension AppModel {
         var channels: [TotalMixChannel] = [], outputs: [TotalMixChannel] = []
         for c in sent {
             switch c.target {
-            case let .channel(_, tm, _): channels.append(tm)
+            case let .channel(_, tm, p):
+                channels.append(tm)
+                if p == .stereo { channels.append(TotalMixChannel(tm.bus, tm.number + 1)) }   // 右声道的名字、配对也会变
             case let .sendPan(_, _, _, o): outputs.append(o)
             }
         }

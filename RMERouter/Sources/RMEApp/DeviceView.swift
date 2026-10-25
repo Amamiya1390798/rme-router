@@ -1,6 +1,7 @@
 import Foundation
 import RMECore
 import RMEAdapters
+import RMEEngine
 
 /// “设备”页的数据（文档第 6.4 节）：TotalMix 式通道条、线缆两端、信号状态。界面无关，便于测试。
 public struct XTStrip: Identifiable, Equatable, Sendable {
@@ -31,6 +32,37 @@ extension AppModel {
             let ref: ChannelRef? = bus == .playback ? ChannelRef("xt.playback.in", ch.number) : xtMap[ch]?.ref
             return XTStrip(tm: ch, ref: ref, name: names[ch] ?? "\(ch)", stereo: tmState.isStereo(ch) == true)
         }
+    }
+
+    /// 一个来源送到了哪些输出（读回的节点电平），按输出序号；立体声输出只列左声道那条。
+    public func xtSends(from source: TotalMixChannel) -> [(output: TotalMixChannel, dB: Double)] {
+        tmState.nodes.keys.filter { $0.source == source }.compactMap { key in
+            guard let dB = tmState.gainDB(key) else { return nil }
+            if key.output.number % 2 == 0, tmState.isStereo(TotalMixChannel(.output, key.output.number - 1)) == true { return nil }
+            return (key.output, dB)
+        }
+        .sorted { $0.output < $1.output }
+    }
+
+    /// 通道的简短名字：“12Mic Mic 1”“XTC MADI 输入 9”。
+    public func shortName(_ ref: ChannelRef) -> String {
+        let topo = snapshot.topology
+        guard let port = topo.port(ref.portID) else { return ref.description }
+        let device = topo.device(port.deviceID)?.name ?? port.deviceID
+        let ch = ref.portID.hasSuffix(".mic.in") || ref.portID.hasSuffix(".analog.in") ? "Mic \(ref.channel)" : "\(port.name) \(ref.channel)"
+        return "\(device) \(ch)"
+    }
+
+    /// 这些通道沿接线和路由追到底的源头（第 6.4.3 节“麦克风去向”）；源头就是自己的不列。
+    public func originLabels(_ refs: [ChannelRef]) -> [ChannelRef: String] {
+        let trace = SignalTrace(snapshot: snapshot)
+        var out: [ChannelRef: String] = [:]
+        for ref in refs {
+            let origins = Set(trace.upstream(to: ref).compactMap { $0.first?.hop.from }).filter { $0 != ref }.sorted()
+            guard !origins.isEmpty else { continue }
+            out[ref] = "← " + origins.prefix(2).map(shortName).joined(separator: "、") + (origins.count > 2 ? " 等" : "")
+        }
+        return out
     }
 
     /// 某条发送当前的电平（读回）；nil = 没有这条发送。
