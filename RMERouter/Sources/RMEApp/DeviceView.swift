@@ -13,6 +13,12 @@ public struct XTStrip: Identifiable, Equatable, Sendable {
     public var id: TotalMixChannel { tm }
 }
 
+/// 源头标签：verified 为 false 时路径上有演示数据（还没从设备读到）。
+public struct OriginLabel: Equatable, Sendable {
+    public var text: String
+    public var verified: Bool
+}
+
 /// 一根要画的线缆：两端都用“锚点名”表示（面板接口 `conn:<id>`，或节点 `node:<id>`）。
 public struct CableSpec: Identifiable, Equatable, Sendable {
     public var id: String
@@ -21,6 +27,8 @@ public struct CableSpec: Identifiable, Equatable, Sendable {
     public var type: PortType
     public var text: String
     public var issues: [String]
+    /// 核对状态：false 时画虚线（只是接线表里的声明）。
+    public var verified: Bool = true
 }
 
 extension AppModel {
@@ -53,16 +61,32 @@ extension AppModel {
         return "\(device) \(ch)"
     }
 
-    /// 这些通道沿接线和路由追到底的源头（第 6.4.3 节“麦克风去向”）；源头就是自己的不列。
-    public func originLabels(_ refs: [ChannelRef]) -> [ChannelRef: String] {
-        let trace = SignalTrace(snapshot: snapshot)
-        var out: [ChannelRef: String] = [:]
-        for ref in refs {
-            let origins = Set(trace.upstream(to: ref).compactMap { $0.first?.hop.from }).filter { $0 != ref }.sorted()
-            guard !origins.isEmpty else { continue }
-            out[ref] = "← " + origins.prefix(2).map(shortName).joined(separator: "、") + (origins.count > 2 ? " 等" : "")
+    /// XT 全部输入通道沿接线和路由追到底的源头（第 6.4.3 节“麦克风去向”），按快照版本缓存。
+    /// 路径上有一步是演示数据（证据 unknown），标签标为未核对；源头就是自己的不列。
+    public func originLabels(_ refs: [ChannelRef]) -> [ChannelRef: OriginLabel] {
+        if originCache?.version != snapshotVersion {
+            let trace = SignalTrace(snapshot: snapshot)
+            var all: [ChannelRef: OriginLabel] = [:]
+            let inputs = snapshot.topology.devices.first { $0.id == "xt" }?.ports.filter { $0.direction == .input && $0.type != .usb } ?? []
+            for port in inputs {
+                for ch in 1 ... port.singleSpeedChannels {
+                    let ref = ChannelRef(port.id, ch)
+                    let paths = trace.upstream(to: ref).filter { $0.first?.hop.from != ref }
+                    let origins = Set(paths.compactMap { $0.first?.hop.from }).sorted()
+                    guard !origins.isEmpty else { continue }
+                    // 已核对：路由不是演示数据，且经过的每根线都核对过（信号或用户确认）
+                    let verified = paths.allSatisfy { $0.allSatisfy { step in
+                        if case let .cable(f, t) = step.hop { return linkVerifications[LinkVerification.key(f.portID, t.portID)] != nil }
+                        return step.evidence != .unknown
+                    } }
+                    all[ref] = OriginLabel(text: "← " + origins.prefix(2).map(shortName).joined(separator: "、") + (origins.count > 2 ? " 等" : ""),
+                                           verified: verified)
+                }
+            }
+            originCache = (snapshotVersion, all)
         }
-        return out
+        let labels = originCache!.labels
+        return Dictionary(uniqueKeysWithValues: refs.compactMap { r in labels[r].map { (r, $0) } })
     }
 
     /// 某条发送当前的电平（读回）；nil = 没有这条发送。
@@ -72,14 +96,14 @@ extension AppModel {
 
     /// 端口有没有信号：任一通道最近有电平即为有；收不到电平时为 nil（无法判断）。
     public func hasSignal(port portID: String) -> Bool? {
-        guard meters.receiving() else { return nil }
-        return meters.levels.contains { $0.key.portID == portID && $0.value > -60 }
+        guard meters.live else { return nil }
+        return meters.active.contains { $0.portID == portID }
     }
 
     /// 一个通道有没有信号；收不到电平时为 nil。
     public func hasSignal(_ ref: ChannelRef) -> Bool? {
-        guard meters.receiving() else { return nil }
-        return (meters.levels[ref] ?? -144) > -60
+        guard meters.live else { return nil }
+        return meters.active.contains(ref)
     }
 
     /// 要画的线缆：接线表里的每根线，加上 XT 到“这台 Mac”的 USB 线。只画两端在面板（或节点）上都找得到的。
@@ -95,8 +119,9 @@ extension AppModel {
         var out: [CableSpec] = topo.links.compactMap { l in
             guard let a = anchor(l.from), let b = anchor(l.to), let p = topo.port(l.from) else { return nil }
             let name = { (id: String) in topo.port(id).map { "\(topo.device($0.deviceID)?.name ?? $0.deviceID) \($0.name)" } ?? id }
+            let status = cableStatus(l)
             return CableSpec(id: l.id, from: a, to: b, type: p.type, text: "\(name(l.from)) → \(name(l.to))",
-                             issues: (issues[l.id] ?? []).map(\.description))
+                             issues: (issues[l.id] ?? []).map(\.description), verified: status != .declared)
         }
         out.append(CableSpec(id: "usb", from: "conn:xt.usb", to: "node:mac", type: .usb, text: "MADIface XT USB 3 → 这台 Mac", issues: []))
         return out

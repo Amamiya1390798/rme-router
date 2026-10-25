@@ -117,7 +117,8 @@ public struct TotalMixState: Sendable, Equatable {
         case let .level(ch, dB):
             levels[ch] = dB
         case let .status(key, value):
-            if status[key] != value { revision += 1 }
+            // 只有“连没连上”算变化；DSP 负载等状态 TotalMix 大约每秒发一个，不触发重建
+            if key == "connection", status[key] != value { revision += 1 }
             status[key] = value
         case .other:
             unparsedCount += 1

@@ -80,7 +80,7 @@ struct XTStripsView: View {
         }
     }
 
-    private func strip(_ s: XTStrip, origin: String?) -> some View {
+    private func strip(_ s: XTStrip, origin: OriginLabel?) -> some View {
         SourceStrip(model: model, strip: s, output: current, origin: origin, selected: source == s.tm) {
             source = source == s.tm ? nil : s.tm
         }
@@ -168,7 +168,7 @@ struct SourceStrip: View {
     var model: AppModel
     var strip: XTStrip
     var output: XTStrip?
-    var origin: String?
+    var origin: OriginLabel?
     var selected: Bool
     var select: () -> Void
     @State private var editing = false
@@ -180,15 +180,16 @@ struct SourceStrip: View {
             Button(action: select) {
                 VStack(spacing: 1) {
                     Text(strip.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                    Text(origin ?? (strip.tm.bus == .input ? "录音 \(recordingText(strip))" : "回放 \(recordingText(strip))"))
+                    Text(origin.map { $0.verified ? $0.text : $0.text + "？" }
+                         ?? (strip.tm.bus == .input ? "录音 \(recordingText(strip))" : "回放 \(recordingText(strip))"))
                         .font(.system(size: 9)).lineLimit(1).truncationMode(.tail)
-                        .foregroundStyle(origin == nil ? Tokens.Palette.textMuted : Tokens.Palette.ok)
+                        .foregroundStyle(origin?.verified == true ? Tokens.Palette.ok : Tokens.Palette.textMuted)
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help((origin.map { "\($0)\n" } ?? "") + "点了看它送到哪里")
+            .help((origin.map { $0.verified ? "\($0.text)\n" : "\($0.text)（未核对：这一段来自演示数据，设备还没读到）\n" } ?? "") + "点了看它送到哪里")
             if let ref = strip.ref { MeterBar(store: model.meters, ref: ref, width: 46) } else { Spacer().frame(height: 6) }
             Button { editing = true } label: {
                 Group {

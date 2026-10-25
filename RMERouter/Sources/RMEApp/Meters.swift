@@ -16,6 +16,12 @@ public final class MeterStore {
     /// 开始轮询的时间（用来判断“在线但一直收不到电平”）。
     public private(set) var pollingSince: Date?
 
+    /// 慢变的“有信号”信息（文档第 6.4.3 节）：最多每秒更新一次，且只有内容变了才赋值。
+    /// 大页面（设备页、通道条）只读这两个，电平每 100 ms 的变化不会让整页重画。
+    public private(set) var active: Set<ChannelRef> = []
+    public private(set) var live = false
+    private var activeUpdatedAt: Date?
+
     public init() {}
 
     /// 2 秒内收到过电平，并且设备在线。
@@ -39,6 +45,12 @@ public final class MeterStore {
             levels = new
             lastUpdate = now
         }
+        guard activeUpdatedAt.map({ now.timeIntervalSince($0) >= 1 }) ?? true else { return }
+        activeUpdatedAt = now
+        let isLive = receiving(now: now)
+        let nowActive = isLive ? Set(levels.filter { $0.value > -60 }.keys) : []
+        if nowActive != active { active = nowActive }
+        if isLive != live { live = isLive }
     }
 
     func startPolling(now: Date = Date()) { if pollingSince == nil { pollingSince = now } }
@@ -58,6 +70,7 @@ extension AppModel {
         meters.deviceLive = xtStatus == .live
         meters.startPolling()
         meters.update(out)
+        identifySample()
     }
 
     /// 持续轮询电平（每 100 ms）。App 启动读取成功后开始；读取失败时停止。

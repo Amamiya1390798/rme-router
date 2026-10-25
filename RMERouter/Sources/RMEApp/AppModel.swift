@@ -82,7 +82,19 @@ public final class AppModel {
             adapter = nil
         }
     }
-    public internal(set) var snapshot: SystemSnapshot
+    public internal(set) var snapshot: SystemSnapshot { didSet { snapshotVersion += 1 } }
+    /// 快照每变一次加 1；派生数据（源头标签）按它缓存。
+    @ObservationIgnored var snapshotVersion = 0
+    @ObservationIgnored var originCache: (version: Int, labels: [ChannelRef: OriginLabel])?
+    /// 线缆核对结果（第 6.5 节），按两端端口记，存在 UserDefaults。
+    public internal(set) var linkVerifications: [String: LinkVerification] = [:] {
+        didSet {
+            if let d = try? JSONEncoder().encode(linkVerifications) { defaults.set(d, forKey: Self.verificationsKey) }
+            originCache = nil   // 源头标签要按新的核对结果重算
+        }
+    }
+    /// 正在进行或刚结束的信号核对。
+    public internal(set) var identify: IdentifyTest?
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
     /// 12Mic HTTP 地址（文档第 6.2 节）：网络 http://12mic.local，USB 直连 http://172.20.0.1。
@@ -174,6 +186,8 @@ public final class AppModel {
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
         self.makeXTC = makeXTC
+        linkVerifications = defaults.data(forKey: Self.verificationsKey)
+            .flatMap { try? JSONDecoder().decode([String: LinkVerification].self, from: $0) } ?? [:]
         xtcSettings = defaults.data(forKey: Self.xtcKey).flatMap { try? JSONDecoder().decode(XTCSettings.self, from: $0) }
             ?? XTCSettings()
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"

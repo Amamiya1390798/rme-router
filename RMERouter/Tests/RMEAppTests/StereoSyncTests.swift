@@ -90,7 +90,8 @@ final class StereoSyncTests: XCTestCase {
 
         // 演示数据里 12Mic Mic n → MADI 光口输出 8+n → XT MADI 1 输入 8+n（接线 L1）
         let labels = m.originLabels([ChannelRef("xt.madi1.in", 9), ChannelRef("xt.mic.in", 1)])
-        XCTAssertEqual(labels[ChannelRef("xt.madi1.in", 9)], "← 12Mic Mic 1")
+        XCTAssertEqual(labels[ChannelRef("xt.madi1.in", 9)]?.text, "← 12Mic Mic 1")
+        XCTAssertEqual(labels[ChannelRef("xt.madi1.in", 9)]?.verified, false, "12Mic 没读到：这一段是演示数据，不能当成已核对")
         XCTAssertNil(labels[ChannelRef("xt.mic.in", 1)], "XT 自己的话放没有更上游")
     }
 }

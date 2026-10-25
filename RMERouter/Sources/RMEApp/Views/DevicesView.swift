@@ -8,6 +8,7 @@ struct DevicesView: View {
     @State private var face: PanelFace = .rear
     @State private var selected: String?
     @State private var onlySignal = false
+    @State private var identifying = false
 
     private var selectedConnector: (DevicePanel, PanelConnector)? {
         guard let id = selected else { return nil }
@@ -41,9 +42,12 @@ struct DevicesView: View {
             Picker("面", selection: $face) { ForEach(PanelFace.allCases) { Text($0.title).tag($0) } }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 160)
                 .onChange(of: face) { selected = nil }
+            Button("信号核对…") { identifying = true }
+                .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
+                .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
             Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox)
-                .disabled(!model.meters.receiving())
-                .help(model.meters.receiving() ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
+                .disabled(!model.meters.live)
+                .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
         }
     }
 }
@@ -207,8 +211,10 @@ struct CableLayer: View {
         ZStack {
             ForEach(routed, id: \.cable.id) { r in
                 let on = selected == nil || r.cable.from == selected || r.cable.to == selected
+                // 未核对（只是接线表里的声明）画虚线
                 Self.path(r.points)
-                    .stroke(Self.color(r.cable.type).opacity(on ? 0.95 : 0.12), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .stroke(Self.color(r.cable.type).opacity(on ? 0.95 : 0.12),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: r.cable.verified ? [] : [7, 5]))
                 ForEach(Array([r.points.first!, r.points.last!].enumerated()), id: \.offset) { _, p in
                     Circle().fill(Self.color(r.cable.type).opacity(on ? 1 : 0.15)).frame(width: 8, height: 8).position(p)
                 }
@@ -303,8 +309,19 @@ struct ConnectorDetail: View {
                 }
                 ForEach(links, id: \.id) { l in
                     let other = l.from == portID ? l.to : l.from
+                    let status = model.cableStatus(l)
                     Text(verbatim: "⇄ \(topo.port(other).map { "\(topo.device($0.deviceID)?.name ?? "") \($0.name)" } ?? other)")
                         .font(Tokens.Font.caption)
+                    HStack(spacing: Tokens.Space.xs) {
+                        EvidenceDot(status == .declared ? .inferred : .confirmed)
+                        Text(status.text).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if status == .declared || status == .lockSeen {
+                        Button("我对照实物确认过了") { model.confirmLinkByUser(l) }
+                            .font(Tokens.Font.caption).buttonStyle(.link)
+                            .help("最好先用“信号核对”；这里只在无法用信号核对时使用")
+                    }
                     ForEach((model.linkIssues[l.id] ?? []).map(\.description), id: \.self) {
                         Text("⚠ \($0)").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
                     }

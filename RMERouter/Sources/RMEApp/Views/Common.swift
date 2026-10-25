@@ -113,31 +113,29 @@ struct StatusStrip: View {
 }
 
 /// 电平条（文档第 7.7 节）：-60…0 dB；-6 dB 以上黄，0 dB 及以上红。没有信号时写“无信号”，不画 0。
-/// 包在 TimelineView 里：信号停了、没有新数据时也会按时变成“无信号”。
+/// 不用各自的定时器：只在电平数据或“在不在收”变化时重画（`MeterStore.live` 在信号停了 2 秒后变 false）。
 struct MeterBar: View {
     var store: MeterStore
     var ref: ChannelRef
     var width: CGFloat = 70
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
-            if let dB = store.level(ref, now: context.date) {
-                let fraction = min(max((dB + 60) / 60, 0), 1)
-                HStack(spacing: Tokens.Space.xs) {
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Tokens.Palette.border)
-                        Capsule().fill(color(dB)).frame(width: width * fraction)
-                    }
-                    .frame(width: width, height: 4)
-                    Text(dB <= -60 ? "-∞" : String(format: "%.0f", dB))
-                        .font(Tokens.Font.caption.monospacedDigit()).foregroundStyle(Tokens.Palette.textMuted)
-                        .frame(width: 26, alignment: .trailing)
+        if store.live, let dB = store.levels[ref] {
+            let fraction = min(max((dB + 60) / 60, 0), 1)
+            HStack(spacing: Tokens.Space.xs) {
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Tokens.Palette.border)
+                    Capsule().fill(color(dB)).frame(width: width * fraction)
                 }
-                .help("峰值电平 \(String(format: "%.1f", dB)) dB")
-            } else {
-                Text("无信号").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
-                    .help("XT 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
+                .frame(width: width, height: 4)
+                Text(dB <= -60 ? "-∞" : String(format: "%.0f", dB))
+                    .font(Tokens.Font.caption.monospacedDigit()).foregroundStyle(Tokens.Palette.textMuted)
+                    .frame(width: 26, alignment: .trailing)
             }
+            .help("峰值电平 \(String(format: "%.1f", dB)) dB")
+        } else {
+            Text("无信号").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
+                .help("XT 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
         }
     }
 
