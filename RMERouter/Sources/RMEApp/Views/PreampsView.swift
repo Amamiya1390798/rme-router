@@ -56,7 +56,11 @@ public struct PreampsView: View {
             device == "xt" ? (model.xtStatus == .live || model.xtStatus == .offlineSaved) : model.twelveMicStatus == .live
         }
         a.pending = { device, input, field in model.pendingPreamp(deviceID: device, input: input, field: field) }
-        a.stage = { device, input, field, value in model.stagePreamp(deviceID: device, input: input, field: field, value: value)?.text }
+        a.stage = { device, input, field, value in
+            if let e = model.stagePreamp(deviceID: device, input: input, field: field, value: value) { return e.text }
+            Task { await model.commitIfQuick() }   // 快速方式下立即发送（第 7.4 节）
+            return nil
+        }
         return a
     }
 
@@ -334,7 +338,7 @@ struct PreampGainEditor: View {
             HStack {
                 Spacer()
                 Button("取消") { onDone(nil) }
-                Button("加入待应用") { onDone(value) }.keyboardShortcut(.defaultAction)
+                Button(ConfirmMode.current.applyLabel) { onDone(value) }.keyboardShortcut(.defaultAction)
             }
             Text("不会立即发送；在底部“待应用”栏确认后才写入设备。范围 0–60 dB。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)

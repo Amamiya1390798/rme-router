@@ -27,16 +27,22 @@ public struct OutputsView: View {
         }
         a.canEdit = { card in card.port.deviceID == "xt" && model.lastLoaded != nil }
         a.pendingGain = { src, dst in model.pendingGain(source: src, destination: dst) }
-        a.stage = { src, dst, dB in model.stageGain(source: src, destination: dst, dB: dB)?.text }
-        a.stageNewSend = { src, dst in model.stageNewSend(source: src, destination: dst)?.text }
+        a.stage = { src, dst, dB in model.stageGain(source: src, destination: dst, dB: dB).map(\.text) ?? quick() }
+        a.stageNewSend = { src, dst in model.stageNewSend(source: src, destination: dst).map(\.text) ?? quick() }
         a.sendCandidates = { model.sendSourceCandidates }
         a.canEditRoute = { card in card.port.deviceID == "12mic" && model.twelveMicStatus == .live }
         a.canAddRoute = { device in device == "12mic" && model.twelveMicStatus == .live }
         a.pendingRoute = { dst in model.pendingTwelveMicRoute(dst) }
-        a.stageRoute = { dst, src in model.stageTwelveMicRoute(destination: dst, source: src)?.text }
+        a.stageRoute = { dst, src in model.stageTwelveMicRoute(destination: dst, source: src).map(\.text) ?? quick() }
         a.routeSources = { model.twelveMicRouteSources }
         a.routeOutputs = { model.twelveMicRouteOutputs }
         return a
+    }
+
+    /// 快速方式下暂存后立即发送（第 7.4 节）；返回 nil 表示没有错误。
+    private func quick() -> String? {
+        Task { await model.commitIfQuick() }
+        return nil
     }
 
     private var demoNames: [String] {
@@ -290,7 +296,7 @@ struct GainEditor: View {
                 Button("0 dB") { value = 0 }
                 Spacer()
                 Button("取消") { onDone(current) }
-                Button("加入待应用") { onDone(isOff ? nil : value) }.keyboardShortcut(.defaultAction)
+                Button(ConfirmMode.current.applyLabel) { onDone(isOff ? nil : value) }.keyboardShortcut(.defaultAction)
             }
             Text("不会立即发送；在底部“待应用”栏确认后才写入 TotalMix。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
@@ -324,7 +330,7 @@ struct AddSendEditor: View {
             HStack {
                 Spacer()
                 Button("取消", action: close)
-                Button("加入待应用（-30 dB）") {
+                Button(ConfirmMode.current.applyLabel + "（-30 dB）") {
                     guard let c = choice else { return }
                     if let e = stage(c) { error = e } else { close() }
                 }
@@ -368,7 +374,7 @@ struct RouteEditor: View {
             HStack {
                 Spacer()
                 Button("取消") { onDone(nil) }
-                Button("加入待应用") { onDone(.some(choice)) }.keyboardShortcut(.defaultAction)
+                Button(ConfirmMode.current.applyLabel) { onDone(.some(choice)) }.keyboardShortcut(.defaultAction)
             }
             Text("12Mic 每个输出通道只有一个来源，改了会替换原来的来源。确认后才写入。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
@@ -432,7 +438,7 @@ struct NewRouteButton: View {
                 HStack {
                     Spacer()
                     Button("取消") { open = false }
-                    Button("加入待应用") {
+                    Button(ConfirmMode.current.applyLabel) {
                         guard let output else { return }
                         if let e = actions.stageRoute(output, source) { error = e } else { open = false }
                     }

@@ -12,6 +12,15 @@ extension ControlDomain {
     }
 }
 
+extension ConfirmMode {
+    /// 当前确认方式（读 App 的设置；编辑器按钮文字用）。
+    static var current: ConfirmMode {
+        UserDefaults.standard.string(forKey: defaultsKey).flatMap(ConfirmMode.init(rawValue:)) ?? .always
+    }
+    /// 编辑器里提交按钮的文字。
+    var applyLabel: String { self == .quick ? "应用" : "加入待应用" }
+}
+
 /// 视图标题：衬线 22，下面一行说明。
 struct ViewHeader: View {
     var title: String

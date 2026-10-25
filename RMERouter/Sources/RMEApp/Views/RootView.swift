@@ -111,7 +111,9 @@ struct ConnectionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "连接", subtitle: "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")
+                ViewHeader(title: "连接", subtitle: model.confirmMode == .quick
+                           ? "读取不会改动任何设置；当前为快速方式：改动点下即发送（48V、大幅抬高仍需确认）。"
+                           : "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("TotalMix FX（Global OSC）").font(Tokens.Font.cardTitle)
                     Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.s) {
@@ -132,6 +134,22 @@ struct ConnectionView: View {
                     Button("用这些设置读取") { Task { await model.refresh() } }
                         .disabled(model.xtStatus == .loading)
                 }
+                .card()
+                VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                    Text("确认方式").font(Tokens.Font.cardTitle)
+                    Picker("确认方式", selection: $model.confirmMode) {
+                        ForEach(ConfirmMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 240)
+                    Text(model.confirmMode == .quick
+                         ? "快速：点下改动就发送并回读核对，可撤销。打开 48V、一次抬高超过 10 dB 仍会弹确认框。"
+                         : "每次确认：改动先进底部“待应用”栏，点“应用…”并在确认框里确认后才发送。")
+                        .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("12Mic（HTTP JSON）").font(Tokens.Font.cardTitle)

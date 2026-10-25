@@ -43,6 +43,15 @@ public enum XTStatus: Equatable, Sendable {
     case unreachable(String)  // TotalMix 没回话
 }
 
+/// 写入的确认方式（文档第 7.4 节）。
+public enum ConfirmMode: String, CaseIterable, Identifiable, Sendable {
+    case always   // 每次确认：进待应用栏，确认框里确认才发送
+    case quick    // 快速：点下即发送；打开 48V、大幅抬高仍弹确认框
+    public var id: String { rawValue }
+    public var title: String { self == .always ? "每次确认" : "快速" }
+    public static let defaultsKey = "confirm.mode"
+}
+
 /// 12Mic 读取状态。读不到时“输出”等视图继续显示演示数据并注明。
 public enum TwelveMicStatus: Equatable, Sendable {
     case notLoaded
@@ -80,6 +89,8 @@ public final class AppModel {
     public internal(set) var pendingRoutes: [PendingRouteChange] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
+    /// 确认方式（第 7.4 节）。
+    public var confirmMode: ConfirmMode { didSet { defaults.set(confirmMode.rawValue, forKey: ConfirmMode.defaultsKey) } }
     public internal(set) var isApplying = false
     /// 最近一次从 TotalMix 读回的原始状态与对照表（写入时用来反查 TotalMix 通道）。
     public internal(set) var tmState = TotalMixState()
@@ -103,6 +114,7 @@ public final class AppModel {
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
+        confirmMode = defaults.string(forKey: ConfirmMode.defaultsKey).flatMap(ConfirmMode.init(rawValue:)) ?? .always
         if let data = defaults.data(forKey: Self.settingsKey),
            let saved = try? JSONDecoder().decode(OSCSettings.self, from: data) {
             settings = saved

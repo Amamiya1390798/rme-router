@@ -340,6 +340,25 @@ extension AppModel {
 
     // MARK: 应用
 
+    // MARK: 确认方式（第 7.4 节）
+
+    /// 待应用里有必须明确确认的改动：打开 48V，或一次抬高超过 10 dB。
+    public var needsExplicitConfirmation: Bool {
+        pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.needsPhantomAck || $0.isLargeJump }
+    }
+
+    /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。
+    /// 每次确认方式下什么也不做。只应由界面操作调用。
+    public func commitIfQuick() async {
+        guard confirmMode == .quick, hasPending, !isApplying else { return }
+        if needsExplicitConfirmation {
+            showConfirm = true
+            return
+        }
+        let ops = pending.map(\.operation) + pendingPreamps.map(\.operation) + pendingRoutes.map(\.operation)
+        _ = await applyPending(confirmation: ConfirmationGate.userConfirmed(ops))
+    }
+
     /// 按确认框签发的凭证发送全部待应用改动（发送电平 + 前级），回读核对，记入历史。只应由确认框的“确认发送”调用。
     public func applyPending(confirmation: UserConfirmation) async -> AppliedBatch? {
         guard hasPending, !isApplying else { return nil }

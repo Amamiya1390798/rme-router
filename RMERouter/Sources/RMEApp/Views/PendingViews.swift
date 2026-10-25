@@ -12,6 +12,9 @@ struct PendingBar: View {
                 HStack {
                     Text("待应用 \(model.pending.count + model.pendingPreamps.count + model.pendingRoutes.count) 项").font(Tokens.Font.cardTitle)
                     Text("还没有发送任何消息").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    if model.confirmMode == .quick {
+                        Text("快速方式：这些改动需要你确认后才发送").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
+                    }
                     Spacer()
                     Button("全部放弃") { model.discardAll() }
                     Button("应用…") { model.showConfirm = true }
@@ -41,7 +44,11 @@ struct PendingBar: View {
                     Text(last.date.formatted(date: .omitted, time: .standard))
                         .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                     Spacer()
-                    Button("撤销这批…") { model.stageUndo(last) }.help("把旧值加入待应用，仍需确认")
+                    Button("撤销这批…") {
+                        model.stageUndo(last)
+                        Task { await model.commitIfQuick() }
+                    }
+                    .help(model.confirmMode == .quick ? "把这批改回旧值（快速方式：立即发送）" : "把旧值加入待应用，仍需确认")
                 }
             }
         }
@@ -96,7 +103,11 @@ struct ConfirmSheet: View {
             HStack {
                 Spacer()
                 if let result {
-                    Button("撤销这批…") { model.stageUndo(result); model.showConfirm = false }
+                    Button("撤销这批…") {
+                        model.stageUndo(result)
+                        model.showConfirm = false
+                        Task { await model.commitIfQuick() }
+                    }
                     Button("完成") { model.showConfirm = false }.keyboardShortcut(.defaultAction)
                 } else {
                     Button("取消") { model.showConfirm = false }.keyboardShortcut(.cancelAction)
