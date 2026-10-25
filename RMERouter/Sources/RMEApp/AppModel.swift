@@ -98,6 +98,9 @@ public final class AppModel {
     /// Core Audio 读到的 XT（第 6.6 节）；nil = 没找到（XT 没接）。
     public internal(set) var xtAudio: AudioDeviceInfo?
     public internal(set) var audioChecked = false
+    /// Logic 设定的音频设备（第 6.7 节）；没装 Logic 为 nil。
+    public internal(set) var logicSettings: LogicAudioSettings?
+    @ObservationIgnored public var logicPrefsURL = LogicAudioSettings.defaultURL
     @ObservationIgnored let audioSystem: AudioSystem
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
@@ -335,11 +338,27 @@ public final class AppModel {
 
     /// “输出”视图是否列出电脑回放来源（默认不列）。
     public var showPlayback = false
+    /// 输出页“只看有信号”（第 8.2 节 E1）。收不到电平时界面把开关灰掉。
+    public var outputsOnlySignal = false
 
     public var outputs: [DeviceOutputs] {
-        OutputCards.build(snapshot, showPlayback: showPlayback) { [self] ref in
+        let all = OutputCards.build(snapshot, showPlayback: showPlayback) { [self] ref in
             guard deviceID(of: ref) == "xt", let tm = tmChannel(for: ref) else { return nil }
             return tmState.isStereo(tm)
+        }
+        return outputsOnlySignal ? Self.onlyWithSignal(all, active: meters.active) : all
+    }
+
+    /// “只看有信号”（第 8.2 节 E1）：每张卡只留有电平的来源，没有来源的卡去掉。只在收得到电平时生效。
+    static func onlyWithSignal(_ groups: [DeviceOutputs], active: Set<ChannelRef>) -> [DeviceOutputs] {
+        groups.compactMap { g in
+            var g = g
+            g.cards = g.cards.compactMap { c in
+                var c = c
+                c.sources = c.sources.filter { $0.refs.contains(where: active.contains) }
+                return c.sources.isEmpty ? nil : c
+            }
+            return g.cards.isEmpty ? nil : g
         }
     }
 

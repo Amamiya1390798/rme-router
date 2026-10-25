@@ -207,9 +207,11 @@ struct SourceStrip: View {
                 VStack(spacing: 1) {
                     Text(strip.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
                     Text(origin.map { $0.verified ? $0.text : $0.text + "？" }
-                         ?? (strip.tm.bus == .input ? "录音 \(recordingText(strip))" : "回放 \(recordingText(strip))"))
+                         ?? (strip.tm.bus == .input ? "录音 \(recordingText(strip))"
+                             : (strip.ref.flatMap { model.hasSignal($0) } == true ? "DAW 在送" : "回放 \(recordingText(strip))")))
                         .font(.system(size: 9)).lineLimit(1).truncationMode(.tail)
-                        .foregroundStyle(origin?.verified == true ? Tokens.Palette.ok : Tokens.Palette.textMuted)
+                        .foregroundStyle(origin?.verified == true || (strip.tm.bus == .playback && strip.ref.flatMap { model.hasSignal($0) } == true)
+                                         ? Tokens.Palette.ok : Tokens.Palette.textMuted)
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())

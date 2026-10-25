@@ -9,6 +9,8 @@ extension AppModel {
     public func refreshAudio() {
         let info = audioSystem.device(nameContains: "MADIface XT")
         if info != xtAudio { xtAudio = info }
+        let logic = LogicAudioSettings.read(logicPrefsURL)
+        if logic != logicSettings { logicSettings = logic }
         audioChecked = true
         mergeAudioIntoXT()
     }
@@ -47,5 +49,41 @@ extension AppModel {
 
     public static func rateText(_ r: Double) -> String {
         r.truncatingRemainder(dividingBy: 1000) == 0 ? "\(Int(r / 1000)) kHz" : String(format: "%.1f kHz", r / 1000)
+    }
+}
+
+/// Logic Pro 设定的音频设备（文档第 6.7 节）：只读它的偏好文件里两项，格式未公开（C）。
+public struct LogicAudioSettings: Equatable, Sendable {
+    public var inputDevice: String?
+    public var outputDevice: String?
+
+    /// 录音或放音设备是不是 XT。
+    public var usesXT: (input: Bool, output: Bool) {
+        (inputDevice?.contains("MADIface XT") == true, outputDevice?.contains("MADIface XT") == true)
+    }
+
+    public static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Preferences/com.apple.logic10.plist")
+
+    /// 读偏好文件（二进制或 XML 都行）；没装 Logic 或读不到返回 nil。只读。
+    public static func read(_ url: URL = defaultURL) -> LogicAudioSettings? {
+        guard let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return nil }
+        let s = LogicAudioSettings(inputDevice: plist["InputDriverName"] as? String, outputDevice: plist["OutputDriverName"] as? String)
+        return s.inputDevice == nil && s.outputDevice == nil ? nil : s
+    }
+}
+
+extension AppModel {
+    /// DAW 现在从哪几路回放送出声音（TotalMix 回放电平，第 6.7 节）：例如 “1–2、9–10”。收不到电平时为 nil。
+    public var dawActivePlayback: String? {
+        guard meters.live else { return nil }
+        let chans = meters.active.filter { $0.portID == "xt.playback.in" }.map(\.channel).sorted()
+        guard !chans.isEmpty else { return "" }
+        var ranges: [(Int, Int)] = []
+        for c in chans {
+            if let last = ranges.last, last.1 + 1 == c { ranges[ranges.count - 1].1 = c } else { ranges.append((c, c)) }
+        }
+        return ranges.map { $0.0 == $0.1 ? "\($0.0)" : "\($0.0)–\($0.1)" }.joined(separator: "、")
     }
 }

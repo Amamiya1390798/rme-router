@@ -8,13 +8,14 @@ struct MacNodeCard: View {
     @State private var open = false
 
     private var lines: [String] {
+        let logicWarn: [String] = model.logicSettings.map { $0.usesXT.input && $0.usesXT.output ? [] : ["⚠ Logic 没有全用 XT"] } ?? []
         guard let a = model.xtAudio else {
-            return [model.audioChecked ? "没找到 XT（没接或驱动没装）" : "还没读取"]
+            return [model.audioChecked ? "没找到 XT（没接或驱动没装）" : "还没读取"] + logicWarn
         }
         var l = ["\(a.transport) · \(a.sampleRate.map(AppModel.rateText) ?? "?") · \(a.inputs) 入 / \(a.outputs) 出"]
         let clients = model.xtAudioClients
         l.append(clients.isEmpty ? "没有程序在用 XT" : "在用：" + clients.map(\.name).joined(separator: "、"))
-        return l
+        return l + logicWarn
     }
 
     var body: some View {
@@ -74,6 +75,8 @@ struct MacDetail: View {
                 Text("系统里没找到 MADIface XT：检查 USB / PCIe 线和 RME 驱动。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             }
+            Divider()
+            dawSection
             if let message {
                 Text(message).font(Tokens.Font.caption).foregroundStyle(message.hasPrefix("已") ? Tokens.Palette.ok : Tokens.Palette.problem)
             }
@@ -100,6 +103,37 @@ struct MacDetail: View {
             Button("取消", role: .cancel) { pendingRate = nil }
         } message: {
             Text("整条时钟链会换速度：12Mic、XTC 要跟着改，否则会失锁。正在录音或播放的程序会中断一下。")
+        }
+    }
+
+    /// DAW 一节（第 6.7 节）：Logic 设定的设备、DAW 现在从哪几路送出声音。
+    @ViewBuilder private var dawSection: some View {
+        Text("DAW").font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
+        if let logic = model.logicSettings {
+            let uses = logic.usesXT
+            Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.xs) {
+                GridRow {
+                    Text("Logic 录音设备").foregroundStyle(Tokens.Palette.textMuted)
+                    Text(logic.inputDevice ?? "?").foregroundStyle(uses.input ? Tokens.Palette.text : Tokens.Palette.warn)
+                }
+                GridRow {
+                    Text("Logic 放音设备").foregroundStyle(Tokens.Palette.textMuted)
+                    Text(logic.outputDevice ?? "?").foregroundStyle(uses.output ? Tokens.Palette.text : Tokens.Palette.warn)
+                }
+            }
+            .font(Tokens.Font.body)
+            if !(uses.input && uses.output) {
+                Text("Logic 现在没有全用 XT：在 Logic 的 设置 → 音频 里把输入、输出设备选成 MADIface XT，否则录不到 / 听不到 XT 的声音。")
+                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("读自 Logic 的偏好文件（格式未公开，只读）。").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        } else {
+            Text("没找到 Logic 的设置（没装 Logic，或还没打开过）。").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        }
+        switch model.dawActivePlayback {
+        case nil: Text("回放电平：收不到（XT 未连接或没勾 Send Level Data）").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        case ""?: Text("DAW 现在没有从任何回放送出声音").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        case let p?: Text("DAW 正在从回放 \(p) 送出声音").font(Tokens.Font.body).foregroundStyle(Tokens.Palette.ok)
         }
     }
 

@@ -13,6 +13,7 @@ public struct OutputsView: View {
             ScrollView {
                 OutputsContent(outputs: model.outputs, status: model.xtStatus, lastLoaded: model.lastLoaded,
                                demoDevices: demoNames, twelveMic: model.twelveMicStatus, showPlayback: $model.showPlayback,
+                               onlySignal: model.meters.live ? $model.outputsOnlySignal : nil,
                                columns: max(1, Int((geo.size.width - 48) / 300)), actions: actions)
                 .padding(Tokens.Space.xl)
             }
@@ -65,11 +66,15 @@ public struct OutputsContent: View {
     var demoDevices: [String]
     var twelveMic: TwelveMicStatus
     @Binding var showPlayback: Bool
+    /// nil = 收不到电平，“只看有信号”不可用。
+    var onlySignal: Binding<Bool>?
     var columns: Int
     var actions: OutputActions
 
     public init(outputs: [DeviceOutputs], status: XTStatus, lastLoaded: Date?, demoDevices: [String],
-                twelveMic: TwelveMicStatus = .notLoaded, showPlayback: Binding<Bool>, columns: Int, actions: OutputActions = OutputActions()) {
+                twelveMic: TwelveMicStatus = .notLoaded, showPlayback: Binding<Bool>, onlySignal: Binding<Bool>? = nil,
+                columns: Int, actions: OutputActions = OutputActions()) {
+        self.onlySignal = onlySignal
         self.outputs = outputs
         self.status = status
         self.lastLoaded = lastLoaded
@@ -84,6 +89,10 @@ public struct OutputsContent: View {
         VStack(alignment: .leading, spacing: Tokens.Space.xl) {
             HStack(alignment: .top) {
                 ViewHeader(title: "输出", subtitle: "每个在用的输出现在送出什么。点一路来源可以看它的完整路径。")
+                Toggle("只看有信号", isOn: onlySignal ?? .constant(false)).toggleStyle(.switch).controlSize(.small)
+                    .font(Tokens.Font.body).fixedSize()
+                    .disabled(onlySignal == nil)
+                    .help(onlySignal == nil ? "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）" : "每张卡只列有电平的来源")
                 Toggle("显示电脑回放", isOn: $showPlayback).toggleStyle(.switch).controlSize(.small)
                     .font(Tokens.Font.body).fixedSize()
             }
