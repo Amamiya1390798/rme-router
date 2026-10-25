@@ -21,6 +21,7 @@ public struct RootView: View {
                 case .outputs: OutputsView(model: model)
                 case .signalFlow: SignalFlowView(model: model)
                 case .preamps: PreampsView(model: model)
+                case .clock: ClockView(model: model)
                 case .checkup: CheckupView(model: model)
                 case .connection: ConnectionView(model: model)
                 }

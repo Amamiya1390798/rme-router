@@ -13,13 +13,14 @@ public struct OSCSettings: Codable, Equatable, Sendable {
 }
 
 public enum AppSection: String, CaseIterable, Identifiable, Sendable {
-    case outputs, signalFlow, preamps, checkup, connection
+    case outputs, signalFlow, preamps, clock, checkup, connection
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .outputs: return "输出"
         case .signalFlow: return "信号流"
         case .preamps: return "前级"
+        case .clock: return "时钟"
         case .checkup: return "体检"
         case .connection: return "连接"
         }
@@ -29,6 +30,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .outputs: return "speaker.wave.2"
         case .signalFlow: return "point.3.connected.trianglepath.dotted"
         case .preamps: return "mic"
+        case .clock: return "clock"
         case .checkup: return "stethoscope"
         case .connection: return "cable.connector"
         }
