@@ -12,6 +12,8 @@ final class WriteTests: XCTestCase {
         let transport = MockOSCTransport()
         private let lock = NSLock()
         private var nodes: [String: Float] = ["/mix/in/0/4/fader": -6.9]   // Mic 1 → Phones 1
+        /// XT Mic 1 的前级参数（第 7.0 节实测的字段）。
+        private var inputParams: [String: Float] = ["/input/0/gain": 20, "/input/0/48v": 0, "/input/0/phase": 0, "/input/0/autoset": 0]
         var ignoreWrites = false
         private(set) var writes: [OSCMessage] = []
 
@@ -27,13 +29,21 @@ final class WriteTests: XCTestCase {
                 OSCMessage("/output/4/name", [.string("Phones 1")]), OSCMessage("/output/4/stereo", [.float(1)]),
                 OSCMessage("/status/connection", [.float(0)]),
             ]
-            if m.address.hasPrefix("/mix/") {
+            if m.address.hasPrefix("/input/"), m.address.split(separator: "/").count == 3 {
+                lock.withLock {
+                    writes.append(m)
+                    if !ignoreWrites, case let .float(v)? = m.arguments.first { inputParams[m.address] = v }
+                }
+            } else if m.address.hasPrefix("/sendchan/input/"), let n = Int(m.address.split(separator: "/").last!) {
+                t.inject(lock.withLock { inputParams.filter { $0.key.hasPrefix("/input/\(n)/") }.map { OSCMessage($0.key, [.float($0.value)]) } })
+            } else if m.address.hasPrefix("/mix/") {
                 lock.withLock {
                     writes.append(m)
                     if !ignoreWrites, case let .float(v)? = m.arguments.first { nodes[m.address] = v }
                 }
             } else if m.address == "/sendall" {
-                t.inject(names + nodeMessages(output: nil))
+                t.inject(names + nodeMessages(output: nil)
+                         + lock.withLock { inputParams.map { OSCMessage($0.key, [.float($0.value)]) } })
             } else if m.address.hasPrefix("/sendsubmix/"), let out = Int(m.address.split(separator: "/").last!) {
                 t.inject(nodeMessages(output: out))
             } else if m.address == "/sendstate" {

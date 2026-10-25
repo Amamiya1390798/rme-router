@@ -42,9 +42,54 @@ public struct PendingChange: Identifiable, Equatable, Sendable {
     public var totalMixLabel: String { "\(label(tmSource, tmSourceName)) → \(label(tmOutput, tmOutputName))" }
 }
 
+/// 一条待应用的前级改动（文档第 7.2 节）：XT 走 TotalMix，12Mic 走 JSON。
+public struct PendingPreampChange: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public var deviceID: String          // "xt" 或 "12mic"
+    public var input: ChannelRef         // xt.mic.in:1、12mic.analog.in:3
+    public var tmInput: TotalMixChannel? // 仅 XT
+    public var label: String             // 界面名：标签或 “Mic n”
+    public var field: PreampField
+    public var old: PreampValue?
+    public var new: PreampValue
+
+    /// 打开 48V：确认框必须先勾选“没有接带式话筒等设备”。
+    public var needsPhantomAck: Bool { field == .phantom && new == .flag(true) }
+
+    /// 增益抬高超过 10 dB。
+    public var isLargeJump: Bool {
+        guard case let .gain(n) = new else { return false }
+        if case let .gain(o)? = old { return n - o > 10 }
+        return false
+    }
+
+    public var operation: PlannedOperation {
+        PlannedOperation(id: id, deviceID: deviceID, parameter: parameter, oldValue: old?.text,
+                         newValue: new.text, access: .readWrite)
+    }
+
+    /// 写入的地址：XT 为 OSC 地址，12Mic 为 JSON 路径。
+    public var parameter: String {
+        if let tm = tmInput { return TotalMixWrite.preamp(input: tm, field: field, value: new).message.address }
+        return TwelveMicWriteGate.parameter(channel: input.channel, field: field)
+    }
+
+    /// 确认框里显示的原文。
+    public var wireText: String {
+        if let tm = tmInput { return "OSC：" + TotalMixWrite.preamp(input: tm, field: field, value: new).message.description }
+        guard let body = TwelveMicWriteGate.preampBody(channel: input.channel, field: field, value: new),
+              let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "JSON：（无效）" }
+        return "JSON：" + text
+    }
+
+    var key: String { "\(deviceID)|\(input)|\(field.rawValue)" }
+}
+
 public enum VerifyOutcome: Equatable, Sendable {
     case verified
     case mismatch(readBack: Double?)
+    case mismatchValue(readBack: String)
     case notReadBack
     case failed(String)
 
@@ -52,6 +97,7 @@ public enum VerifyOutcome: Equatable, Sendable {
         switch self {
         case .verified: return "已核对"
         case let .mismatch(r): return "回读不一致：\(PendingChange.format(r))"
+        case let .mismatchValue(r): return "回读不一致：\(r)"
         case .notReadBack: return "未回读到"
         case let .failed(e): return "发送失败：\(e)"
         }
@@ -62,19 +108,27 @@ public struct AppliedBatch: Identifiable, Equatable, Sendable {
     public let id = UUID()
     public var date: Date
     public var changes: [PendingChange]
+    public var preamps: [PendingPreampChange] = []
     public var outcomes: [UUID: VerifyOutcome]
+
+    public var count: Int { changes.count + preamps.count }
+    public var verifiedCount: Int { outcomes.values.filter { $0 == .verified }.count }
 }
 
 public enum StageError: Error, Equatable {
     case notMapped(ChannelRef)
     case notTotalMix
     case notLoaded
+    case notConnected(String)
+    case unknownCurrent(String)
 
     public var text: String {
         switch self {
         case let .notMapped(r): return "\(r) 在 TotalMix 对照表里找不到，不能写入"
         case .notTotalMix: return "只有 MADIface XT（TotalMix）上的发送可以修改"
         case .notLoaded: return "还没有从 TotalMix 读取"
+        case let .notConnected(d): return "\(d) 没有读到，不能写入"
+        case let .unknownCurrent(f): return "读不到当前的\(f)，不能写入（先读一次设备）"
         }
     }
 }
@@ -137,7 +191,7 @@ extension AppModel {
     }
 
     public func discard(_ id: UUID) { pending.removeAll { $0.id == id } }
-    public func discardAll() { pending.removeAll() }
+    public func discardAll() { pending.removeAll(); pendingPreamps.removeAll() }
 
     static func same(_ a: Double?, _ b: Double?) -> Bool {
         switch (a, b) {
@@ -149,26 +203,99 @@ extension AppModel {
 
     // MARK: 应用
 
-    /// 按确认框签发的凭证发送全部待应用改动，回读核对，记入历史。只应由确认框的“确认发送”调用。
+    // MARK: 前级暂存（第 7.2 节）
+
+    /// 暂存一个前级字段的改动。改回原值时移除。
+    @discardableResult
+    public func stagePreamp(deviceID: String, input: ChannelRef, field: PreampField, value: PreampValue) -> StageError? {
+        var value = value
+        if case let .gain(g) = value {
+            value = .gain(min(max(g, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+        }
+        var tmInput: TotalMixChannel? = nil
+        switch deviceID {
+        case "xt":
+            guard lastLoaded != nil else { return .notLoaded }
+            guard let tm = tmChannel(for: input), tm.bus == .input else { return .notMapped(input) }
+            tmInput = tm
+        case "12mic":
+            guard twelveMicStatus == .live else { return .notConnected("12Mic") }
+        default:
+            return .notConnected(deviceID)
+        }
+        guard let preamp = snapshot.devices[deviceID]?.preamps.first(where: { $0.input == input }),
+              let old = preamp.value(field) else { return .unknownCurrent(field.label) }
+
+        let key = "\(deviceID)|\(input)|\(field.rawValue)"
+        if let i = pendingPreamps.firstIndex(where: { $0.key == key }) {
+            if Self.same(pendingPreamps[i].old, value) { pendingPreamps.remove(at: i) } else { pendingPreamps[i].new = value }
+            return nil
+        }
+        guard !Self.same(old, value) else { return nil }
+        let label = preamp.label.knownValue.flatMap { $0.isEmpty ? nil : $0 } ?? "Mic \(input.channel)"
+        pendingPreamps.append(PendingPreampChange(id: UUID(), deviceID: deviceID, input: input, tmInput: tmInput,
+                                                  label: label, field: field, old: old, new: value))
+        return nil
+    }
+
+    /// 某个前级字段在待应用栏里的目标值。
+    public func pendingPreamp(deviceID: String, input: ChannelRef, field: PreampField) -> PreampValue? {
+        pendingPreamps.first { $0.deviceID == deviceID && $0.input == input && $0.field == field }?.new
+    }
+
+    public func discardPreamp(_ id: UUID) { pendingPreamps.removeAll { $0.id == id } }
+
+    static func same(_ a: PreampValue?, _ b: PreampValue?) -> Bool {
+        switch (a, b) {
+        case let (.gain(x)?, .gain(y)?): return abs(x - y) < 0.05
+        default: return a == b
+        }
+    }
+
+    public var hasPending: Bool { !pending.isEmpty || !pendingPreamps.isEmpty }
+
+    // MARK: 应用
+
+    /// 按确认框签发的凭证发送全部待应用改动（发送电平 + 前级），回读核对，记入历史。只应由确认框的“确认发送”调用。
     public func applyPending(confirmation: UserConfirmation) async -> AppliedBatch? {
-        guard let adapter, !pending.isEmpty, !isApplying else { return nil }
+        guard hasPending, !isApplying else { return nil }
         isApplying = true
         defer { isApplying = false }
 
-        let changes = pending
+        let changes = pending, preamps = pendingPreamps
         var outcomes: [UUID: VerifyOutcome] = [:]
-        var sent: [PendingChange] = []
-        for c in changes {
-            do {
-                try await adapter.client.write(c.write, for: c.operation, confirmation: confirmation)
-                sent.append(c)
-            } catch {
-                outcomes[c.id] = .failed("\(error)")
+
+        // 1. XT：发送电平与 XT 前级都经 TotalMix
+        var sentSends: [PendingChange] = [], sentXT: [PendingPreampChange] = []
+        let xtPreamps = preamps.filter { $0.deviceID == "xt" }
+        if let adapter {
+            for c in changes {
+                do { try await adapter.client.write(c.write, for: c.operation, confirmation: confirmation); sentSends.append(c) }
+                catch { outcomes[c.id] = .failed("\(error)") }
             }
+            for p in xtPreamps {
+                guard let tm = p.tmInput else { outcomes[p.id] = .failed("没有 TotalMix 通道"); continue }
+                do {
+                    try await adapter.client.write(.preamp(input: tm, field: p.field, value: p.new), for: p.operation,
+                                                   confirmation: confirmation)
+                    sentXT.append(p)
+                } catch { outcomes[p.id] = .failed("\(error)") }
+            }
+            if !sentSends.isEmpty { _ = try? await adapter.client.refreshSubmixes(sentSends.map(\.tmOutput)) }
+            if !sentXT.isEmpty { _ = try? await adapter.client.refreshChannels(sentXT.compactMap(\.tmInput)) }
+            if !sentSends.isEmpty || !sentXT.isEmpty {
+                await captureTotalMixState(from: adapter)
+                apply(xt: TotalMixOSCAdapter.makeSnapshot(
+                    deviceID: "xt", state: tmState, map: adapter.channelMap,
+                    controlPath: ControlPath(controller: "this-app", transport: .osc(host: settings.host, port: settings.port),
+                                             state: .online, active: true),
+                    observedAt: Date()))
+            }
+        } else {
+            for c in changes { outcomes[c.id] = .failed("TotalMix 未连接") }
+            for p in xtPreamps { outcomes[p.id] = .failed("TotalMix 未连接") }
         }
-        _ = try? await adapter.client.refreshSubmixes(sent.map(\.tmOutput))
-        await captureTotalMixState(from: adapter)
-        for c in sent {
+        for c in sentSends {
             let readBack = currentGain(source: c.tmSource, output: c.tmOutput)
             let hasNode = tmState.nodes[.init(source: c.tmSource, output: c.tmOutput)] != nil
             if !hasNode {
@@ -179,19 +306,45 @@ extension AppModel {
                 outcomes[c.id] = readBack == nil ? .verified : .mismatch(readBack: readBack)
             }
         }
+        for p in sentXT { outcomes[p.id] = verify(p) }
 
-        // 用回读后的状态重建 XT 快照。
-        let xt = TotalMixOSCAdapter.makeSnapshot(
-            deviceID: "xt", state: tmState, map: adapter.channelMap,
-            controlPath: ControlPath(controller: "this-app", transport: .osc(host: settings.host, port: settings.port),
-                                     state: .online, active: true),
-            observedAt: Date())
-        apply(xt: xt)
+        // 2. 12Mic 前级经 JSON
+        let micPreamps = preamps.filter { $0.deviceID == "12mic" }
+        if !micPreamps.isEmpty {
+            if let url = URL(string: twelveMicURL), url.host != nil {
+                let mic = makeTwelveMic(url)
+                var sent: [PendingPreampChange] = []
+                for p in micPreamps {
+                    do {
+                        try await mic.writePreamp(channel: p.input.channel, field: p.field, value: p.new,
+                                                  for: p.operation, confirmation: confirmation)
+                        sent.append(p)
+                    } catch { outcomes[p.id] = .failed("\(error)") }
+                }
+                if !sent.isEmpty, let readBack = try? await mic.readPreamps() {
+                    var devices = snapshot.devices
+                    devices["12mic"]?.preamps = readBack
+                    replaceDevices(devices)
+                }
+                for p in sent { outcomes[p.id] = verify(p) }
+            } else {
+                for p in micPreamps { outcomes[p.id] = .failed("12Mic 地址无效") }
+            }
+        }
 
-        let batch = AppliedBatch(date: Date(), changes: changes, outcomes: outcomes)
+        let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, outcomes: outcomes)
         history.insert(batch, at: 0)
         pending.removeAll()
+        pendingPreamps.removeAll()
         return batch
+    }
+
+    /// 前级回读核对：快照里该字段的当前值是否等于目标值。
+    func verify(_ p: PendingPreampChange) -> VerifyOutcome {
+        guard let now = snapshot.devices[p.deviceID]?.preamps.first(where: { $0.input == p.input })?.value(p.field) else {
+            return .notReadBack
+        }
+        return Self.same(now, p.new) ? .verified : .mismatchValue(readBack: now.text)
     }
 
     /// 撤销一批：把已发出的改动的旧值做成新的待应用改动（仍需确认）。
@@ -199,6 +352,11 @@ extension AppModel {
         for c in batch.changes {
             if case .failed = batch.outcomes[c.id] { continue }
             stageGain(source: c.source, destination: c.destination, dB: c.oldDB)
+        }
+        for p in batch.preamps {
+            if case .failed = batch.outcomes[p.id] { continue }
+            guard let old = p.old else { continue }
+            stagePreamp(deviceID: p.deviceID, input: p.input, field: p.field, value: old)
         }
     }
 }

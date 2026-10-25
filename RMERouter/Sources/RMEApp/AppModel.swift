@@ -76,6 +76,7 @@ public final class AppModel {
 
     // 写入（文档第 7.1 节）：待应用的改动、应用历史、确认框状态。
     public internal(set) var pending: [PendingChange] = []
+    public internal(set) var pendingPreamps: [PendingPreampChange] = []
     public internal(set) var history: [AppliedBatch] = []
     public var showConfirm = false
     public internal(set) var isApplying = false
@@ -87,7 +88,7 @@ public final class AppModel {
     @ObservationIgnored private var retired: [TotalMixOSCAdapter] = []
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
-    @ObservationIgnored private let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
+    @ObservationIgnored let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
     private static let settingsKey = "osc.settings"
     private static let twelveMicKey = "12mic.url"
 
@@ -140,10 +141,15 @@ public final class AppModel {
     public func apply(twelveMic: DeviceSnapshot) {
         var devices = snapshot.devices
         devices["12mic"] = twelveMic
+        replaceDevices(devices)
+        twelveMicStatus = .live
+    }
+
+    /// 只换设备快照，其余（拓扑、约束）不变。
+    func replaceDevices(_ devices: [String: DeviceSnapshot]) {
         snapshot = SystemSnapshot(topology: snapshot.topology, devices: devices, capabilities: snapshot.capabilities,
                                   terminals: snapshot.terminals, concurrency: snapshot.concurrency,
                                   expectations: snapshot.expectations, auxDeviceFirstChannel: snapshot.auxDeviceFirstChannel)
-        twelveMicStatus = .live
     }
 
     /// 从 TotalMix 读取一次（/sendstate + /sendall 2，只读请求）。

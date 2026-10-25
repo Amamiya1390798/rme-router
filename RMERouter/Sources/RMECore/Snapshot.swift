@@ -54,6 +54,38 @@ public struct ControlPath: Codable, Sendable, Hashable {
     }
 }
 
+/// 可写的前级字段（文档第 7.2 节）。只有这三个，其余一律拦截。
+public enum PreampField: String, Codable, Sendable, CaseIterable {
+    case gain, phantom, phase
+
+    /// TotalMix Global OSC 的参数名（/input/<N>/<key>）。
+    public var totalMixKey: String {
+        switch self { case .gain: return "gain"; case .phantom: return "48v"; case .phase: return "phase" }
+    }
+    /// 12Mic JSON 的字段名（input/analog/<n>/<key>）。
+    public var twelveMicKey: String {
+        switch self { case .gain: return "gain"; case .phantom: return "p48"; case .phase: return "phase" }
+    }
+    public var label: String {
+        switch self { case .gain: return "增益"; case .phantom: return "48V"; case .phase: return "相位" }
+    }
+    /// 增益可写范围（第 7.2 节：先限定 0–60 dB）。
+    public static let gainRange: ClosedRange<Double> = 0 ... 60
+}
+
+/// 前级字段的值。
+public enum PreampValue: Codable, Sendable, Equatable {
+    case gain(Double)
+    case flag(Bool)
+
+    public var text: String {
+        switch self {
+        case let .gain(g): return String(format: "%.1f dB", g)
+        case let .flag(b): return b ? "开" : "关"
+        }
+    }
+}
+
 /// 一路话放（前级）的状态（文档第 6.2 节）。读不到的字段为 unknown，不猜默认值。
 public struct PreampChannel: Codable, Sendable, Equatable, Identifiable {
     public var input: ChannelRef          // 例如 12mic.analog.in:1
@@ -66,6 +98,15 @@ public struct PreampChannel: Codable, Sendable, Equatable, Identifiable {
     public var gainGroup: Fact<String>
 
     public var id: ChannelRef { input }
+
+    /// 某个可写字段的当前值；读不到为 nil。
+    public func value(_ field: PreampField) -> PreampValue? {
+        switch field {
+        case .gain: return gainDB.knownValue.map(PreampValue.gain)
+        case .phantom: return phantom.knownValue.map(PreampValue.flag)
+        case .phase: return phase.knownValue.map(PreampValue.flag)
+        }
+    }
 
     public init(input: ChannelRef, label: Fact<String>, gainDB: Fact<Double>, phantom: Fact<Bool>, phase: Fact<Bool>,
                 hiZ: Fact<Bool>, autoGain: Fact<Bool>, gainGroup: Fact<String>) {

@@ -1,4 +1,5 @@
 import Foundation
+import RMECore
 
 /// TotalMix FX 2.1 Global OSC 的地址层。
 /// 出处（A）：RME 协议表 OSCProtocoll_260721.ods，https://www.rme-audio.de/downloads/globalosc_protocol_b2.zip
@@ -152,18 +153,16 @@ public enum TotalMixFader {
     }
 }
 
-/// 写入类消息（文档第 7.1 节）。第一版只写混音节点电平。
+/// 写入类消息（文档第 7.1、7.2 节）：混音节点电平、输入通道的前级三项。
 /// 只能经 `TotalMixGlobalOSCClient.write` 发出，那里要求用户确认（`UserConfirmation`）。
 public enum TotalMixWrite: Equatable, Sendable {
     /// 节点电平；dB 为 nil 表示关（发送 -300 dB）。超过 +6 dB 截到 +6，低于 -65 dB 视为关。
     case sendGain(source: TotalMixChannel, output: TotalMixChannel, dB: Double?)
+    /// 输入通道的前级：增益（dB，截到 0–60）、48V、相位（1.0/0.0）。
+    case preamp(input: TotalMixChannel, field: PreampField, value: PreampValue)
 
     public static let offDB: Float = -300
     public static let maxDB = 6.0
-
-    public var output: TotalMixChannel {
-        switch self { case let .sendGain(_, o, _): return o }
-    }
 
     public var message: OSCMessage {
         switch self {
@@ -171,6 +170,15 @@ public enum TotalMixWrite: Equatable, Sendable {
             precondition(src.bus != .output && out.bus == .output, "节点来源须为输入/回放，目标须为输出")
             let value: Float = dB.flatMap(Self.clamp).map { Float($0) } ?? Self.offDB
             return OSCMessage("/mix/\(src.bus.shortToken)/\(src.wireIndex)/\(out.wireIndex)/fader", [.float(value)])
+        case let .preamp(input, field, value):
+            precondition(input.bus == .input, "前级只在输入通道上")
+            let v: Float
+            switch (field, value) {
+            case let (.gain, .gain(g)): v = Float(min(max(g, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+            case let (.phantom, .flag(b)), let (.phase, .flag(b)): v = b ? 1 : 0
+            default: preconditionFailure("字段与值类型不匹配：\(field) \(value)")
+            }
+            return OSCMessage("/input/\(input.wireIndex)/\(field.totalMixKey)", [.float(v)])
         }
     }
 

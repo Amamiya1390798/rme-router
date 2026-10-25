@@ -40,7 +40,7 @@ public struct PreampsView: View {
         GeometryReader { geo in
             ScrollView {
                 PreampsContent(sections: sections, trace: SignalTrace(snapshot: model.snapshot),
-                               columns: max(1, Int((geo.size.width - 48) / 220))) { ref in
+                               columns: max(1, Int((geo.size.width - 48) / 220)), actions: actions) { ref in
                     model.traceTarget = ref
                     model.section = .signalFlow
                 }
@@ -48,6 +48,16 @@ public struct PreampsView: View {
             }
         }
         .background(Tokens.Palette.bg)
+    }
+
+    private var actions: PreampActions {
+        var a = PreampActions()
+        a.canEdit = { device in
+            device == "xt" ? (model.xtStatus == .live || model.xtStatus == .offlineSaved) : model.twelveMicStatus == .live
+        }
+        a.pending = { device, input, field in model.pendingPreamp(deviceID: device, input: input, field: field) }
+        a.stage = { device, input, field, value in model.stagePreamp(deviceID: device, input: input, field: field, value: value)?.text }
+        return a
     }
 
     private var sections: [PreampSection] {
@@ -83,19 +93,21 @@ public struct PreampsContent: View {
     var sections: [PreampSection]
     var trace: SignalTrace
     var columns: Int
+    var actions: PreampActions
     var onSelect: (ChannelRef) -> Void
 
-    public init(sections: [PreampSection], trace: SignalTrace, columns: Int,
+    public init(sections: [PreampSection], trace: SignalTrace, columns: Int, actions: PreampActions = PreampActions(),
                 onSelect: @escaping (ChannelRef) -> Void = { _ in }) {
         self.sections = sections
         self.trace = trace
         self.columns = columns
+        self.actions = actions
         self.onSelect = onSelect
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-            ViewHeader(title: "前级", subtitle: "每一路话放的增益、48V、相位和标签。目前只读；点一张卡可以看这一路送到哪里。")
+            ViewHeader(title: "前级", subtitle: "每一路话放的增益、48V、相位和标签。改动先进待应用栏，确认后才发送；点卡片空白处看这一路送到哪里。")
             ForEach(sections) { section in
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     HStack(spacing: Tokens.Space.s) {
@@ -110,7 +122,8 @@ public struct PreampsContent: View {
                             ForEach(Array(rows(section.preamps).enumerated()), id: \.offset) { _, row in
                                 GridRow {
                                     ForEach(row) { p in
-                                        PreampCard(preamp: p, destinations: trace.destinations(of: p.input))
+                                        PreampCard(preamp: p, destinations: trace.destinations(of: p.input),
+                                                   deviceID: section.id, actions: actions)
                                             .onTapGesture { onSelect(p.input) }
                                     }
                                     ForEach(0 ..< (columns - row.count), id: \.self) { _ in Color.clear.gridCellUnsizedAxes([.vertical]) }
@@ -160,9 +173,25 @@ public struct PreampsContent: View {
     }
 }
 
+/// 前级卡片上的交互。默认全空（只读，便于出图）。
+public struct PreampActions {
+    public var canEdit: (String) -> Bool = { _ in false }
+    public var pending: (String, ChannelRef, PreampField) -> PreampValue? = { _, _, _ in nil }
+    /// 返回错误说明；nil 表示已加入待应用。
+    public var stage: (String, ChannelRef, PreampField, PreampValue) -> String? = { _, _, _, _ in nil }
+    public init() {}
+}
+
 struct PreampCard: View {
     var preamp: PreampChannel
     var destinations: [ChannelRef]
+    var deviceID: String = ""
+    var actions: PreampActions = PreampActions()
+    @State private var editingGain = false
+    @State private var error: String?
+
+    private var editable: Bool { actions.canEdit(deviceID) }
+    private func pending(_ f: PreampField) -> PreampValue? { actions.pending(deviceID, preamp.input, f) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s) {
@@ -174,11 +203,32 @@ struct PreampCard: View {
                 }
             }
             Text(preamp.input.description).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
-            Text(gainText).font(.system(size: 22, weight: .regular, design: .monospaced).monospacedDigit())
-                .foregroundStyle(preamp.gainDB.knownValue == nil ? Tokens.Palette.unknown : Tokens.Palette.text)
+            if editable, preamp.gainDB.knownValue != nil {
+                Button { editingGain = true } label: { gainLabel }
+                    .buttonStyle(.plain)
+                    .help("修改增益（先进待应用栏）")
+                    .popover(isPresented: $editingGain, arrowEdge: .bottom) {
+                        PreampGainEditor(title: "\(title)（\(preamp.input.description)）增益",
+                                         current: preamp.gainDB.knownValue ?? 0,
+                                         initial: pending(.gain).flatMap { if case let .gain(g) = $0 { return g } else { return nil } }
+                                                  ?? preamp.gainDB.knownValue ?? 0) { value in
+                            if let v = value { error = actions.stage(deviceID, preamp.input, .gain, .gain(v)) }
+                            editingGain = false
+                        }
+                    }
+            } else {
+                gainLabel
+            }
+            if editable {
+                HStack(spacing: Tokens.Space.xs) {
+                    flagToggle(.phantom, on: "48V 开", off: "48V 关", onColor: Tokens.Palette.warn)
+                    flagToggle(.phase, on: "Ø 反相", off: "Ø 正相", onColor: Tokens.Palette.accent)
+                }
+            }
+            if let error { Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
             HStack(spacing: Tokens.Space.xs) {
-                if preamp.phantom.knownValue == true { Badge(text: "48V", color: Tokens.Palette.warn) }
-                if preamp.phase.knownValue == true { Badge(text: "Ø 反相", color: Tokens.Palette.accent) }
+                if !editable, preamp.phantom.knownValue == true { Badge(text: "48V", color: Tokens.Palette.warn) }
+                if !editable, preamp.phase.knownValue == true { Badge(text: "Ø 反相", color: Tokens.Palette.accent) }
                 if preamp.hiZ.knownValue == true { Badge(text: "Hi-Z", color: Tokens.Palette.textMuted) }
                 if preamp.autoGain.knownValue == true { Badge(text: "AutoSet", color: Tokens.Palette.textMuted) }
                 if let g = preamp.gainGroup.knownValue, !g.isEmpty, g != "0", g.lowercased() != "none" {
@@ -199,6 +249,39 @@ struct PreampCard: View {
         .contentShape(Rectangle())
         .card()
         .help("查看 \(preamp.input.description) 的信号流")
+    }
+
+    @ViewBuilder private var gainLabel: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
+            Text(gainText).font(.system(size: 22, weight: .regular, design: .monospaced).monospacedDigit())
+                .foregroundStyle(preamp.gainDB.knownValue == nil ? Tokens.Palette.unknown : Tokens.Palette.text)
+            if let p = pending(.gain) {
+                Text("→ \(p.text)").font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.accent)
+            }
+        }
+    }
+
+    /// 48V / 相位开关：点一下把相反的值加入待应用；再点一下撤回。
+    @ViewBuilder private func flagToggle(_ field: PreampField, on: String, off: String, onColor: Color) -> some View {
+        let current: Bool? = { if case let .flag(b)? = preamp.value(field) { return b } else { return nil } }()
+        let target: Bool? = { if case let .flag(b)? = pending(field) { return b } else { return nil } }()
+        let shown = target ?? current
+        if let current {
+            Button {
+                error = actions.stage(deviceID, preamp.input, field, .flag(!(target ?? current)))
+            } label: {
+                HStack(spacing: 2) {
+                    Text(shown == true ? on : off)
+                    if target != nil { Text("（待应用）") }
+                }
+                .font(Tokens.Font.caption)
+                .foregroundStyle(target != nil ? Tokens.Palette.accent : (shown == true ? onColor : Tokens.Palette.textMuted))
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .overlay(Capsule().strokeBorder((target != nil ? Tokens.Palette.accent : (shown == true ? onColor : Tokens.Palette.border)).opacity(0.7), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .help(field == .phantom ? "切换 48V（先进待应用栏；打开时确认框会再问一次）" : "切换相位（先进待应用栏）")
+        }
     }
 
     private var labelText: String? {
@@ -222,5 +305,41 @@ struct PreampCard: View {
         guard !destinations.isEmpty else { return "没有送到任何地方" }
         let shown = destinations.prefix(2).map(\.description).joined(separator: "、")
         return "送到 " + shown + (destinations.count > 2 ? " 等 \(destinations.count) 处" : "")
+    }
+}
+
+/// 前级增益编辑：0–60 dB（第 7.2 节）。结果只进待应用栏。
+struct PreampGainEditor: View {
+    var title: String
+    var current: Double
+    var onDone: (Double?) -> Void
+    @State private var value: Double
+
+    init(title: String, current: Double, initial: Double, onDone: @escaping (Double?) -> Void) {
+        self.title = title
+        self.current = current
+        self.onDone = onDone
+        _value = State(initialValue: min(max(initial, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Text(title).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack {
+                Text(String(format: "%.1f dB", value)).font(Tokens.Font.cardTitle).monospacedDigit()
+                Spacer()
+                Text(String(format: "当前 %.1f dB", current)).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+            Slider(value: $value, in: PreampField.gainRange, step: 0.5)
+            HStack {
+                Spacer()
+                Button("取消") { onDone(nil) }
+                Button("加入待应用") { onDone(value) }.keyboardShortcut(.defaultAction)
+            }
+            Text("不会立即发送；在底部“待应用”栏确认后才写入设备。范围 0–60 dB。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        }
+        .padding(Tokens.Space.l)
+        .frame(width: 320)
     }
 }

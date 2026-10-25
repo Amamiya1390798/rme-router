@@ -79,6 +79,15 @@ public actor TotalMixGlobalOSCClient {
         return await waitQuiet(after: before, quiet: quiet, timeout: timeout)
     }
 
+    /// 写后回读前级：对每个输入发 `/sendchan/input/<N> 1`，等回包停顿。
+    @discardableResult
+    public func refreshChannels(_ channels: [TotalMixChannel], quiet: Duration = .milliseconds(200),
+                                timeout: Duration = .seconds(2)) async throws -> Bool {
+        let before = stats.packetsReceived
+        for ch in Set(channels).sorted() { try await request(.sendChannel(ch)) }
+        return await waitQuiet(after: before, quiet: quiet, timeout: timeout)
+    }
+
     /// 统一限速发送（文档第 7 节安全规则 6）。
     private func send(_ message: OSCMessage) async throws {
         if let last = lastSend {

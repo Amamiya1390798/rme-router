@@ -13,6 +13,24 @@ public enum TwelveMicReadGate {
     }
 }
 
+/// 前级写入检查（文档第 7.2 节）：请求体必须正好是 input/analog/<n>/<gain|p48|phase> 这一个叶子。
+public enum TwelveMicWriteGate {
+    public static func preampBody(channel: Int, field: PreampField, value: PreampValue) -> [String: Any]? {
+        guard channel >= 1 else { return nil }
+        let leaf: Any
+        switch (field, value) {
+        case let (.gain, .gain(g)) where PreampField.gainRange.contains(g): leaf = g
+        case let (.phantom, .flag(b)), let (.phase, .flag(b)): leaf = b
+        default: return nil
+        }
+        return ["input": ["analog": [String(channel): [field.twelveMicKey: leaf]]]]
+    }
+
+    public static func parameter(channel: Int, field: PreampField) -> String {
+        "input/analog/\(channel)/\(field.twelveMicKey)"
+    }
+}
+
 /// 12Mic：官方手册公开的 JSON(OSC) 远程接口（文档第 6.2 节）。
 /// - 方法：HTTP POST，`Content-Type: application/json`，地址 `http://<host>/api/v2/self`
 ///   （USB 直连时为 http://172.20.0.1；mDNS 为 12mic.local）。需在 STATE > Remote 打开 HTTP Remote。
@@ -204,6 +222,27 @@ public struct TwelveMicJSONAdapter: DeviceAdapter {
                                  autoGain: bool("gain_autoset"), gainGroup: string("gain_group"))
         }
         .sorted { $0.input < $1.input }
+    }
+
+    /// 写一个前级字段（第 7.2 节）。确认凭证必须覆盖该操作，操作的 parameter 必须就是这个字段。
+    public func writePreamp(channel: Int, field: PreampField, value: PreampValue,
+                            for op: PlannedOperation, confirmation: UserConfirmation) async throws {
+        try precheck(op, confirmation)
+        guard op.parameter == TwelveMicWriteGate.parameter(channel: channel, field: field),
+              let body = TwelveMicWriteGate.preampBody(channel: channel, field: field, value: value) else {
+            throw AdapterError.notWritable("前级写入只允许 input/analog/<n>/gain|p48|phase，且增益在 0–60 dB")
+        }
+        _ = try await post(body)
+    }
+
+    /// 读回前级（全部为 null 的只读请求）。
+    public func readPreamps() async throws -> [PreampChannel] {
+        let reply = try await read(["input": ["analog": NSNull()]])
+        let analog = (reply["input"] as? [String: Any])?["analog"] as? [String: Any] ?? [:]
+        let now = Date()
+        return Self.parsePreamps(analog, inputPortID: inputPortMap["analog"] ?? "\(deviceID).analog.in") { path in
+            FactSource(deviceID: deviceID, interface: "12mic-json", reference: path, observedAt: now)
+        }
     }
 
     public func plan(_ change: RouteChange, current: DeviceSnapshot) -> [PlannedOperation] {
