@@ -1,5 +1,6 @@
 import SwiftUI
 import RMECore
+import RMEAdapters
 
 /// 窗口右侧的检查器（阶段 B2）：选中通道的全部信息。点其中的通道可以继续追。
 struct InspectorPanel: View {
@@ -8,7 +9,8 @@ struct InspectorPanel: View {
     var body: some View {
         ScrollView {
             if let ref = model.inspectorTarget {
-                InspectorContent(info: model.inspectorInfo(ref)) { model.inspect($0) }
+                InspectorContent(info: model.inspectorInfo(ref),
+                                 strip: model.deviceID(of: ref) == "xt" && model.lastLoaded != nil ? model.stripActions : nil) { model.inspect($0) }
                     .padding(Tokens.Space.l)
             } else {
                 Text("在信号流、输出卡标题或前级卡上选一个通道，这里显示它的全部信息。")
@@ -22,6 +24,8 @@ struct InspectorPanel: View {
 
 struct InspectorContent: View {
     var info: InspectorInfo
+    /// TotalMix 通道条（第 7.8 节）；非 XT 通道为 nil。
+    var strip: StripActions? = nil
     var select: (ChannelRef) -> Void
 
     var body: some View {
@@ -39,6 +43,10 @@ struct InspectorContent: View {
                         }
                     }
                 }
+            }
+
+            if let strip, TotalMixStripParam.allCases.contains(where: { strip.current(info.ref, $0) != nil }) {
+                section("通道条（TotalMix）") { StripControls(ref: info.ref, actions: strip) }
             }
 
             if let p = info.preamp {

@@ -1,5 +1,6 @@
 import SwiftUI
 import RMECore
+import RMEAdapters
 
 /// “输出”视图：按设备分栏，每个在用的输出一张卡，列出送进来的声音。
 public struct OutputsView: View {
@@ -38,6 +39,10 @@ public struct OutputsView: View {
         a.routeOutputs = { model.twelveMicRouteOutputs }
         a.inspect = { model.inspect($0) }
         a.meters = model.meters
+        a.strip = model.stripActions
+        a.sendPan = { model.sendPan(source: $0, destination: $1) }
+        a.pendingSendPan = { model.pendingSendPan(source: $0, destination: $1) }
+        a.stageSendPan = { s, d, p in model.stageSendPan(source: s, destination: d, pan: p).map(\.text) ?? quick() }
         return a
     }
 
@@ -136,6 +141,11 @@ public struct OutputActions {
     public var inspect: (ChannelRef) -> Void = { _ in }
     /// 电平（第 7.7 节）；nil 表示不显示电平条（出图时）。
     public var meters: MeterStore?
+    /// TotalMix 通道条与发送声像（第 7.8 节）。
+    public var strip = StripActions()
+    public var sendPan: (ChannelRef, ChannelRef) -> Double? = { _, _ in nil }
+    public var pendingSendPan: (ChannelRef, ChannelRef) -> Double? = { _, _ in nil }
+    public var stageSendPan: (ChannelRef, ChannelRef, Double) -> String? = { _, _, _ in nil }
     public init() {}
 }
 
@@ -165,6 +175,7 @@ struct OutputCardView: View {
                 // 只有 XT（TotalMix）有电平数据
                 if let m = actions.meters, card.port.deviceID == "xt" { MeterBar(store: m, ref: destination) }
             }
+            if editable { StripControls(ref: destination, actions: actions.strip) }
             Rectangle().fill(Tokens.Palette.border).frame(height: 1)
             ForEach(Array(card.sources.prefix(Self.visibleSources).enumerated()), id: \.offset) { _, source in
                 SourceRow(source: source, destination: destination, editable: editable,
@@ -238,9 +249,17 @@ struct SourceRow: View {
                 .help("修改电平（先进待应用栏）")
                 // 电平按钮在卡片最右侧：向左弹出，窗口窄时也不会伸出窗口右边。
                 .popover(isPresented: $editing, arrowEdge: .leading) {
+                    let pan = actions.sendPan(source.refs[0], destination)
+                    let pendingPan = actions.pendingSendPan(source.refs[0], destination)
                     GainEditor(current: source.kind.gainDB, initial: pending ?? source.kind.gainDB,
-                               title: "\(source.label) → \(destination)") { dB in
-                        _ = actions.stage(source.refs[0], destination, dB)
+                               title: "\(source.label) → \(destination)",
+                               pan: pan.map { (current: $0, initial: pendingPan ?? $0) }) { dB, newPan in
+                        if !StripControls.sameVolume(dB, source.kind.gainDB) || pending != nil {
+                            _ = actions.stage(source.refs[0], destination, dB)
+                        }
+                        if let newPan, let pan, abs(newPan - pan) > 0.005 || pendingPan != nil {
+                            _ = actions.stageSendPan(source.refs[0], destination, newPan)
+                        }
                         editing = false
                     }
                 }
@@ -286,14 +305,24 @@ struct SourceRow: View {
 struct GainEditor: View {
     var current: Double?
     var title: String
-    var onDone: (Double?) -> Void
+    var panCurrent: Double?
+    var onDone: (Double?, Double?) -> Void
     @State private var value: Double
+    @State private var pan: Double
 
-    init(current: Double?, initial: Double?, title: String, onDone: @escaping (Double?) -> Void) {
+    /// pan 不为 nil 时同时编辑这条发送的声像（第 7.8 节）；onDone 的第二个值是声像（没有声像时为 nil）。
+    init(current: Double?, initial: Double?, title: String, pan: (current: Double, initial: Double)? = nil,
+         onDone: @escaping (Double?, Double?) -> Void) {
         self.current = current
         self.title = title
+        self.panCurrent = pan?.current
         self.onDone = onDone
         _value = State(initialValue: initial ?? -65)
+        _pan = State(initialValue: pan?.initial ?? 0)
+    }
+
+    init(current: Double?, initial: Double?, title: String, onDone: @escaping (Double?) -> Void) {
+        self.init(current: current, initial: initial, title: title, pan: nil) { dB, _ in onDone(dB) }
     }
 
     private var isOff: Bool { value <= TotalMixFaderUI.off }
@@ -307,12 +336,26 @@ struct GainEditor: View {
                 Text("当前 \(PendingChange.format(current))").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
             }
             Slider(value: $value, in: TotalMixFaderUI.off ... 6, step: 0.5)
+            if let panCurrent {
+                HStack {
+                    Text("声像 \(TotalMixWrite.panText(pan))").font(Tokens.Font.body).monospacedDigit()
+                    Spacer()
+                    Text("当前 \(TotalMixWrite.panText(panCurrent))").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                }
+                HStack(spacing: Tokens.Space.s) {
+                    Text("左").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    Slider(value: $pan, in: -1 ... 1, step: 0.01)
+                    Text("右").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    Button("居中") { pan = 0 }
+                }
+            }
             HStack {
                 Button("关") { value = TotalMixFaderUI.off }
                 Button("0 dB") { value = 0 }
                 Spacer()
-                Button("取消") { onDone(current) }
-                Button(ConfirmMode.current.applyLabel) { onDone(isOff ? nil : value) }.keyboardShortcut(.defaultAction)
+                Button("取消") { onDone(current, nil) }
+                Button(ConfirmMode.current.applyLabel) { onDone(isOff ? nil : value, panCurrent == nil ? nil : pan) }
+                    .keyboardShortcut(.defaultAction)
             }
             Text("不会立即发送；在底部“待应用”栏确认后才写入 TotalMix。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)

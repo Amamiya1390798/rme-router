@@ -153,13 +153,57 @@ public enum TotalMixFader {
     }
 }
 
-/// 写入类消息（文档第 7.1、7.2 节）：混音节点电平、输入通道的前级三项。
+/// 通道条参数（文档第 7.8 节）。只有这四个可写。
+public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
+    case volume, balpan, mute, phase
+
+    /// 这一总线上有没有这个参数（协议表 + 实测：输入、回放没有 volume / balpan）。
+    public func applies(to bus: TotalMixBus) -> Bool {
+        switch self {
+        case .volume, .balpan: return bus == .output
+        case .mute, .phase: return true
+        }
+    }
+
+    /// 协议表标 L/R：立体声右声道用 N+1 单独寻址。
+    public var isPerSide: Bool { self == .phase }
+
+    public var label: String {
+        switch self { case .volume: return "音量"; case .balpan: return "平衡"; case .mute: return "静音"; case .phase: return "相位" }
+    }
+
+    /// 截到协议允许的范围；音量 -65 dB 及以下为“关”（-300）。
+    public func clamp(_ v: Double) -> Double {
+        switch self {
+        case .volume: return v <= TotalMixFader.offThresholdDB ? Double(TotalMixWrite.offDB) : min(v, TotalMixWrite.maxDB)
+        case .balpan: return min(max(v, -1), 1)
+        case .mute, .phase: return v >= 0.5 ? 1 : 0
+        }
+    }
+
+    /// 界面文字。
+    public func text(_ v: Double?) -> String {
+        guard let v else { return "?" }
+        switch self {
+        case .volume: return TotalMixFader.isOn(v) ? String(format: "%.1f dB", v) : "关"
+        case .balpan: return TotalMixWrite.panText(v)
+        case .mute: return v >= 0.5 ? "静音" : "开"
+        case .phase: return v >= 0.5 ? "反相" : "正相"
+        }
+    }
+}
+
+/// 写入类消息（文档第 7.1、7.2、7.8 节）：混音节点电平与声像、输入通道的前级三项、通道条参数。
 /// 只能经 `TotalMixGlobalOSCClient.write` 发出，那里要求用户确认（`UserConfirmation`）。
 public enum TotalMixWrite: Equatable, Sendable {
     /// 节点电平；dB 为 nil 表示关（发送 -300 dB）。超过 +6 dB 截到 +6，低于 -65 dB 视为关。
     case sendGain(source: TotalMixChannel, output: TotalMixChannel, dB: Double?)
     /// 输入通道的前级：增益（dB，截到 0–60）、48V、相位（1.0/0.0）。
     case preamp(input: TotalMixChannel, field: PreampField, value: PreampValue)
+    /// 节点声像，-1（左）…+1（右）。
+    case sendPan(source: TotalMixChannel, output: TotalMixChannel, pan: Double)
+    /// 通道条参数（第 7.8 节）。
+    case strip(channel: TotalMixChannel, param: TotalMixStripParam, value: Double)
 
     public static let offDB: Float = -300
     public static let maxDB = 6.0
@@ -179,7 +223,20 @@ public enum TotalMixWrite: Equatable, Sendable {
             default: preconditionFailure("字段与值类型不匹配：\(field) \(value)")
             }
             return OSCMessage("/input/\(input.wireIndex)/\(field.totalMixKey)", [.float(v)])
+        case let .sendPan(src, out, pan):
+            precondition(src.bus != .output && out.bus == .output, "节点来源须为输入/回放，目标须为输出")
+            return OSCMessage("/mix/\(src.bus.shortToken)/\(src.wireIndex)/\(out.wireIndex)/balpan",
+                              [.float(Float(TotalMixStripParam.balpan.clamp(pan)))])
+        case let .strip(ch, param, value):
+            precondition(param.applies(to: ch.bus), "\(ch.bus) 没有 \(param.rawValue)")
+            return OSCMessage("/\(ch.bus.rawValue)/\(ch.wireIndex)/\(param.rawValue)", [.float(Float(param.clamp(value)))])
         }
+    }
+
+    /// 声像文字：中、左 30、右 100。
+    public static func panText(_ v: Double) -> String {
+        let n = Int((v * 100).rounded())
+        return n == 0 ? "中" : n < 0 ? "左 \(-n)" : "右 \(n)"
     }
 
     /// 截到 [-65, +6]；-65 及以下统一为关。

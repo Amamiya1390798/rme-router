@@ -147,9 +147,10 @@ public struct AppliedBatch: Identifiable, Equatable, Sendable {
     public var preamps: [PendingPreampChange] = []
     public var routes: [PendingRouteChange] = []
     public var xtcRoutes: [PendingXTCRouteChange] = []
+    public var strips: [PendingStripChange] = []
     public var outcomes: [UUID: VerifyOutcome]
 
-    public var count: Int { changes.count + preamps.count + routes.count + xtcRoutes.count }
+    public var count: Int { changes.count + preamps.count + routes.count + xtcRoutes.count + strips.count }
     public var verifiedCount: Int { outcomes.values.filter { $0 == .verified }.count }
 }
 
@@ -159,6 +160,8 @@ public enum StageError: Error, Equatable {
     case notLoaded
     case notConnected(String)
     case unknownCurrent(String)
+    case notSupported(String)
+    case noSend
 
     public var text: String {
         switch self {
@@ -167,6 +170,8 @@ public enum StageError: Error, Equatable {
         case .notLoaded: return "还没有从 TotalMix 读取"
         case let .notConnected(d): return "\(d) 没有读到，不能写入"
         case let .unknownCurrent(f): return "读不到当前的\(f)，不能写入（先读一次设备）"
+        case let .notSupported(t): return t
+        case .noSend: return "这里还没有发送；先“送一路声音”，再调声像"
         }
     }
 }
@@ -231,6 +236,7 @@ extension AppModel {
     public func discard(_ id: UUID) { pending.removeAll { $0.id == id } }
     public func discardAll() {
         pending.removeAll(); pendingPreamps.removeAll(); pendingRoutes.removeAll(); pendingXTCRoutes.removeAll()
+        pendingStrips.removeAll()
     }
 
     static func same(_ a: Double?, _ b: Double?) -> Bool {
@@ -298,14 +304,17 @@ extension AppModel {
 
     public var hasPending: Bool {
         !pending.isEmpty || !pendingPreamps.isEmpty || !pendingRoutes.isEmpty || !pendingXTCRoutes.isEmpty
+            || !pendingStrips.isEmpty
     }
 
-    public var pendingCount: Int { pending.count + pendingPreamps.count + pendingRoutes.count + pendingXTCRoutes.count }
+    public var pendingCount: Int {
+        pending.count + pendingPreamps.count + pendingRoutes.count + pendingXTCRoutes.count + pendingStrips.count
+    }
 
     /// 待应用改动对应的全部计划操作（确认凭证按它签发）。
     public var allPendingOperations: [PlannedOperation] {
         pending.map(\.operation) + pendingPreamps.map(\.operation) + pendingRoutes.map(\.operation)
-            + pendingXTCRoutes.map(\.operation)
+            + pendingXTCRoutes.map(\.operation) + pendingStrips.map(\.operation)
     }
 
     // MARK: 12Mic 路由暂存（第 7.3 节）
@@ -368,6 +377,7 @@ extension AppModel {
     /// 待应用里有必须明确确认的改动：打开 48V，或一次抬高超过 10 dB。
     public var needsExplicitConfirmation: Bool {
         pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.needsPhantomAck || $0.isLargeJump }
+            || pendingStrips.contains { $0.isUnmute || $0.isLargeJump }
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。
@@ -387,11 +397,11 @@ extension AppModel {
         isApplying = true
         defer { isApplying = false }
 
-        let changes = pending, preamps = pendingPreamps
+        let changes = pending, preamps = pendingPreamps, strips = pendingStrips
         var outcomes: [UUID: VerifyOutcome] = [:]
 
         // 1. XT：发送电平与 XT 前级都经 TotalMix
-        var sentSends: [PendingChange] = [], sentXT: [PendingPreampChange] = []
+        var sentSends: [PendingChange] = [], sentXT: [PendingPreampChange] = [], sentStrips: [PendingStripChange] = []
         let xtPreamps = preamps.filter { $0.deviceID == "xt" }
         if let adapter {
             for c in changes {
@@ -406,9 +416,10 @@ extension AppModel {
                     sentXT.append(p)
                 } catch { outcomes[p.id] = .failed("\(error)") }
             }
+            sentStrips = await applyStrips(strips, adapter: adapter, confirmation: confirmation, outcomes: &outcomes)
             if !sentSends.isEmpty { _ = try? await adapter.client.refreshSubmixes(sentSends.map(\.tmOutput)) }
             if !sentXT.isEmpty { _ = try? await adapter.client.refreshChannels(sentXT.compactMap(\.tmInput)) }
-            if !sentSends.isEmpty || !sentXT.isEmpty {
+            if !sentSends.isEmpty || !sentXT.isEmpty || !sentStrips.isEmpty {
                 await captureTotalMixState(from: adapter)
                 apply(xt: TotalMixOSCAdapter.makeSnapshot(
                     deviceID: "xt", state: tmState, map: adapter.channelMap,
@@ -419,7 +430,9 @@ extension AppModel {
         } else {
             for c in changes { outcomes[c.id] = .failed("TotalMix 未连接") }
             for p in xtPreamps { outcomes[p.id] = .failed("TotalMix 未连接") }
+            for c in strips { outcomes[c.id] = .failed("TotalMix 未连接") }
         }
+        for c in sentStrips { outcomes[c.id] = verify(c) }
         for c in sentSends {
             let readBack = currentGain(source: c.tmSource, output: c.tmOutput)
             let hasNode = tmState.nodes[.init(source: c.tmSource, output: c.tmOutput)] != nil
@@ -489,12 +502,13 @@ extension AppModel {
                        confirmation: confirmation, outcomes: &outcomes)
 
         let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, routes: routes, xtcRoutes: xtcRoutes,
-                                 outcomes: outcomes)
+                                 strips: strips, outcomes: outcomes)
         history.insert(batch, at: 0)
         pending.removeAll()
         pendingPreamps.removeAll()
         pendingRoutes.removeAll()
         pendingXTCRoutes.removeAll()
+        pendingStrips.removeAll()
         return batch
     }
 
@@ -520,6 +534,10 @@ extension AppModel {
         for r in batch.routes {
             if case .failed = batch.outcomes[r.id] { continue }
             stageTwelveMicRoute(destination: r.destination, source: r.old)
+        }
+        for c in batch.strips {
+            if case .failed = batch.outcomes[c.id] { continue }
+            stageUndo(c)
         }
         for r in batch.xtcRoutes {
             if case .failed = batch.outcomes[r.id] { continue }

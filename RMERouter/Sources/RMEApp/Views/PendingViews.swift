@@ -46,6 +46,11 @@ struct PendingBar: View {
                         change: "\(PendingRouteChange.text(r.old)) → \(PendingRouteChange.text(r.new))",
                         badges: r.isPhones ? [("耳机：注意音量", Tokens.Palette.warn)] : []) { model.discardRoute(r.id) }
                 }
+                ForEach(model.pendingStrips) { c in
+                    row(title: c.title, change: c.changeText,
+                        badges: (c.isUnmute ? [("取消静音：会出声", Tokens.Palette.problem)] : [])
+                            + (c.isLargeJump ? [("大幅抬高", Tokens.Palette.warn)] : [])) { model.discardStrip(c.id) }
+                }
                 ForEach(model.pendingXTCRoutes) { r in
                     row(title: r.title, change: r.changeText,
                         badges: [("整块 8 路一起换", Tokens.Palette.warn)]) { model.discardXTCRoute(r.id) }
@@ -99,6 +104,7 @@ struct ConfirmSheet: View {
     private var preamps: [PendingPreampChange] { result?.preamps ?? model.pendingPreamps }
     private var routes: [PendingRouteChange] { result?.routes ?? model.pendingRoutes }
     private var xtcRoutes: [PendingXTCRouteChange] { result?.xtcRoutes ?? model.pendingXTCRoutes }
+    private var strips: [PendingStripChange] { result?.strips ?? model.pendingStrips }
     private var needsPhantomAck: Bool { result == nil && model.pendingPreamps.contains(where: \.needsPhantomAck) }
 
     var body: some View {
@@ -108,6 +114,7 @@ struct ConfirmSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     ForEach(sends) { c in sendRow(c) }
+                    ForEach(strips) { c in stripRow(c) }
                     ForEach(routes) { r in routeRow(r) }
                     ForEach(xtcRoutes) { r in xtcRouteRow(r) }
                     ForEach(preamps) { p in preampRow(p) }
@@ -146,7 +153,7 @@ struct ConfirmSheet: View {
 
     @ViewBuilder private var connectionNote: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xs) {
-            if !sends.isEmpty || preamps.contains(where: { $0.deviceID == "xt" }) {
+            if !sends.isEmpty || !strips.isEmpty || preamps.contains(where: { $0.deviceID == "xt" }) {
                 switch model.xtStatus {
                 case .live:
                     Label("MADIface XT 已连接：改动会立即影响声音。", systemImage: "exclamationmark.triangle")
@@ -203,6 +210,26 @@ struct ConfirmSheet: View {
                 if r.old != nil { Badge(text: "替换原来的来源", color: Tokens.Palette.warn) }
                 if r.isPhones { Badge(text: "目标是耳机：注意音量", color: Tokens.Palette.problem) }
                 outcome(r.id)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
+    private func stripRow(_ c: PendingStripChange) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+            HStack(spacing: Tokens.Space.s) {
+                Text(verbatim: c.title).font(Tokens.Font.mono)
+                Spacer()
+                Text(verbatim: c.changeText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.accent)
+            }
+            Text(verbatim: "TotalMix：\(c.totalMixLabel)").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            Text(verbatim: c.wireText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack(spacing: Tokens.Space.s) {
+                if c.stereo { Badge(text: "立体声：作用于左右两声道", color: Tokens.Palette.textMuted) }
+                if c.isUnmute { Badge(text: "取消静音：会突然出声", color: Tokens.Palette.problem) }
+                if c.isLargeJump { Badge(text: "大幅抬高", color: Tokens.Palette.problem) }
+                outcome(c.id)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

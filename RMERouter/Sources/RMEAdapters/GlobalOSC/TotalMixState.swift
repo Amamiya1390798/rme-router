@@ -131,6 +131,21 @@ public struct TotalMixState: Sendable, Equatable {
         channels[ch]?["stereo"]?.number.map { $0 >= 0.5 }
     }
 
+    /// 节点声像（-1…+1）；没收到为 nil。
+    public func nodePan(_ key: NodeKey) -> Double? { nodes[key]?["balpan"]?.number }
+
+    /// 通道条参数的当前值；没收到为 nil。
+    public func stripValue(_ ch: TotalMixChannel, _ param: TotalMixStripParam) -> Double? {
+        channels[ch]?[param.rawValue]?.number
+    }
+
+    /// 通道条参数写到哪个 TotalMix 通道：立体声右声道（偶数号、左声道是立体声）除 L/R 参数外改用左声道。
+    public func stripTarget(_ ch: TotalMixChannel, _ param: TotalMixStripParam) -> TotalMixChannel {
+        guard !param.isPerSide, ch.number % 2 == 0 else { return ch }
+        let left = TotalMixChannel(ch.bus, ch.number - 1)
+        return isStereo(left) == true ? left : ch
+    }
+
     /// 节点电平 dB：优先 fader，其次由 faderlin 换算；关闭时为 nil。
     public func gainDB(_ key: NodeKey) -> Double? {
         guard let params = nodes[key] else { return nil }
