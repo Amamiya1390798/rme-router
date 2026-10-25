@@ -31,7 +31,7 @@ struct RMERouterApp: App {
                 .frame(minWidth: model.showInspector ? 1200 : 900, minHeight: 600)
         }
         .windowResizability(.contentMinSize)
-        // 精致窗口（第 5.1 节）：紧凑工具栏、不显示标题文字，标题栏和内容连成一片
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        // 仿 Claude 桌面 App（第 5.1 节）：没有标题栏，红黄绿按钮浮在侧边栏上
+        .windowStyle(.hiddenTitleBar)
     }
 }

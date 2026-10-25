@@ -11,46 +11,26 @@ public struct RootView: View {
 
     public init(model: AppModel) { self.model = model }
 
+    @State private var sidebarVisible = true
+
+    /// 窗口（第 5.1 节，仿 Claude 桌面 App）：没有标题栏；侧边栏与窗口底色一体；内容是浮在底色上的圆角面板。
     public var body: some View {
-        NavigationSplitView {
-            // 只在值变了才写（同值写入也会通知观察者）。
-            Sidebar(selection: Binding(get: { model.section },
-                                       set: { if model.section != $0 { model.section = $0 } }),
-                    devices: deviceRows)
-                .equatable()
-                .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）；只重建内容，不动窗口和工具栏
-                .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-        } detail: {
-            ZStack {
-                // 设备页建一次就一直留着（藏在后面），切回来不用重建：200 多条通道条重建一次要 0.2 秒以上
-                if devicesBuilt {
-                    DevicesView(model: model)
-                        .opacity(onDevices ? 1 : 0)
-                        .allowsHitTesting(onDevices)
-                        .accessibilityHidden(!onDevices)
-                        .environment(\.pageActive, onDevices)
-                }
-                // 输出页同样常驻（卡片多，重建一次约 0.15 秒）
-                if outputsBuilt {
-                    OutputsView(model: model)
-                        .opacity(onOutputs ? 1 : 0)
-                        .allowsHitTesting(onOutputs)
-                        .accessibilityHidden(!onOutputs)
-                }
-                if !onDevices && !onOutputs { otherPage }
+        HStack(spacing: 0) {
+            if sidebarVisible {
+                // 只在值变了才写（同值写入也会通知观察者）。
+                Sidebar(selection: Binding(get: { model.section },
+                                           set: { if model.section != $0 { model.section = $0 } }),
+                        devices: deviceRows)
+                    .equatable()
+                    .frame(width: 208)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            .id(model.theme)
-            .onChange(of: model.section, initial: true) {
-                if onDevices { devicesBuilt = true }
-                if onOutputs { outputsBuilt = true }
-            }
-            .inspector(isPresented: $model.showInspector) {
-                InspectorPanel(model: model).inspectorColumnWidth(min: 260, ideal: 300, max: 420)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
-            }
+            panel
+                .padding(.vertical, 8).padding(.trailing, 8).padding(.leading, sidebarVisible ? 0 : 8)
         }
+        .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）
+        .background(Tokens.Palette.chrome)
+        .ignoresSafeArea()
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .sheet(isPresented: $model.showOnboarding) {
             OnboardingSheet(model: model) {
@@ -58,27 +38,87 @@ public struct RootView: View {
                 model.showOnboarding = false
             }
         }
-        .modifier(TransparentToolbar())
-        .toolbar {
-            ToolbarItem(placement: .principal) { StatusPill(model: model) }
-            ToolbarItem { SendAcrossButton(model: model) }
-            ToolbarItem {
-                Button { model.showInspector.toggle() } label: { Label("检查器", systemImage: "sidebar.right") }
-                    .help("显示或隐藏右侧检查器")
-            }
-            ToolbarItem {
-                Button {
-                    Task { await model.refresh() }
-                } label: {
-                    Label("读取设备", systemImage: "arrow.clockwise")
-                }
-                .disabled(model.xtStatus == .loading || model.twelveMicStatus == .loading)
-                .help("只读：读取 TotalMix（/sendstate、/sendall）与 12Mic（JSON，全部为 null），不改动设备")
-            }
-        }
         .task {
+            // 打开时不让搜索框自动抢焦点（会吞掉快捷键）
+            DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
             if !model.onboardingDone { model.showOnboarding = true }
             if model.xtStatus == .notLoaded { await model.refresh() }
+        }
+    }
+
+    /// 圆角嵌入面板：顶部一条（页名、状态胶囊、工具按钮），下面是当前页与检查器，底部待应用栏。
+    private var panel: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            HStack(spacing: 0) {
+                pages
+                if model.showInspector {
+                    Divider()
+                    InspectorPanel(model: model).frame(width: 300)
+                        .transition(.move(edge: .trailing))
+                }
+            }
+            if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
+        }
+        .background(Tokens.Palette.bg)
+        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
+        .shadow(color: .black.opacity(0.08), radius: 6, y: 1)
+    }
+
+    private var header: some View {
+        HStack(spacing: Tokens.Space.m) {
+            if !sidebarVisible { Spacer().frame(width: 64) }   // 让开红黄绿按钮
+            Button { withAnimation(.easeOut(duration: 0.15)) { sidebarVisible.toggle() } } label: {
+                Image(systemName: "sidebar.left")
+            }
+            .buttonStyle(.borderless).help("显示或隐藏侧边栏（⌃⌘S）")
+            .keyboardShortcut("s", modifiers: [.control, .command])
+            Text((model.section ?? .devices).title).font(.system(size: 13, weight: .semibold))
+            Spacer()
+            StatusPill(model: model)
+            Spacer()
+            SendAcrossButton(model: model).labelStyle(.iconOnly).buttonStyle(.borderless)
+            Button { withAnimation(.easeOut(duration: 0.15)) { model.showInspector.toggle() } } label: {
+                Image(systemName: "sidebar.right")
+            }
+            .buttonStyle(.borderless).help("显示或隐藏右侧检查器")
+            Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
+                .buttonStyle(.borderless)
+                .disabled(model.xtStatus == .loading || model.twelveMicStatus == .loading)
+                .help("只读：读取 TotalMix（/sendstate、/sendall）与 12Mic（JSON，全部为 null），不改动设备")
+        }
+        .foregroundStyle(Tokens.Palette.textMuted)
+        .padding(.horizontal, Tokens.Space.m)
+        .frame(height: 40)
+        .contentShape(Rectangle())
+        .modifier(WindowDraggable())
+    }
+
+    private var pages: some View {
+        ZStack {
+            // 设备页建一次就一直留着（藏在后面），切回来不用重建：200 多条通道条重建一次要 0.2 秒以上
+            if devicesBuilt {
+                DevicesView(model: model)
+                    .opacity(onDevices ? 1 : 0)
+                    .allowsHitTesting(onDevices)
+                    .accessibilityHidden(!onDevices)
+                    .environment(\.pageActive, onDevices)
+            }
+            // 输出页同样常驻（卡片多，重建一次约 0.15 秒）
+            if outputsBuilt {
+                OutputsView(model: model)
+                    .opacity(onOutputs ? 1 : 0)
+                    .allowsHitTesting(onOutputs)
+                    .accessibilityHidden(!onOutputs)
+            }
+            if !onDevices && !onOutputs { otherPage }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: model.section, initial: true) {
+            if onDevices { devicesBuilt = true }
+            if onOutputs { outputsBuilt = true }
         }
     }
 
@@ -146,27 +186,69 @@ struct Sidebar: View, Equatable {
     @Binding var selection: AppSection?
     var devices: [DeviceRow]
 
-    static func == (a: Sidebar, b: Sidebar) -> Bool { a.devices == b.devices }
+    static func == (a: Sidebar, b: Sidebar) -> Bool { a.devices == b.devices && a.selection == b.selection }
 
     var body: some View {
-        List(selection: $selection) {
-            BrandHeader().selectionDisabled()
-            Section("页面") {
-                ForEach(AppSection.allCases) { s in
-                    Label(s.title, systemImage: s.symbol).tag(s)
+        VStack(alignment: .leading, spacing: 2) {
+            BrandHeader()
+                .padding(.top, 40)   // 红黄绿按钮在上面
+                .padding(.bottom, Tokens.Space.l)
+            ForEach(AppSection.allCases) { s in item(s) }
+            Spacer()
+            Text("设备").font(.system(size: 11, weight: .medium)).foregroundStyle(Tokens.Palette.textMuted)
+                .padding(.horizontal, 10).padding(.bottom, 2)
+            ForEach(devices) { d in
+                HStack(spacing: Tokens.Space.s) {
+                    EvidenceDot(d.evidence)
+                    Text(d.name).font(.system(size: 12)).foregroundStyle(Tokens.Palette.textMuted)
                 }
-            }
-            Section("设备状态") {
-                ForEach(devices) { d in
-                    HStack(spacing: Tokens.Space.s) {
-                        EvidenceDot(d.evidence)
-                        Text(d.name)
-                    }
-                    .selectionDisabled()
-                }
+                .padding(.horizontal, 10).padding(.vertical, 3)
             }
         }
+        .padding(.horizontal, 10).padding(.bottom, Tokens.Space.l)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .modifier(WindowDraggable())
     }
+
+    /// 页面项：圆角块，选中浅色底（不用系统蓝）。
+    private func item(_ s: AppSection) -> some View {
+        let on = selection == s
+        return Button { selection = s } label: {
+            HStack(spacing: 10) {
+                Image(systemName: s.symbol).frame(width: 18)
+                    .foregroundStyle(on ? Tokens.Palette.accent : Tokens.Palette.textMuted)
+                Text(s.title).font(.system(size: 13, weight: on ? .semibold : .regular))
+                    .foregroundStyle(Tokens.Palette.text)
+                Spacer()
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8).fill(on ? Tokens.Palette.border.opacity(0.7) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 拖空白处移动窗口（没有标题栏时用，第 5.1 节）：macOS 15 用系统的窗口拖动手势；更早的系统让窗口背景可拖。
+struct WindowDraggable: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.gesture(WindowDragGesture())
+        } else {
+            content.background(WindowDragArea()).onAppear { NSApp.windows.forEach { $0.isMovableByWindowBackground = true } }
+        }
+    }
+}
+
+/// 拖这里能移动窗口（没有标题栏时用，第 5.1 节）。只放在侧边栏空白处和面板顶部一条，不影响面板里的拖线。
+struct WindowDragArea: NSViewRepresentable {
+    final class DragView: NSView {
+        override var mouseDownCanMoveWindow: Bool { true }
+        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+    func makeNSView(context: Context) -> NSView { DragView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// 页内分栏（第 6.8 节）：顶部居中一组分段按钮，下面是当前分栏。

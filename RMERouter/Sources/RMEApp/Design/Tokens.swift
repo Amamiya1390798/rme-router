@@ -7,6 +7,8 @@ public enum Tokens {
     /// 颜色随主题（第 5.1 节）和系统浅色 / 深色变化：绘制时按当前主题取值。
     public enum Palette {
         public static let bg = Color(token: .bg)
+        /// 窗口框（侧边栏与面板四周），比页面底色稍深（第 5.1 节）。
+        public static let chrome = Color(token: .chrome)
         public static let surface = Color(token: .surface)
         public static let border = Color(token: .border)
         public static let text = Color(token: .text)
@@ -48,13 +50,14 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
     nonisolated(unsafe) public static var current: UITheme =
         UserDefaults.standard.string(forKey: defaultsKey).flatMap(UITheme.init(rawValue:)) ?? .warm
 
-    public enum Token: CaseIterable { case bg, surface, border, text, textMuted, accent, ok, warn, problem, unknown }
+    public enum Token: CaseIterable { case chrome, bg, surface, border, text, textMuted, accent, ok, warn, problem, unknown }
 
     /// (浅色, 深色)
     public func value(_ t: Token) -> (UInt32, UInt32) {
         switch self {
         case .warm:
             switch t {
+            case .chrome: return (0xECE9E1, 0x1E1D1B)
             case .bg: return (0xF5F3EE, 0x262624)
             case .surface: return (0xFBFAF7, 0x2F2F2C)
             case .border: return (0xE4E0D6, 0x3E3D39)
@@ -68,6 +71,7 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             }
         case .studio:
             switch t {
+            case .chrome: return (0xE3E7EC, 0x171A1E)
             case .bg: return (0xEEF1F4, 0x1E2227)
             case .surface: return (0xF8FAFC, 0x272C33)
             case .border: return (0xD8DEE5, 0x3A414B)
@@ -81,6 +85,7 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             }
         case .contrast:
             switch t {
+            case .chrome: return (0xEDEDED, 0x000000)
             case .bg: return (0xFFFFFF, 0x121212)
             case .surface: return (0xFFFFFF, 0x1C1C1C)
             case .border: return (0x8A8A8A, 0x6A6A6A)
