@@ -110,9 +110,14 @@ public final class AppModel {
     public internal(set) var xtMap = TotalMixChannelMap()
 
     @ObservationIgnored var adapter: TotalMixOSCAdapter?
+    /// 电平（第 7.7 节）：单独的可观察对象，只让电平条重绘。
+    @ObservationIgnored public let meters = MeterStore()
+    @ObservationIgnored var meterTask: Task<Void, Never>?
     @ObservationIgnored private var retired: [TotalMixOSCAdapter] = []
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let makeAdapter: (OSCSettings) -> TotalMixOSCAdapter
+    /// 读取成功后自动开始电平轮询（App 里开；测试里关，测试直接调 pollMetersOnce）。
+    @ObservationIgnored public var startsMeters = false
     @ObservationIgnored let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
     @ObservationIgnored let linkStore: LinkStore
     @ObservationIgnored let sceneStore: SceneStore
@@ -195,7 +200,9 @@ public final class AppModel {
             let xt = try await adapter.snapshot()
             await captureTotalMixState(from: adapter)
             apply(xt: xt)
+            if startsMeters { startMeterLoop() }
         } catch {
+            stopMeterLoop()
             await adapter.client.stop()
             self.adapter = nil
             xtStatus = .unreachable(Self.describe(error))

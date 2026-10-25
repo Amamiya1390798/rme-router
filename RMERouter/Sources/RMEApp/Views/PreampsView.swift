@@ -57,6 +57,7 @@ public struct PreampsView: View {
         }
         a.pending = { device, input, field in model.pendingPreamp(deviceID: device, input: input, field: field) }
         a.inspect = { model.inspect($0) }
+        a.meters = model.meters
         a.stage = { device, input, field, value in
             if let e = model.stagePreamp(deviceID: device, input: input, field: field, value: value) { return e.text }
             Task { await model.commitIfQuick() }   // 快速方式下立即发送（第 7.4 节）
@@ -185,6 +186,7 @@ public struct PreampActions {
     /// 返回错误说明；nil 表示已加入待应用。
     public var stage: (String, ChannelRef, PreampField, PreampValue) -> String? = { _, _, _, _ in nil }
     public var inspect: (ChannelRef) -> Void = { _ in }
+    public var meters: MeterStore?
     public init() {}
 }
 
@@ -210,7 +212,11 @@ struct PreampCard: View {
                     Text("Mic \(preamp.input.channel)").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                 }
             }
-            Text(preamp.input.description).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack {
+                Text(preamp.input.description).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+                Spacer(minLength: Tokens.Space.xs)
+                if let m = actions.meters, deviceID == "xt" { MeterBar(store: m, ref: preamp.input, width: 50) }
+            }
             if editable, preamp.gainDB.knownValue != nil {
                 Button { editingGain = true } label: { gainLabel }
                     .buttonStyle(.plain)

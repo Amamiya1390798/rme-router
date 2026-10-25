@@ -111,3 +111,51 @@ struct StatusStrip: View {
         }
     }
 }
+
+/// 电平条（文档第 7.7 节）：-60…0 dB；-6 dB 以上黄，0 dB 及以上红。没有信号时写“无信号”，不画 0。
+/// 包在 TimelineView 里：信号停了、没有新数据时也会按时变成“无信号”。
+struct MeterBar: View {
+    var store: MeterStore
+    var ref: ChannelRef
+    var width: CGFloat = 70
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+            if let dB = store.level(ref, now: context.date) {
+                let fraction = min(max((dB + 60) / 60, 0), 1)
+                HStack(spacing: Tokens.Space.xs) {
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Tokens.Palette.border)
+                        Capsule().fill(color(dB)).frame(width: width * fraction)
+                    }
+                    .frame(width: width, height: 4)
+                    Text(dB <= -60 ? "-∞" : String(format: "%.0f", dB))
+                        .font(Tokens.Font.caption.monospacedDigit()).foregroundStyle(Tokens.Palette.textMuted)
+                        .frame(width: 26, alignment: .trailing)
+                }
+                .help("峰值电平 \(String(format: "%.1f", dB)) dB")
+            } else {
+                Text("无信号").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
+                    .help("XT 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
+            }
+        }
+    }
+
+    private func color(_ dB: Double) -> Color {
+        dB >= 0 ? Tokens.Palette.problem : dB >= -6 ? Tokens.Palette.warn : Tokens.Palette.ok
+    }
+}
+
+/// 在线却一直收不到电平时的提示（第 7.7 节）。
+struct LevelHint: View {
+    var store: MeterStore
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if store.likelyLevelSendingOff(now: context.date) {
+                Label("收不到电平：在 TotalMix 的 Settings → OSC 里勾选 Send Level Data。", systemImage: "waveform.slash")
+                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
+            }
+        }
+    }
+}

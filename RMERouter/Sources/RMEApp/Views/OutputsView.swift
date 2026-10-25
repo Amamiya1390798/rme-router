@@ -37,6 +37,7 @@ public struct OutputsView: View {
         a.routeSources = { model.twelveMicRouteSources }
         a.routeOutputs = { model.twelveMicRouteOutputs }
         a.inspect = { model.inspect($0) }
+        a.meters = model.meters
         return a
     }
 
@@ -82,6 +83,7 @@ public struct OutputsContent: View {
                     .font(Tokens.Font.body).fixedSize()
             }
             StatusStrip(status: status, lastLoaded: lastLoaded, demoDevices: demoDevices, twelveMic: twelveMic)
+            if let m = actions.meters { LevelHint(store: m) }
             ForEach(outputs) { group in
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     HStack(spacing: Tokens.Space.s) {
@@ -132,6 +134,8 @@ public struct OutputActions {
     public var routeOutputs: () -> [ChannelRef] = { [] }
     /// 在检查器里打开某个通道。
     public var inspect: (ChannelRef) -> Void = { _ in }
+    /// 电平（第 7.7 节）；nil 表示不显示电平条（出图时）。
+    public var meters: MeterStore?
     public init() {}
 }
 
@@ -155,7 +159,12 @@ struct OutputCardView: View {
                 Spacer(minLength: Tokens.Space.s)
                 EvidenceDot(card.evidence)
             }
-            Text(card.address).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack {
+                Text(card.address).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+                Spacer(minLength: Tokens.Space.s)
+                // 只有 XT（TotalMix）有电平数据
+                if let m = actions.meters, card.port.deviceID == "xt" { MeterBar(store: m, ref: destination) }
+            }
             Rectangle().fill(Tokens.Palette.border).frame(height: 1)
             ForEach(Array(card.sources.prefix(Self.visibleSources).enumerated()), id: \.offset) { _, source in
                 SourceRow(source: source, destination: destination, editable: editable,
