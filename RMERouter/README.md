@@ -1,5 +1,7 @@
 # RMERouter（v3 复核配套代码）
 
+使用说明见 [docs/使用手册.md](docs/使用手册.md)。
+
 > 已在 Mac（Swift 6.2.3）上编译，测试全绿。修改后请运行
 > `swift build && swift test`。
 
