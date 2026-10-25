@@ -72,6 +72,20 @@ if let i = CommandLine.arguments.firstIndex(of: "--params"), i + 1 < CommandLine
         if params.isEmpty { print("  （没有收到）") }
     }
 }
+if let i = CommandLine.arguments.firstIndex(of: "--node"), i + 1 < CommandLine.arguments.count {
+    // 例：--node input:1>output:5  打印这个混音节点收到的全部参数原值（fader、balpan 等）
+    for spec in CommandLine.arguments[i + 1].split(separator: ",") {
+        let ends = spec.split(separator: ">").map { $0.split(separator: ":") }
+        guard ends.count == 2, ends.allSatisfy({ $0.count == 2 }),
+              let sb = TotalMixBus(rawValue: String(ends[0][0])), let sn = Int(ends[0][1]),
+              let ob = TotalMixBus(rawValue: String(ends[1][0])), let on = Int(ends[1][1]) else { continue }
+        let key = TotalMixState.NodeKey(source: TotalMixChannel(sb, sn), output: TotalMixChannel(ob, on))
+        print("\n== 节点 \(key.source) → \(key.output) 参数原值 ==")
+        let params = state.nodes[key] ?? [:]
+        for (k, v) in params.sorted(by: { $0.key < $1.key }) { print("  \(k) = \(v)") }
+        if params.isEmpty { print("  （没有收到）") }
+    }
+}
 print("\n== TotalMix 原始混音节点（> -65 dB，与 TotalMix 屏幕逐条对照）==")
 let open = state.nodes.keys.compactMap { k in state.gainDB(k).map { (k, $0) } }
     .sorted { ($0.0.output, $0.0.source) < ($1.0.output, $1.0.source) }
