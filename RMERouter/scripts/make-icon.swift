@@ -1,4 +1,4 @@
-// 生成 App 图标：一个大旋钮（暖炭黑底、象牙色旋钮与指针、陶土色刻度弧），下方 TotalMix 字样，参考 TotalMix 图标的构图。
+// 生成 App 图标：陶土色渐变底上一个白色旋钮（细刻度弧、圆点指针），只保留一个形状。
 // 用法：swift scripts/make-icon.swift <输出目录>   → <输出目录>/AppIcon.icns
 import AppKit
 
@@ -17,45 +17,43 @@ func draw(size: CGFloat) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let s = size / 1024
-    let center = NSPoint(x: 512 * s, y: 572 * s)
+    let center = NSPoint(x: 512 * s, y: 512 * s)
 
-    // macOS 图标网格：824×824 圆角方块，留边 100；暖炭黑底，上亮下暗
+    // macOS 图标网格：824×824 圆角方块，留边 100；陶土色渐变，上亮下深
     let body = NSBezierPath(roundedRect: NSRect(x: 100 * s, y: 100 * s, width: 824 * s, height: 824 * s),
                             xRadius: 185 * s, yRadius: 185 * s)
-    NSGradient(starting: color(0x34332F), ending: color(0x1F1E1C))!.draw(in: body, angle: -90)
-    color(0x45443F).setStroke(); body.lineWidth = 4 * s; body.stroke()
+    NSGradient(starting: color(0xE69274), ending: color(0xC4593A))!.draw(in: body, angle: -90)
 
-    // 旋钮刻度环：灰色底轨 270°，陶土色表示当前值
+    // 刻度弧：270° 细环，未到的部分半透明，已到的部分纯白
     let value: CGFloat = 0.64
     let start: CGFloat = 225, sweep: CGFloat = 270
     let end = start - sweep * value
-    func arc(_ from: CGFloat, _ to: CGFloat, _ hex: UInt32) {
+    func arc(_ from: CGFloat, _ to: CGFloat, _ c: NSColor) {
         let p = NSBezierPath()
-        p.appendArc(withCenter: center, radius: 245 * s, startAngle: from, endAngle: to, clockwise: true)
-        p.lineWidth = 44 * s; p.lineCapStyle = .round
-        color(hex).setStroke(); p.stroke()
+        p.appendArc(withCenter: center, radius: 272 * s, startAngle: from, endAngle: to, clockwise: true)
+        p.lineWidth = 30 * s; p.lineCapStyle = .round
+        c.setStroke(); p.stroke()
     }
-    arc(start, start - sweep, 0x45443F)
-    arc(start, end, 0xD97757)
+    arc(start, start - sweep, NSColor.white.withAlphaComponent(0.28))
+    arc(start, end, .white)
 
-    // 旋钮本体：象牙色描边的圆盘
-    let knob = NSBezierPath(ovalIn: NSRect(x: center.x - 170 * s, y: center.y - 170 * s, width: 340 * s, height: 340 * s))
-    color(0x262624).setFill(); knob.fill()
-    color(0xF0EEE6).setStroke(); knob.lineWidth = 26 * s; knob.stroke()
+    // 旋钮：白色圆盘，柔和投影
+    let knobRect = NSRect(x: center.x - 180 * s, y: center.y - 180 * s, width: 360 * s, height: 360 * s)
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor(srgbRed: 0.35, green: 0.12, blue: 0.05, alpha: 0.35)
+    shadow.shadowBlurRadius = 48 * s
+    shadow.shadowOffset = NSSize(width: 0, height: -18 * s)
+    shadow.set()
+    color(0xFBFAF7).setFill(); NSBezierPath(ovalIn: knobRect).fill()
+    NSGraphicsContext.restoreGraphicsState()
+    NSGradient(starting: .white, ending: color(0xEFECE4))!.draw(in: NSBezierPath(ovalIn: knobRect), angle: -90)
 
-    // 指针：从中心指向当前值
-    let rad = end * .pi / 180
-    let pointer = NSBezierPath()
-    pointer.move(to: NSPoint(x: center.x + 20 * s * cos(rad), y: center.y + 20 * s * sin(rad)))
-    pointer.line(to: NSPoint(x: center.x + 120 * s * cos(rad), y: center.y + 120 * s * sin(rad)))
-    pointer.lineWidth = 30 * s; pointer.lineCapStyle = .round
-    color(0xF0EEE6).setStroke(); pointer.stroke()
-
-    // 字样：象牙色衬线体，居中在旋钮下方
-    let font = NSFont(name: "Georgia", size: 112 * s) ?? NSFont.systemFont(ofSize: 112 * s)
-    let text = NSAttributedString(string: "TotalMix", attributes: [.font: font, .foregroundColor: color(0xF0EEE6), .kern: 2 * s])
-    let ts = text.size()
-    text.draw(at: NSPoint(x: center.x - ts.width / 2, y: 178 * s))
+    // 指针：一个陶土色圆点
+    let rad = end * .pi / 180, r = 26 * s
+    let dot = NSPoint(x: center.x + 118 * s * cos(rad), y: center.y + 118 * s * sin(rad))
+    color(0xD06A4A).setFill()
+    NSBezierPath(ovalIn: NSRect(x: dot.x - r, y: dot.y - r, width: 2 * r, height: 2 * r)).fill()
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
 }
