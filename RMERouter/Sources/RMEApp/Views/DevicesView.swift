@@ -80,7 +80,7 @@ struct RackView: View {
             unit("12mic").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:0"] = $1 }
             HStack(alignment: .center, spacing: Tokens.Space.l) {
                 unit("xt").frame(maxWidth: 560)
-                NodeCard(title: "这台 Mac", lines: macLines, color: Color(hex: 0x9B8BD6))
+                MacNodeCard(model: model)
                     .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:mac"] = $1 }
                 NodeCard(title: "Behringer P16-I", lines: ["ADAT A 输入", "ADAT B 输入"], color: Color(hex: 0x6AA6C9))
                     .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:p16i"] = $1 }
@@ -96,14 +96,6 @@ struct RackView: View {
                            selected: selected.map { "conn:\($0)" })
             }
             .allowsHitTesting(false)
-        }
-    }
-
-    private var macLines: [String] {
-        switch model.xtStatus {
-        case .live: return ["XT 已连接", "USB 3"]
-        case .offlineSaved: return ["XT 未连接", "显示 TotalMix 保存的配置"]
-        default: return ["TotalMix 未读取"]
         }
     }
 

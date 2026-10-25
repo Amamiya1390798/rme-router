@@ -102,6 +102,7 @@ extension AppModel {
                 await self?.pollMetersOnce()
                 // 每秒一次：把 TotalMix 里的改动（立体声配对、名字、发送）同步过来
                 if tick % 10 == 0 { await self?.syncFromTotalMix() }
+                if tick % 20 == 0 { self?.refreshAudio() }   // 每 2 秒读一次 Core Audio（第 6.6 节）
                 tick += 1
                 try? await Task.sleep(for: .milliseconds(100))
             }

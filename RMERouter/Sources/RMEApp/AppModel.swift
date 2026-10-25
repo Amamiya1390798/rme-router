@@ -95,6 +95,10 @@ public final class AppModel {
     }
     /// 正在进行或刚结束的信号核对。
     public internal(set) var identify: IdentifyTest?
+    /// Core Audio 读到的 XT（第 6.6 节）；nil = 没找到（XT 没接）。
+    public internal(set) var xtAudio: AudioDeviceInfo?
+    public internal(set) var audioChecked = false
+    @ObservationIgnored let audioSystem: AudioSystem
     public private(set) var xtStatus: XTStatus = .notLoaded
     public private(set) var lastLoaded: Date?
     /// 12Mic HTTP 地址（文档第 6.2 节）：网络 http://12mic.local，USB 直连 http://172.20.0.1。
@@ -182,6 +186,7 @@ public final class AppModel {
                 },
                 makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) },
                 makeXTC: @escaping (XTCSettings) -> XTCMIDIAdapter = AppModel.coreMIDIXTC,
+                audioSystem: AudioSystem = CoreAudioSystem(),
                 linkStore: LinkStore = .none, sceneStore: SceneStore = .none) {
         self.defaults = defaults
         self.linkStore = linkStore
@@ -190,6 +195,7 @@ public final class AppModel {
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
         self.makeXTC = makeXTC
+        self.audioSystem = audioSystem
         linkVerifications = defaults.data(forKey: Self.verificationsKey)
             .flatMap { try? JSONDecoder().decode([String: LinkVerification].self, from: $0) } ?? [:]
         xtcSettings = defaults.data(forKey: Self.xtcKey).flatMap { try? JSONDecoder().decode(XTCSettings.self, from: $0) }
@@ -218,6 +224,7 @@ public final class AppModel {
 
     /// 读取全部设备（只读）：TotalMix、12Mic、XTC（打开“读取 XTC”时）同时进行。
     public func refresh() async {
+        refreshAudio()
         async let mic: Void = refreshTwelveMic()
         async let xtc: Void = refreshXTC()
         await refreshTotalMix()
@@ -281,6 +288,7 @@ public final class AppModel {
         syncXTCCapability()
         xtStatus = xt.reachable ? .live : .offlineSaved
         lastLoaded = Date()
+        mergeAudioIntoXT()
         if traceTarget == nil { traceTarget = traceCandidates.first }
     }
 
