@@ -382,7 +382,7 @@ extension AppModel {
     /// 快速方式下仍要确认的改动（第 7.4 节，2026-10-26 收窄）：切换 48V，或一次抬高超过 20 dB。
     public var needsExplicitConfirmation: Bool {
         pending.contains(where: \.isLargeJump) || pendingPreamps.contains { $0.isPhantomChange || $0.isLargeJump }
-            || pendingStrips.contains(where: \.isLargeJump)
+            || pendingStrips.contains { $0.isLargeJump || $0.isLoopbackOn }
     }
 
     /// 界面暂存改动后调用。快速方式下：需要明确确认的打开确认框，其余立即发送（用户这一下点击即确认）。

@@ -55,7 +55,8 @@ struct PendingBar: View {
                     row(title: c.title, change: c.changeText,
                         badges: (c.isLayoutChange ? [("改通道布局", Tokens.Palette.warn)] : [])
                             + (c.isUnmute ? [("取消静音：会出声", Tokens.Palette.problem)] : [])
-                            + (c.isLargeJump ? [("大幅抬高", Tokens.Palette.warn)] : [])) { model.discardStrip(c.id) }
+                            + (c.isLargeJump ? [("大幅抬高", Tokens.Palette.warn)] : [])
+                            + (c.isLoopbackOn ? [("顶替\(c.loopbackRecording ?? "录音")的硬件输入", Tokens.Palette.problem)] : [])) { model.discardStrip(c.id) }
                 }
                 ForEach(model.pendingXTCRoutes) { r in
                     row(title: r.title, change: r.changeText,
@@ -256,6 +257,9 @@ struct ConfirmSheet: View {
                 if c.isLayoutChange { Badge(text: "改通道布局：这一对的发送、名字会跟着变", color: Tokens.Palette.warn) }
                 if c.isUnmute { Badge(text: "取消静音：会突然出声", color: Tokens.Palette.problem) }
                 if c.isLargeJump { Badge(text: "大幅抬高", color: Tokens.Palette.problem) }
+                if c.isLoopbackOn {
+                    Badge(text: "送电脑录音：DAW 的\(c.loopbackRecording ?? "录音")将录到这个输出的混音，不再是原来的硬件输入", color: Tokens.Palette.problem)
+                }
                 outcome(c.id)
             }
         }

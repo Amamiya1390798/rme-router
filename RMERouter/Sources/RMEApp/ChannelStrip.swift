@@ -55,6 +55,15 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
     /// 合并或拆分立体声：改变通道布局。
     public var isLayoutChange: Bool { param == .stereo }
 
+    /// 打开送电脑录音：顶替录音通道原来的硬件输入，一律明确确认（第 7.8 节）。
+    public var isLoopbackOn: Bool { param == .loopback && (old ?? 0) < 0.5 && new >= 0.5 }
+
+    /// 送电脑录音顶替的录音通道（同号的硬件输入），例如“录音 9/10”。
+    public var loopbackRecording: String? {
+        guard param == .loopback, case let .channel(_, tm, _) = target else { return nil }
+        return stereo ? "录音 \(tm.number)/\(tm.number + 1)" : "录音 \(tm.number)"
+    }
+
     /// 取消静音：会突然出声。
     public var isUnmute: Bool { param == .mute && (old ?? 0) >= 0.5 && new < 0.5 }
 
@@ -78,7 +87,7 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
         switch p {
         case .volume: return (!TotalMixFader.isOn(a) && !TotalMixFader.isOn(b)) || abs(a - b) < 0.05
         case .balpan: return abs(a - b) < 0.005
-        case .mute, .phase, .stereo: return (a >= 0.5) == (b >= 0.5)
+        case .mute, .phase, .stereo, .loopback: return (a >= 0.5) == (b >= 0.5)
         }
     }
 }
@@ -210,6 +219,16 @@ extension AppModel {
         switch c.target {
         case let .channel(ref, _, p): stageStrip(ref, p, old)
         case let .sendPan(s, d, _, _): stageSendPan(source: s, destination: d, pan: old)
+        }
+    }
+}
+
+extension AppModel {
+    /// 打开了送电脑录音、占用录音通道 n 的输出（第 7.8 节）；没有则为 nil。
+    public func loopbackSource(recording n: Int) -> XTStrip? {
+        xtStrips(.output).first { o in
+            guard let ref = o.ref, (stripValue(ref, .loopback) ?? 0) >= 0.5 else { return false }
+            return o.tm.number == n || (o.stereo && o.tm.number + 1 == n)
         }
     }
 }

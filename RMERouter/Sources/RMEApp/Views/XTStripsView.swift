@@ -352,11 +352,12 @@ struct SourceStrip: View {
             Button(action: select) {
                 VStack(spacing: 1) {
                     Text(strip.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                    Text(origin.map { $0.verified ? $0.text : $0.text + "？" }
+                    let looped = strip.tm.bus == .input ? model.loopbackSource(recording: strip.tm.number) : nil
+                    Text(looped.map { "录音 = \($0.name) 回环" } ?? origin.map { $0.verified ? $0.text : $0.text + "？" }
                          ?? (strip.tm.bus == .input ? "录音 \(recordingText(strip))"
                              : (strip.ref.flatMap { model.hasSignal($0) } == true ? "DAW 在送" : "回放 \(recordingText(strip))")))
                         .font(.system(size: 9)).lineLimit(1).truncationMode(.tail)
-                        .foregroundStyle(origin?.verified == true || (strip.tm.bus == .playback && strip.ref.flatMap { model.hasSignal($0) } == true)
+                        .foregroundStyle(looped != nil ? Tokens.Palette.problem : origin?.verified == true || (strip.tm.bus == .playback && strip.ref.flatMap { model.hasSignal($0) } == true)
                                          ? Tokens.Palette.ok : Tokens.Palette.textMuted)
                 }
                 .frame(maxWidth: .infinity)
@@ -458,6 +459,8 @@ struct MiniStripButtons: View {
             HStack(spacing: 3) {
                 chip("M", .mute, on: Tokens.Palette.problem)
                 chip("Ø", .phase, on: Tokens.Palette.warn)
+                // 送电脑录音（只有输出有；TotalMix 没回报这一项时不显示）
+                if model.stripValue(ref, .loopback) != nil { chip("录", .loopback, on: Tokens.Palette.problem) }
             }
             if let s = strip, s.tm.number % 2 == 1, canPair(s) { pairChip(s) }
         }
@@ -498,7 +501,10 @@ struct MiniStripButtons: View {
         }
         .buttonStyle(.plain)
         .disabled(now == nil)
-        .help(p == .mute ? (isOn ? "取消静音（会出声，需要确认）" : "静音") : "切换相位")
+        .help(p == .mute ? (isOn ? "取消静音（会出声，需要确认）" : "静音")
+              : p == .loopback ? (isOn ? "关掉送电脑录音（录音通道恢复为原来的硬件输入）"
+                                       : "把这个输出的混音送进电脑同号录音通道（会顶替那一路硬件输入，需要确认）")
+              : "切换相位")
     }
 }
 

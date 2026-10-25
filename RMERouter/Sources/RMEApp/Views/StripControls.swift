@@ -44,6 +44,7 @@ struct StripControls: View {
                     if has.contains(.phase) { phaseChip }
                     if has.contains(.volume) { volumeChip }
                     if has.contains(.balpan) { balanceChip }
+                    if has.contains(.loopback) { loopbackChip }
                     Spacer(minLength: 0)
                 }
                 if let error {
@@ -60,6 +61,14 @@ struct StripControls: View {
     }
 
     private func stage(_ p: TotalMixStripParam, _ v: Double) { error = actions.stage(ref, p, v) }
+
+    private var loopbackChip: some View {
+        let v = value(.loopback), on = (v.shown ?? 0) >= 0.5
+        return chip(on ? "送电脑录音" : "不送录音", color: on ? Tokens.Palette.problem : Tokens.Palette.textMuted, pending: v.pending) {
+            stage(.loopback, on ? 0 : 1)
+        }
+        .help(on ? "关掉：录音通道恢复为原来的硬件输入" : "把这个输出的混音送进电脑同号录音通道（顶替那一路硬件输入，需要确认）")
+    }
 
     private var muteChip: some View {
         let v = value(.mute), on = (v.shown ?? 0) >= 0.5
