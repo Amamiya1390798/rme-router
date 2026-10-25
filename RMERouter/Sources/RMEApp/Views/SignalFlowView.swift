@@ -43,6 +43,9 @@ public struct SignalFlowView: View {
 }
 
 /// 可追踪通道列表。
+/// 不用 SwiftUI 的 List：macOS 15 上 List（底层 NSTableView）行数多时，每次出现都会在终端打
+/// “reentrant operation in its NSTableView delegate”（最小 App 放 300 行同样出现，见文档第 2 节 B4）。
+/// 这里用 ScrollView + LazyVStack 自己画，点选与上下方向键都支持。
 struct CandidateList: View {
     struct Group: Equatable {
         var device: String
@@ -51,17 +54,57 @@ struct CandidateList: View {
 
     var groups: [Group]
     @Binding var selection: ChannelRef?
+    @FocusState private var focused: Bool
+
+    private var all: [ChannelRef] { groups.flatMap(\.refs) }
 
     var body: some View {
-        List(selection: $selection) {
-            ForEach(groups, id: \.device) { g in
-                Section(g.device) {
-                    ForEach(g.refs, id: \.self) { ref in
-                        Text(ref.description).font(Tokens.Font.mono).tag(ref)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                    ForEach(groups, id: \.device) { g in
+                        Section {
+                            ForEach(g.refs, id: \.self) { ref in row(ref).id(ref) }
+                        } header: {
+                            Text(g.device).font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, Tokens.Space.m).padding(.vertical, Tokens.Space.xs)
+                                .background(Tokens.Palette.surface)
+                        }
                     }
                 }
+                .padding(.vertical, Tokens.Space.xs)
             }
+            .background(Tokens.Palette.surface)
+            .focusable()
+            .focused($focused)
+            .focusEffectDisabled()
+            .onKeyPress(.downArrow) { move(1, proxy); return .handled }
+            .onKeyPress(.upArrow) { move(-1, proxy); return .handled }
+            .onAppear { if let s = selection { proxy.scrollTo(s, anchor: .center) } }
         }
+    }
+
+    private func row(_ ref: ChannelRef) -> some View {
+        let selected = ref == selection
+        return Text(verbatim: ref.description)
+            .font(Tokens.Font.mono)
+            .foregroundStyle(selected ? Color.white : Tokens.Palette.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Tokens.Space.m).padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 5).fill(selected ? Tokens.Palette.accent : Color.clear)
+                .padding(.horizontal, Tokens.Space.xs))
+            .contentShape(Rectangle())
+            .onTapGesture { selection = ref; focused = true }
+    }
+
+    private func move(_ delta: Int, _ proxy: ScrollViewProxy) {
+        let list = all
+        guard !list.isEmpty else { return }
+        let i = selection.flatMap { list.firstIndex(of: $0) } ?? (delta > 0 ? -1 : list.count)
+        let next = list[min(max(i + delta, 0), list.count - 1)]
+        selection = next
+        proxy.scrollTo(next)
     }
 }
 
