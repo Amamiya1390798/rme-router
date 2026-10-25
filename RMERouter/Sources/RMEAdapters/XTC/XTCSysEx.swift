@@ -91,6 +91,17 @@ public enum XTCRoutingSource: Equatable, Hashable, Sendable {
         }
     }
 
+    /// 面板上的名字（值表 2）。
+    public var label: String {
+        switch self {
+        case .mic: return "Mic 1–8"
+        case .adatIn: return "ADAT IN"
+        case .aesIn: return "AES IN"
+        case let .madi(b): return "MADI \(b * 8 + 1)–\(b * 8 + 8)"
+        case let .playback(v): let f = (v - 11) * 4 + 1; return "PB \(f)–\(f + 7)"
+        }
+    }
+
     public var value: Int {
         switch self {
         case .mic: return 0
@@ -181,6 +192,8 @@ public struct XTCMicSettings: Equatable, Sendable {
     public var autoSet: Bool
     public var phantom: Bool
     public var padOrInstrument: Bool
+    /// 编组：0 = 无，1…4。
+    public var group: Int
 
     /// 增益编码：0 = 0 dB；n（1…56）= n+9 dB，即 10…65 dB。
     public static func gain(fromCode c: Int) -> Double { c == 0 ? 0 : Double(c + 9) }
@@ -206,6 +219,7 @@ public struct XTCMicSettings: Equatable, Sendable {
         autoSet = msb & 0x02 != 0
         phantom = msb & 0x04 != 0
         padOrInstrument = msb & 0x08 != 0
+        group = Int((msb >> 4) & 0x07)
     }
 }
 
