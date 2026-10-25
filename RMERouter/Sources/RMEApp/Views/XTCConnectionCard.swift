@@ -54,6 +54,10 @@ struct XTCConnectionCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
         .onAppear { reloadEndpoints() }
+        .onChange(of: model.xtcSettings) { _, s in
+            // 设置变了就重读一次（只发请求，不改 XTC）；没打开读取时什么也不发。
+            if s.readEnabled, s.endpointsChosen { Task { await model.refreshXTC() } }
+        }
     }
 
     @ViewBuilder private var status: some View {

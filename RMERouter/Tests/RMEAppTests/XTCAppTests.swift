@@ -81,7 +81,8 @@ final class XTCAppTests: XCTestCase {
     func testWriteNeedsAuxConfirmation() async {
         let m = makeModel()
         enableRead(m)
-        m.xtcSettings.writeEnabled = true          // 没勾 Aux Device 确认
+        m.xtcSettings.writeEnabled = true          // 没勾 Aux Device 确认：打不开
+        XCTAssertFalse(m.xtcSettings.writeEnabled)
         await m.refreshXTC()
         XCTAssertFalse(m.xtcWritable)
         enableWrite(m)
@@ -163,7 +164,8 @@ final class XTCAppTests: XCTestCase {
         m.stageXTCRoute(destination: ChannelRef("xtc.madi.out", 25), source: ChannelRef("xtc.madi.in", 17))
         m.stagePreamp(deviceID: "xtc", input: ChannelRef("xtc.mic.in", 1), field: .phase, value: .flag(true))
         XCTAssertEqual(m.pendingCount, 2)
-        m.xtcSettings.writeEnabled = false
+        m.xtcSettings.auxDeviceOff = false
+        XCTAssertFalse(m.xtcSettings.writeEnabled)     // 前提没了，开关一并关掉
         XCTAssertFalse(m.xtcWritable)
         XCTAssertEqual(m.pendingCount, 0)
         XCTAssertEqual(m.snapshot.capabilities.first { $0.deviceID == "xtc" }?.access, .manual)

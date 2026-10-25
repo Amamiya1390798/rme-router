@@ -100,6 +100,11 @@ public final class AppModel {
     /// XTC（文档第 6.3 节）：设置全部默认关。
     public var xtcSettings: XTCSettings {
         didSet {
+            // 前提没了，“允许改动”一并关掉，不留一个显示为开、实际无效的开关。
+            if xtcSettings.writeEnabled, !xtcSettings.readEnabled || !xtcSettings.auxDeviceOff {
+                xtcSettings.writeEnabled = false
+                return
+            }
             if let data = try? JSONEncoder().encode(xtcSettings) { defaults.set(data, forKey: Self.xtcKey) }
             if oldValue.sourceName != xtcSettings.sourceName || oldValue.destinationName != xtcSettings.destinationName
                 || oldValue.midiDeviceID != xtcSettings.midiDeviceID || oldValue.canWrite != xtcSettings.canWrite {
