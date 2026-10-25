@@ -93,51 +93,59 @@ TotalMix 主窗口从上到下三行：**硬件输入**（Hardware Inputs，接�
 
 ## 3. 顶部菜单
 
-菜单文字取自 TotalMix 程序文件（本机 2.x 版）。分组按菜单栏顺序整理，个别条目所在菜单以实物为准。**这些基本都不经 Global OSC，本 App 做不了，在 TotalMix 里点。**
+按本机 TotalMix 实际菜单逐项列出（2026-10-26 只读列出，未点击）。**这些基本都不经 Global OSC，本 App 做不了，在 TotalMix 里点。**
 
 ### TotalMix FX（程序菜单）
 | 条目 | 意思 |
 | --- | --- |
 | About TotalMix FX | 版本信息 |
-| Preferences | 偏好设置（界面、存储位置等） |
-| Hide / Quit | 隐藏、退出（**本 App 需要 TotalMix 在后台运行，别退出**） |
+| Settings… | 偏好设置（界面、存储位置等） |
+| Services / Hide / Hide Others / Show All | 系统菜单 |
+| Quit TotalMix FX / Quit and Keep Windows | 退出（**本 App 需要 TotalMix 在后台运行，别退出**；不想看见它用 Hide） |
 
 ### File（文件）
 | 条目 | 意思 | 本 App |
 | --- | --- | --- |
-| Load Workspace… / Save Workspace As… | 读取 / 另存“工作区”（整套混音 + 界面布局，存成文件） | ⛔；本 App 的“场景”可存整套路由与通道条 |
-| Workspace Quick Select | 快速切换最多 8 个常用工作区 | ⛔ |
-| Load Snapshot / Save Snapshot As… | 从文件读 / 存快照 | ⛔（调用快照 1–8 ✅） |
+| New TotalMix Window | 再开一个 TotalMix 窗口 | ⛔ |
+| Load Snapshot… / Save Snapshot As… | 从文件读 / 把快照存成文件 | ⛔（调用快照 1–8 ✅） |
+| Preload all Snapshots… | 一次读入全部 8 个快照 | ⛔ |
+| Load Workspace… / Save Workspace As… | 读取 / 另存“工作区”（整套混音 + 界面，存成文件） | ⛔；本 App 的“场景”可存整套路由与通道条 |
+| Workspace Quick Select | 快速切换常用工作区 | ⛔ |
 | Open Recent | 最近打开的文件 | ⛔ |
+| Close Window / Close All | 关窗口 | ⛔ |
 
 ### Function（功能）
 | 条目 | 意思 |
 | --- | --- |
-| Mixer View / Matrix View | 切换调音台视图 / 矩阵视图 |
+| Mixer View / Matrix View | 调音台视图 / 矩阵视图 |
 | Toggle Mixer Window / Toggle Matrix Window | 打开或关闭这两个窗口 |
 
 ### Options（选项）
 | 条目 | 意思 | 本 App |
 | --- | --- | --- |
 | Enable MIDI Control | 允许 MIDI 控制 TotalMix | ⛔ |
+| Submix linked to MIDI Controller | MIDI 控制器切子混音时界面跟着切 | ⛔ |
 | **Enable OSC Control** | 允许 OSC 控制——**本 App 靠它工作，必须勾上** | 设置页有说明 |
-| Submix linked to MIDI / OSC Controller | 子混音跟着控制器切换（Global OSC 要**关闭** “Follow Submix”） | 设置页有说明 |
-| Enable Stand Alone MIDI | 电脑关着时也能用 MIDI 控制设备 | ⛔ |
-| Activate CC mode on disconnect | 断开后进 CC 模式 | ⛔ |
-| Reset Mix → Straight playback / … mix to Main Out / Clear all submixes / Set output volumes / Clear all channel effects / Reset channel names / Total Reset | 一键重置混音的各种方式（**会清掉现有混音，慎用**） | ⛔ |
-| Store current State into Device → Setup 1–6 | 把当前状态存进设备（脱机时用） | ⛔ |
+| Submix linked to OSC Controller | OSC 切子混音时界面跟着切（Global OSC 下要**关闭**，即 Follow Submix） | 设置页有说明 |
+| Mixer Settings… | 设置窗口：混音、MIDI、OSC、Aux Devices 等页（OSC 端口在这里设） | 设置页有说明 |
 | Channel Layout… | 隐藏 / 显示通道、布局预设（隐藏的通道 Global OSC 也收不到） | 布局预设调用 🔜 可做（协议有 `/layout/load`） |
-| Device Info… | 设备信息 | ⛔ |
-| ARC & Key Command Settings… | ARC 遥控器与快捷键设置 | ⛔ |
-| Mixer Settings… | 设置窗口（混音、MIDI、OSC、Aux Devices 等页；OSC 端口在这里设） | 设置页有说明 |
+| ARC & Key Command Settings… | ARC 遥控器与快捷键 | ⛔ |
+| Reset Mix ▸ | 一键重置（**会清掉现有混音，慎用**）：Straight playback, mix to Main Out（回放直通并混到主输出）、Straight playback（只直通）、Clear all submixes（清空全部子混音）、Set output volumes（重设输出音量）、Clear all channel effects / w/o Room EQ（清效果，可保留 Room EQ）、Reset channel names（恢复通道名）、Set all channels mono / stereo（全部单声道 / 立体声）、Set inputs mono / outputs stereo（输入单声道、输出立体声）、Total Reset / w/o Room EQ（全部重置） | ⛔ |
+| Operational Mode… | 工作模式（设备相关） | ⛔ |
+| Offline Device Setup… | 设备没接时也能编辑它的配置 | ⛔ |
+| Network Remote Settings… | 网络遥控（iPad 等）设置 | ⛔ |
 | Always on Top | 窗口总在最前 | ⛔ |
+| Prevent Sleep | 运行时阻止 Mac 睡眠 | ⛔ |
+| Store current State into Device ▸ | 把当前状态存进设备（脱机时用） | ⛔ |
 
 ### Window（窗口）
 | 条目 | 意思 |
 | --- | --- |
-| Set Scale to | 界面缩放 |
-| New TotalMix Window | 再开一个 TotalMix 窗口 |
-| Minimize / Zoom / Bring All to Front / Close Window | 系统窗口操作 |
+| Set Scale to ▸ | 界面缩放（100%、135%、180%、200%） |
+| Toggle Old-New Design | 新旧两种界面外观切换 |
+| Hide Control Strip | 隐藏右侧控制条 |
+| Minimize / Zoom / Fill / Center / 全屏 / 标签页相关 | 系统窗口操作 |
+| 最底下“RME TotalMix FX: MADIface XT (序列号) - disconnected” | 当前窗口对应的设备与连接状态（本机 XT 未接时显示 disconnected） |
 
 ### Help（帮助）
 | 条目 | 意思 |
