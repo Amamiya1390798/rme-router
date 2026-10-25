@@ -31,20 +31,33 @@ public struct StudioScene: Codable, Identifiable, Equatable, Sendable {
         public var source: ChannelRef?
     }
 
+    /// XTC 一个 8 路输出块的来源（第 7.6 节）。
+    public struct XTCBlock: Codable, Hashable, Sendable {
+        /// 输出块首通道，例如 xtc.madi.out:25。
+        public var destination: ChannelRef
+        /// 来源块首通道；来源没有登记端口（ADAT IN、AES IN、电脑回放）时为 nil。
+        public var source: ChannelRef?
+        /// 值表 2 的名字，例如“MADI 17–24”。
+        public var sourceLabel: String
+    }
+
     public var id: UUID
     public var name: String
     public var date: Date
-    /// 保存时读到真实数据的设备（"xt"、"12mic"）。
+    /// 保存时读到真实数据的设备（"xt"、"12mic"、"xtc"）。
     public var devices: [String]
     public var sends: [Send]
     public var preamps: [Preamp]
     public var routes: [RouteEntry]
+    /// 旧场景文件没有这一项（nil）。
+    public var xtcRoutes: [XTCBlock]? = nil
 
     public var summary: String {
         var parts: [String] = []
         if devices.contains("xt") { parts.append("TotalMix 发送 \(sends.count) 条") }
         if !preamps.isEmpty { parts.append("前级 \(preamps.count) 路") }
         if devices.contains("12mic") { parts.append("12Mic 路由 \(routes.count) 条") }
+        if devices.contains("xtc") { parts.append("XTC 路由 \(xtcRoutes?.count ?? 0) 块") }
         return parts.isEmpty ? "空场景" : parts.joined(separator: "、")
     }
 }
@@ -55,6 +68,7 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
         case send(source: ChannelRef, destination: ChannelRef, scene: Double?, now: Double?)
         case preamp(device: String, input: ChannelRef, field: PreampField, scene: PreampValue, now: PreampValue?)
         case route(destination: ChannelRef, scene: ChannelRef?, now: ChannelRef?)
+        case xtcRoute(scene: StudioScene.XTCBlock, now: String?)
     }
 
     public var kind: Kind
@@ -63,6 +77,7 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
         case let .send(s, d, _, _): return "send|\(s)|\(d)"
         case let .preamp(dev, i, f, _, _): return "pre|\(dev)|\(i)|\(f.rawValue)"
         case let .route(d, _, _): return "route|\(d)"
+        case let .xtcRoute(b, _): return "xtc|\(b.destination)"
         }
     }
 
@@ -71,10 +86,16 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
         case let .send(s, d, scene, now):
             return "TotalMix 发送 \(s) → \(d)：现在 \(PendingChange.format(now))，场景 \(PendingChange.format(scene))"
         case let .preamp(dev, i, f, scene, now):
-            return "\(dev == "xt" ? "XT" : "12Mic") 前级 \(i) \(f.label)：现在 \(now?.text ?? "?")，场景 \(scene.text)"
+            return "\(Self.deviceLabel(dev)) 前级 \(i) \(f.label)：现在 \(now?.text ?? "?")，场景 \(scene.text)"
         case let .route(d, scene, now):
             return "12Mic 路由 \(d)：现在 \(PendingRouteChange.text(now))，场景 \(PendingRouteChange.text(scene))"
+        case let .xtcRoute(b, now):
+            return "XTC 路由 \(b.destination.portID):\(b.destination.channel)–\(b.destination.channel + 7)：现在 \(now ?? "?")，场景 \(b.sourceLabel)"
         }
+    }
+
+    static func deviceLabel(_ dev: String) -> String {
+        switch dev { case "xt": return "XT"; case "xtc": return "XTC"; default: return "12Mic" }
     }
 }
 
@@ -124,6 +145,7 @@ extension AppModel {
         var d: [String] = []
         if lastLoaded != nil, xtStatus == .live || xtStatus == .offlineSaved { d.append("xt") }
         if twelveMicStatus == .live { d.append("12mic") }
+        if xtcStatus == .live, !isDemo("xtc") { d.append("xtc") }
         return d
     }
 
@@ -150,6 +172,17 @@ extension AppModel {
             .sorted { $0.destination < $1.destination }
     }
 
+    /// XTC 各输出块当前的来源（读回的设置），按块顺序。
+    func currentXTCRoutes() -> [StudioScene.XTCBlock] {
+        guard let settings = snapshot.devices["xtc"]?.settings else { return [] }
+        return XTCRoutingOutput.all.compactMap { out in
+            let port = out.port(), first = out.firstChannel
+            guard let label = settings["\(port).\(first)-\(first + 7).source"]?.knownValue else { return nil }
+            let dst = ChannelRef(port, first)
+            return StudioScene.XTCBlock(destination: dst, source: xtcSource(ofBlock: dst), sourceLabel: label)
+        }
+    }
+
     // MARK: 保存、删除
 
     /// 把当前读到的真实状态存成场景。没有任何设备可存时返回 nil。
@@ -162,7 +195,8 @@ extension AppModel {
                           date: Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down)), devices: devices,
                           sends: devices.contains("xt") ? currentSends() : [],
                           preamps: currentPreamps(devices),
-                          routes: devices.contains("12mic") ? currentTwelveMicRoutes() : [])
+                          routes: devices.contains("12mic") ? currentTwelveMicRoutes() : [],
+                          xtcRoutes: devices.contains("xtc") ? currentXTCRoutes() : nil)
         sceneStore.save(scene)
         scenes.insert(scene, at: 0)
         return scene
@@ -207,6 +241,12 @@ extension AppModel {
                 out.append(SceneDiff(kind: .route(destination: d, scene: s, now: c)))
             }
         }
+        if scene.devices.contains("xtc"), now.contains("xtc"), let saved = scene.xtcRoutes {
+            let current = Dictionary(uniqueKeysWithValues: currentXTCRoutes().map { ($0.destination, $0.sourceLabel) })
+            for b in saved where current[b.destination] != b.sourceLabel {
+                out.append(SceneDiff(kind: .xtcRoute(scene: b, now: current[b.destination])))
+            }
+        }
         return out
     }
 
@@ -220,6 +260,12 @@ extension AppModel {
             case let .send(s, dst, sceneDB, _): e = stageGain(source: s, destination: dst, dB: sceneDB)
             case let .preamp(dev, i, f, want, _): e = stagePreamp(deviceID: dev, input: i, field: f, value: want)
             case let .route(dst, src, _): e = stageTwelveMicRoute(destination: dst, source: src)
+            case let .xtcRoute(b, _):
+                guard let src = b.source else {
+                    errors.append("\(d.text)：来源“\(b.sourceLabel)”本 App 不能设置，需在 XTC 面板上设置")
+                    continue
+                }
+                e = stageXTCRoute(destination: b.destination, source: src)
             }
             if let e { errors.append("\(d.text)：\(e.text)") }
         }
