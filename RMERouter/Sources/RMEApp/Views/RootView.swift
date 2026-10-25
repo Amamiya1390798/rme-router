@@ -20,6 +20,7 @@ public struct RootView: View {
                 switch model.section ?? .outputs {
                 case .outputs: OutputsView(model: model)
                 case .signalFlow: SignalFlowView(model: model)
+                case .checkup: CheckupView(model: model)
                 case .connection: ConnectionView(model: model)
                 }
             }

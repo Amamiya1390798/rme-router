@@ -160,8 +160,10 @@ public struct R6ReturnPath: DiagnosticRule {
     public let id = "R6"; public let severity = Severity.warning
     public init() {}
     public func evaluate(_ s: SystemSnapshot) -> [Finding] {
-        s.topology.validate().filter { $0.issue == .missingReturnPath }
+        let missing = s.topology.validate().filter { $0.issue == .missingReturnPath }
             .map { finding("\($0.link.from)→\($0.link.to)", .fail($0.issue.description)) }
+        // 没有缺的就明确给一条通过，免得“没有结论”被当成“没有可检查的项”。
+        return missing.isEmpty ? [finding("连接表", .pass)] : missing
     }
 }
 
@@ -295,6 +297,8 @@ public struct R14SpeedInfo: DiagnosticRule {
     public init() {}
     public func evaluate(_ s: SystemSnapshot) -> [Finding] {
         let rates = s.devices.values.compactMap { $0.clock.configuredRate.knownValue }
+        // 一个采样率都读不到时不能算通过（读不到 = 无法判断）。
+        guard !rates.isEmpty else { return [finding("系统", .cannotDetermine("读不到任何设备的采样率"))] }
         guard let high = rates.compactMap(SpeedMode.init(sampleRate:)).max(), high != .single else { return [finding("系统", .pass)] }
         return [finding("系统", .fail("当前为 \(high == .double ? "双速" : "四速")：MADI 每口最多 \(64 / high.rawValue) 路，ADAT 每口 \(8 / high.rawValue) 路，请重新检查路由"))]
     }
