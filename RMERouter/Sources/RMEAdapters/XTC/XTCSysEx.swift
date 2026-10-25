@@ -32,6 +32,8 @@ public enum XTCSysEx {
         case notSysEx
     }
 
+    public static func hex(_ bytes: [UInt8]) -> String { bytes.map { String(format: "%02X", $0) }.joined(separator: " ") }
+
     /// 请求类消息（10、11、12）。
     public static func request(_ cmd: Command, device: Int) throws -> [UInt8] {
         guard (0 ... 0x7F).contains(device) else { throw CodecError.deviceID(device) }
@@ -199,7 +201,7 @@ public struct XTCMicSettings: Equatable, Sendable {
     public static func gain(fromCode c: Int) -> Double { c == 0 ? 0 : Double(c + 9) }
     /// 0 dB 编码为 0；其余按 10…65 dB 截取后取整。
     public static func code(fromGain dB: Double) -> UInt8 {
-        if dB < 5 { return 0 }
+        if dB < 0.5 { return 0 }
         return UInt8(min(max(Int(dB.rounded()), 10), 65) - 9)
     }
 
@@ -211,6 +213,19 @@ public struct XTCMicSettings: Equatable, Sendable {
         if let v = phantom { if v { p.msb |= 0x04 }; p.flags! |= 0x10 }
         return p
     }
+
+    /// 本 App 的前级字段 → 设置参数；类型不匹配为 nil。
+    public static func setParam(mic: Int, field: PreampField, value: PreampValue) -> XTCSysEx.Param? {
+        switch (field, value) {
+        case let (.gain, .gain(g)): return setParam(mic: mic, gainDB: g)
+        case let (.phase, .flag(b)): return setParam(mic: mic, phase: b)
+        case let (.phantom, .flag(b)): return setParam(mic: mic, phantom: b)
+        default: return nil
+        }
+    }
+
+    /// XTC 实际能设的增益（0 dB 或 10–65 dB 的整数）。
+    public static func effectiveGain(_ dB: Double) -> Double { gain(fromCode: Int(code(fromGain: dB))) }
 
     public init(lsb: UInt8, msb: UInt8) {
         gainDB = Self.gain(fromCode: Int(lsb & 0x3F))

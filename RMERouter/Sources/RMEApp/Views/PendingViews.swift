@@ -25,7 +25,7 @@ struct PendingBar: View {
             }
             if model.hasPending {
                 HStack {
-                    Text("待应用 \(model.pending.count + model.pendingPreamps.count + model.pendingRoutes.count) 项").font(Tokens.Font.cardTitle)
+                    Text("待应用 \(model.pendingCount) 项").font(Tokens.Font.cardTitle)
                     Text("还没有发送任何消息").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                     if model.confirmMode == .quick {
                         Text("快速方式：这些改动需要你确认后才发送").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn)
@@ -45,6 +45,10 @@ struct PendingBar: View {
                     row(title: "12Mic 路由 \(r.destination.description)",
                         change: "\(PendingRouteChange.text(r.old)) → \(PendingRouteChange.text(r.new))",
                         badges: r.isPhones ? [("耳机：注意音量", Tokens.Palette.warn)] : []) { model.discardRoute(r.id) }
+                }
+                ForEach(model.pendingXTCRoutes) { r in
+                    row(title: r.title, change: r.changeText,
+                        badges: [("整块 8 路一起换", Tokens.Palette.warn)]) { model.discardXTCRoute(r.id) }
                 }
                 ForEach(model.pendingPreamps) { p in
                     row(title: "\(p.label)（\(p.input.description)）\(p.field.label)",
@@ -94,6 +98,7 @@ struct ConfirmSheet: View {
     private var sends: [PendingChange] { result?.changes ?? model.pending }
     private var preamps: [PendingPreampChange] { result?.preamps ?? model.pendingPreamps }
     private var routes: [PendingRouteChange] { result?.routes ?? model.pendingRoutes }
+    private var xtcRoutes: [PendingXTCRouteChange] { result?.xtcRoutes ?? model.pendingXTCRoutes }
     private var needsPhantomAck: Bool { result == nil && model.pendingPreamps.contains(where: \.needsPhantomAck) }
 
     var body: some View {
@@ -104,6 +109,7 @@ struct ConfirmSheet: View {
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     ForEach(sends) { c in sendRow(c) }
                     ForEach(routes) { r in routeRow(r) }
+                    ForEach(xtcRoutes) { r in xtcRouteRow(r) }
                     ForEach(preamps) { p in preampRow(p) }
                 }
             }
@@ -156,6 +162,10 @@ struct ConfirmSheet: View {
                 Label("12Mic 已连接：改动会立即生效。", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(Tokens.Palette.warn)
             }
+            if preamps.contains(where: { $0.deviceID == "xtc" }) || !xtcRoutes.isEmpty {
+                Label("XTC 已连接：改动会立即生效；TotalMix Aux Device 与 MIDI Remote 不要同时控制它。", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(Tokens.Palette.warn)
+            }
         }
         .font(Tokens.Font.body)
     }
@@ -199,6 +209,23 @@ struct ConfirmSheet: View {
         .card()
     }
 
+    private func xtcRouteRow(_ r: PendingXTCRouteChange) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+            HStack(spacing: Tokens.Space.s) {
+                Text(verbatim: r.title).font(Tokens.Font.mono)
+                Spacer()
+                Text(verbatim: r.changeText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.accent)
+            }
+            Text(verbatim: r.wireText).font(Tokens.Font.mono).foregroundStyle(Tokens.Palette.textMuted)
+            HStack(spacing: Tokens.Space.s) {
+                Badge(text: "整块 8 路一起换", color: Tokens.Palette.warn)
+                outcome(r.id)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
     private func preampRow(_ p: PendingPreampChange) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xs) {
             HStack(spacing: Tokens.Space.s) {
@@ -229,8 +256,7 @@ struct ConfirmSheet: View {
 
     /// 唯一签发 UserConfirmation 的地方。
     private func confirm() {
-        let ops = model.pending.map(\.operation) + model.pendingPreamps.map(\.operation) + model.pendingRoutes.map(\.operation)
-        let confirmation = ConfirmationGate.userConfirmed(ops)
+        let confirmation = ConfirmationGate.userConfirmed(model.allPendingOperations)
         Task { result = await model.applyPending(confirmation: confirmation) }
     }
 }

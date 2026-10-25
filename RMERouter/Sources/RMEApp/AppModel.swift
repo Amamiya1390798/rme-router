@@ -96,6 +96,21 @@ public final class AppModel {
     public internal(set) var pending: [PendingChange] = []
     public internal(set) var pendingPreamps: [PendingPreampChange] = []
     public internal(set) var pendingRoutes: [PendingRouteChange] = []
+    public internal(set) var pendingXTCRoutes: [PendingXTCRouteChange] = []
+    /// XTC（文档第 6.3 节）：设置全部默认关。
+    public var xtcSettings: XTCSettings {
+        didSet {
+            if let data = try? JSONEncoder().encode(xtcSettings) { defaults.set(data, forKey: Self.xtcKey) }
+            if oldValue.sourceName != xtcSettings.sourceName || oldValue.destinationName != xtcSettings.destinationName
+                || oldValue.midiDeviceID != xtcSettings.midiDeviceID || oldValue.canWrite != xtcSettings.canWrite {
+                dropXTCAdapter()
+                if xtcStatus == .live { xtcStatus = .unreachable("XTC 设置已改，请重新读取") }
+            }
+            if !xtcSettings.readEnabled, oldValue.readEnabled { xtcStatus = .off; restoreXTCDemo() }
+            syncXTCCapability()
+        }
+    }
+    public internal(set) var xtcStatus: XTCStatus = .off
     /// 需要在设备上手动完成的步骤（跨设备“送一路声音”里的 XTC 等，第 7.5 节）。
     public internal(set) var manualTasks: [ManualTask] = []
     /// 已保存的场景（第 7.6 节），新的在前。
@@ -125,10 +140,15 @@ public final class AppModel {
     /// 读取成功后自动开始电平轮询（App 里开；测试里关，测试直接调 pollMetersOnce）。
     @ObservationIgnored public var startsMeters = false
     @ObservationIgnored let makeTwelveMic: (URL) -> TwelveMicJSONAdapter
+    @ObservationIgnored let makeXTC: (XTCSettings) -> XTCMIDIAdapter
+    @ObservationIgnored var xtcAdapter: XTCMIDIAdapter?
+    /// 设置变了换下来的 XTC 连接：下次读取前先停掉（与 TotalMix 的 retired 同理）。
+    @ObservationIgnored var xtcRetired: [XTCMIDIAdapter] = []
     @ObservationIgnored let linkStore: LinkStore
     @ObservationIgnored let sceneStore: SceneStore
     private static let settingsKey = "osc.settings"
     private static let twelveMicKey = "12mic.url"
+    static let xtcKey = "xtc.settings"
 
     /// makeAdapter / makeTwelveMic：测试时注入假设备；默认走 UDP / HTTP。
     public init(defaults: UserDefaults = .standard, snapshot: SystemSnapshot? = nil,
@@ -136,6 +156,7 @@ public final class AppModel {
                     TotalMixOSCAdapter(host: $0.host, port: $0.port, localPort: $0.listenPort)
                 },
                 makeTwelveMic: @escaping (URL) -> TwelveMicJSONAdapter = { TwelveMicJSONAdapter(baseURL: $0) },
+                makeXTC: @escaping (XTCSettings) -> XTCMIDIAdapter = AppModel.coreMIDIXTC,
                 linkStore: LinkStore = .none, sceneStore: SceneStore = .none) {
         self.defaults = defaults
         self.linkStore = linkStore
@@ -143,6 +164,9 @@ public final class AppModel {
         self.scenes = sceneStore.load()
         self.makeAdapter = makeAdapter
         self.makeTwelveMic = makeTwelveMic
+        self.makeXTC = makeXTC
+        xtcSettings = defaults.data(forKey: Self.xtcKey).flatMap { try? JSONDecoder().decode(XTCSettings.self, from: $0) }
+            ?? XTCSettings()
         twelveMicURL = defaults.string(forKey: Self.twelveMicKey) ?? "http://12mic.local"
         confirmMode = defaults.string(forKey: ConfirmMode.defaultsKey).flatMap(ConfirmMode.init(rawValue:)) ?? .always
         if let data = defaults.data(forKey: Self.settingsKey),
@@ -158,11 +182,20 @@ public final class AppModel {
         if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.settingsKey) }
     }
 
-    /// 读取全部设备（只读）：TotalMix 与 12Mic 同时进行。
+    /// 真实 XTC：CoreMIDI 端点。
+    nonisolated public static func coreMIDIXTC(_ s: XTCSettings) -> XTCMIDIAdapter {
+        let t = CoreMIDIXTCTransport(sourceName: s.sourceName, destinationName: s.destinationName)
+        return XTCMIDIAdapter(client: XTCClient(transport: t, midiDeviceID: s.midiDeviceID),
+                              endpointName: s.destinationName, controlEnabled: s.canWrite)
+    }
+
+    /// 读取全部设备（只读）：TotalMix、12Mic、XTC（打开“读取 XTC”时）同时进行。
     public func refresh() async {
         async let mic: Void = refreshTwelveMic()
+        async let xtc: Void = refreshXTC()
         await refreshTotalMix()
         await mic
+        await xtc
     }
 
     /// 从 12Mic 读取一次（JSON，请求体全为 null）。读不到时保留演示数据。
@@ -218,6 +251,7 @@ public final class AppModel {
     /// 用读到的 XT 快照更新（测试与预览也走这里）。
     public func apply(xt: DeviceSnapshot) {
         snapshot = StudioSetup.snapshot(xt: xt, others: snapshot.devices.filter { $0.key != "xt" }, links: snapshot.topology.links)
+        syncXTCCapability()
         xtStatus = xt.reachable ? .live : .offlineSaved
         lastLoaded = Date()
         if traceTarget == nil { traceTarget = traceCandidates.first }

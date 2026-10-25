@@ -149,6 +149,10 @@ struct SendAcrossSheet: View {
                 return ("自动", Tokens.Palette.accent, "TotalMix 新建发送 \(s) → \(d)，\(String(format: "%.0f", dB)) dB 起步")
             case let .twelveMicRoute(s, d):
                 return ("自动", Tokens.Palette.accent, "12Mic 路由 \(s) → \(d)")
+            case let .xtcRoute(s, d):
+                let sf = s.block * 8 + 1, df = d.block * 8 + 1
+                return ("自动", Tokens.Palette.accent,
+                        "XTC 路由（整块 8 路）\(s.portID):\(sf)–\(sf + 7) → \(d.portID):\(df)–\(df + 7)")
             case let .existing(r):
                 return ("沿用", Tokens.Palette.ok, "已有 \(r.domain.displayName) 路由 \(r.source) → \(r.destination)")
             case let .cable(f, t):

@@ -14,6 +14,8 @@ public struct SettingsBackup: Codable, Equatable, Sendable {
     public var confirmMode: String
     public var links: [RMECore.Link]
     public var scenes: [StudioScene]
+    /// XTC 连接设置（旧备份没有这一项）。
+    public var xtc: XTCSettings?
 }
 
 public struct ImportSummary: Equatable, Sendable {
@@ -52,7 +54,7 @@ extension AppModel {
         SettingsBackup(version: SettingsBackup.currentVersion,
                        exportedAt: Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down)),
                        osc: settings, twelveMicURL: twelveMicURL, confirmMode: confirmMode.rawValue,
-                       links: links, scenes: scenes)
+                       links: links, scenes: scenes, xtc: xtcSettings)
     }
 
     public func exportBackup() throws -> Data { try Self.backupEncoder.encode(makeBackup()) }
@@ -66,6 +68,12 @@ extension AppModel {
         settings = backup.osc
         twelveMicURL = backup.twelveMicURL
         confirmMode = ConfirmMode(rawValue: backup.confirmMode) ?? .always
+        if var x = backup.xtc {
+            // 端点与读取开关照搬；“允许改动”和 Aux Device 确认不从文件恢复，要在这台电脑上重新确认。
+            x.auxDeviceOff = false
+            x.writeEnabled = false
+            xtcSettings = x
+        }
 
         let topo = snapshot.topology
         let valid = backup.links.filter { topo.port($0.from) != nil && topo.port($0.to) != nil }

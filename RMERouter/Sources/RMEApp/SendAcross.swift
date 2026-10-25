@@ -9,6 +9,8 @@ public struct SendPlan: Equatable, Sendable {
         case totalMixSend(source: ChannelRef, destination: ChannelRef, dB: Double)
         /// 自动：12Mic 路由
         case twelveMicRoute(source: ChannelRef, destination: ChannelRef)
+        /// 自动：XTC 8 路块路由（允许本 App 改动 XTC 时，第 6.3 节）
+        case xtcRoute(source: ChannelRef, destination: ChannelRef)
         /// 沿用已有路由
         case existing(Route)
         /// 线缆（只显示）
@@ -34,7 +36,7 @@ public struct SendPlan: Equatable, Sendable {
     }
     public var autoCount: Int {
         steps.filter {
-            switch $0.action { case .totalMixSend, .twelveMicRoute: return true; default: return false }
+            switch $0.action { case .totalMixSend, .twelveMicRoute, .xtcRoute: return true; default: return false }
         }.count
     }
 }
@@ -87,6 +89,8 @@ public enum SendAcross {
                     action = .totalMixSend(source: change.source, destination: change.destination, dB: newSendDB)
                 case (.twelveMic, .readWrite):
                     action = .twelveMicRoute(source: change.source, destination: change.destination)
+                case (.xtc, .readWrite):
+                    action = .xtcRoute(source: change.source, destination: change.destination)
                 default:
                     action = .manual(manualText(change, in: snapshot))
                 }
@@ -115,7 +119,7 @@ extension AppModel {
     /// 返回出错说明（有一条就整体不加入）。
     @discardableResult
     public func stageSendPlan(_ plans: [SendPlan]) -> [String] {
-        let savedPending = pending, savedRoutes = pendingRoutes
+        let savedPending = pending, savedRoutes = pendingRoutes, savedXTC = pendingXTCRoutes
         var errors: [String] = []
         for plan in plans {
             for step in plan.steps {
@@ -124,6 +128,8 @@ extension AppModel {
                     if let e = stageGain(source: s, destination: d, dB: dB) { errors.append("\(s) → \(d)：\(e.text)") }
                 case let .twelveMicRoute(s, d):
                     if let e = stageTwelveMicRoute(destination: d, source: s) { errors.append("\(s) → \(d)：\(e.text)") }
+                case let .xtcRoute(s, d):
+                    if let e = stageXTCRoute(destination: d, source: s) { errors.append("\(s) → \(d)：\(e.text)") }
                 default:
                     break
                 }
@@ -132,6 +138,7 @@ extension AppModel {
         if !errors.isEmpty {
             pending = savedPending
             pendingRoutes = savedRoutes
+            pendingXTCRoutes = savedXTC
             return errors
         }
         for text in plans.flatMap(\.manualSteps) where !manualTasks.contains(where: { $0.text == text }) {

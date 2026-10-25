@@ -119,6 +119,7 @@ public struct XTCMIDIAdapter: DeviceAdapter {
 
     public func apply(_ op: PlannedOperation, confirmation: UserConfirmation) async throws {
         try precheck(op, confirmation)
+        guard controlEnabled else { throw AdapterError.notWritable(op.parameter) }
         guard let (out, from) = Self.decode(op) else { throw AdapterError.badResponse(op.parameter) }
         try await client.set([out.setParam(from)])
     }
@@ -128,6 +129,37 @@ public struct XTCMIDIAdapter: DeviceAdapter {
         guard let state = try? await client.readAll() else { return .unreadable }
         guard let now = state.routing[out] else { return .unreadable }
         return now == from ? .matches : .differs(readBack: now.label)
+    }
+
+    // MARK: - 写入（前级）
+
+    /// 前级参数地址，例如 "sysex/0/gain"。
+    public static func preampParameter(channel: Int, field: PreampField) -> String { "sysex/\(channel - 1)/\(field.rawValue)" }
+
+    /// 确认框里显示的原文。
+    public static func preampWireText(channel: Int, field: PreampField, value: PreampValue, midiDeviceID: Int) -> String {
+        guard let p = XTCMicSettings.setParam(mic: channel, field: field, value: value),
+              let bytes = try? XTCSysEx.set([p], device: midiDeviceID) else { return "SysEx：（无效）" }
+        return "SysEx：" + XTCSysEx.hex(bytes)
+    }
+
+    /// 改一路前级（mic 1…8）。需要确认凭证覆盖 op，且已允许本 App 改动 XTC。
+    public func writePreamp(channel: Int, field: PreampField, value: PreampValue,
+                            for op: PlannedOperation, confirmation: UserConfirmation) async throws {
+        try precheck(op, confirmation)
+        guard controlEnabled, (1 ... 8).contains(channel), op.parameter == Self.preampParameter(channel: channel, field: field),
+              let p = XTCMicSettings.setParam(mic: channel, field: field, value: value) else {
+            throw AdapterError.notWritable(op.parameter)
+        }
+        if case let .gain(g) = value, !PreampField.gainRange.contains(g) { throw AdapterError.notWritable(op.parameter) }
+        try await client.set([p])
+    }
+
+    /// 路由改动的原文。
+    public func routeWireText(_ op: PlannedOperation) -> String {
+        guard let (out, from) = Self.decode(op), let bytes = try? XTCSysEx.set([out.setParam(from)], device: client.midiDeviceID)
+        else { return "SysEx：（无效）" }
+        return "SysEx：" + XTCSysEx.hex(bytes)
     }
 
     static func decode(_ op: PlannedOperation) -> (XTCRoutingOutput, XTCRoutingSource)? {

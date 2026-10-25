@@ -41,7 +41,9 @@ final class XTCSysExTests: XCTestCase {
         XCTAssertEqual(XTCMicSettings.gain(fromCode: 56), 65)
         XCTAssertEqual(XTCMicSettings.code(fromGain: 0), 0)
         XCTAssertEqual(XTCMicSettings.code(fromGain: 37), 28)
-        XCTAssertEqual(XTCMicSettings.code(fromGain: 7), 1)    // 10 dB 以下（非 0）就近取 10
+        XCTAssertEqual(XTCMicSettings.code(fromGain: 3), 1)    // 1–9 dB 按 10 dB（文档第 6.3 节）
+        XCTAssertEqual(XTCMicSettings.code(fromGain: 0.2), 0)
+        XCTAssertEqual(XTCMicSettings.effectiveGain(4), 10)
         XCTAssertEqual(XTCMicSettings.code(fromGain: 80), 56)
     }
 

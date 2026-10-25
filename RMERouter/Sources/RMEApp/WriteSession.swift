@@ -45,13 +45,15 @@ public struct PendingChange: Identifiable, Equatable, Sendable {
 /// 一条待应用的前级改动（文档第 7.2 节）：XT 走 TotalMix，12Mic 走 JSON。
 public struct PendingPreampChange: Identifiable, Equatable, Sendable {
     public let id: UUID
-    public var deviceID: String          // "xt" 或 "12mic"
+    public var deviceID: String          // "xt"、"12mic" 或 "xtc"
     public var input: ChannelRef         // xt.mic.in:1、12mic.analog.in:3
     public var tmInput: TotalMixChannel? // 仅 XT
     public var label: String             // 界面名：标签或 “Mic n”
     public var field: PreampField
     public var old: PreampValue?
     public var new: PreampValue
+    /// 仅 XTC：MIDI 设备 ID（确认框原文用）。
+    public var xtcMidiDeviceID: Int? = nil
 
     /// 打开 48V：确认框必须先勾选“没有接带式话筒等设备”。
     public var needsPhantomAck: Bool { field == .phantom && new == .flag(true) }
@@ -71,12 +73,16 @@ public struct PendingPreampChange: Identifiable, Equatable, Sendable {
     /// 写入的地址：XT 为 OSC 地址，12Mic 为 JSON 路径。
     public var parameter: String {
         if let tm = tmInput { return TotalMixWrite.preamp(input: tm, field: field, value: new).message.address }
+        if deviceID == "xtc" { return XTCMIDIAdapter.preampParameter(channel: input.channel, field: field) }
         return TwelveMicWriteGate.parameter(channel: input.channel, field: field)
     }
 
     /// 确认框里显示的原文。
     public var wireText: String {
         if let tm = tmInput { return "OSC：" + TotalMixWrite.preamp(input: tm, field: field, value: new).message.description }
+        if let id = xtcMidiDeviceID {
+            return XTCMIDIAdapter.preampWireText(channel: input.channel, field: field, value: new, midiDeviceID: id)
+        }
         guard let body = TwelveMicWriteGate.preampBody(channel: input.channel, field: field, value: new),
               let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
               let text = String(data: data, encoding: .utf8) else { return "JSON：（无效）" }
@@ -140,9 +146,10 @@ public struct AppliedBatch: Identifiable, Equatable, Sendable {
     public var changes: [PendingChange]
     public var preamps: [PendingPreampChange] = []
     public var routes: [PendingRouteChange] = []
+    public var xtcRoutes: [PendingXTCRouteChange] = []
     public var outcomes: [UUID: VerifyOutcome]
 
-    public var count: Int { changes.count + preamps.count + routes.count }
+    public var count: Int { changes.count + preamps.count + routes.count + xtcRoutes.count }
     public var verifiedCount: Int { outcomes.values.filter { $0 == .verified }.count }
 }
 
@@ -222,7 +229,9 @@ extension AppModel {
     }
 
     public func discard(_ id: UUID) { pending.removeAll { $0.id == id } }
-    public func discardAll() { pending.removeAll(); pendingPreamps.removeAll(); pendingRoutes.removeAll() }
+    public func discardAll() {
+        pending.removeAll(); pendingPreamps.removeAll(); pendingRoutes.removeAll(); pendingXTCRoutes.removeAll()
+    }
 
     static func same(_ a: Double?, _ b: Double?) -> Bool {
         switch (a, b) {
@@ -251,6 +260,9 @@ extension AppModel {
             tmInput = tm
         case "12mic":
             guard twelveMicStatus == .live else { return .notConnected("12Mic") }
+        case "xtc":
+            guard xtcWritable else { return .notConnected("XTC（未允许本 App 改动）") }
+            if case let .gain(g) = value { value = .gain(XTCMicSettings.effectiveGain(g)) }
         default:
             return .notConnected(deviceID)
         }
@@ -265,7 +277,8 @@ extension AppModel {
         guard !Self.same(old, value) else { return nil }
         let label = preamp.label.knownValue.flatMap { $0.isEmpty ? nil : $0 } ?? "Mic \(input.channel)"
         pendingPreamps.append(PendingPreampChange(id: UUID(), deviceID: deviceID, input: input, tmInput: tmInput,
-                                                  label: label, field: field, old: old, new: value))
+                                                  label: label, field: field, old: old, new: value,
+                                                  xtcMidiDeviceID: deviceID == "xtc" ? xtcSettings.midiDeviceID : nil))
         return nil
     }
 
@@ -283,7 +296,17 @@ extension AppModel {
         }
     }
 
-    public var hasPending: Bool { !pending.isEmpty || !pendingPreamps.isEmpty || !pendingRoutes.isEmpty }
+    public var hasPending: Bool {
+        !pending.isEmpty || !pendingPreamps.isEmpty || !pendingRoutes.isEmpty || !pendingXTCRoutes.isEmpty
+    }
+
+    public var pendingCount: Int { pending.count + pendingPreamps.count + pendingRoutes.count + pendingXTCRoutes.count }
+
+    /// 待应用改动对应的全部计划操作（确认凭证按它签发）。
+    public var allPendingOperations: [PlannedOperation] {
+        pending.map(\.operation) + pendingPreamps.map(\.operation) + pendingRoutes.map(\.operation)
+            + pendingXTCRoutes.map(\.operation)
+    }
 
     // MARK: 12Mic 路由暂存（第 7.3 节）
 
@@ -355,8 +378,7 @@ extension AppModel {
             showConfirm = true
             return
         }
-        let ops = pending.map(\.operation) + pendingPreamps.map(\.operation) + pendingRoutes.map(\.operation)
-        _ = await applyPending(confirmation: ConfirmationGate.userConfirmed(ops))
+        _ = await applyPending(confirmation: ConfirmationGate.userConfirmed(allPendingOperations))
     }
 
     /// 按确认框签发的凭证发送全部待应用改动（发送电平 + 前级），回读核对，记入历史。只应由确认框的“确认发送”调用。
@@ -461,11 +483,18 @@ extension AppModel {
             }
         }
 
-        let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, routes: routes, outcomes: outcomes)
+        // 3. XTC 前级与路由经 MIDI SysEx（第 6.3 节）
+        let xtcRoutes = pendingXTCRoutes
+        await applyXTC(preamps: preamps.filter { $0.deviceID == "xtc" }, routes: xtcRoutes,
+                       confirmation: confirmation, outcomes: &outcomes)
+
+        let batch = AppliedBatch(date: Date(), changes: changes, preamps: preamps, routes: routes, xtcRoutes: xtcRoutes,
+                                 outcomes: outcomes)
         history.insert(batch, at: 0)
         pending.removeAll()
         pendingPreamps.removeAll()
         pendingRoutes.removeAll()
+        pendingXTCRoutes.removeAll()
         return batch
     }
 
@@ -491,6 +520,11 @@ extension AppModel {
         for r in batch.routes {
             if case .failed = batch.outcomes[r.id] { continue }
             stageTwelveMicRoute(destination: r.destination, source: r.old)
+        }
+        for r in batch.xtcRoutes {
+            if case .failed = batch.outcomes[r.id] { continue }
+            guard let old = r.oldSource else { continue }
+            stageXTCRoute(destination: r.destination, source: old)
         }
     }
 }

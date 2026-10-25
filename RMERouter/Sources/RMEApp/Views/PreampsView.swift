@@ -29,7 +29,7 @@ public struct PreampSection: Identifiable {
     }
 }
 
-/// “前级”视图：XT 自带 Mic 1–2（TotalMix，第 7.0 节）与 12Mic（JSON，第 6.2 节）的话放，只读。
+/// “前级”视图：XT 自带 Mic 1–2（TotalMix，第 7.0 节）、12Mic（JSON，第 6.2 节）与 XTC（MIDI，第 6.3 节）的话放。
 /// 只显示读到的真实数据；读不到时不拿演示值充数。
 public struct PreampsView: View {
     @Bindable var model: AppModel
@@ -53,7 +53,11 @@ public struct PreampsView: View {
     private var actions: PreampActions {
         var a = PreampActions()
         a.canEdit = { device in
-            device == "xt" ? (model.xtStatus == .live || model.xtStatus == .offlineSaved) : model.twelveMicStatus == .live
+            switch device {
+            case "xt": return model.xtStatus == .live || model.xtStatus == .offlineSaved
+            case "xtc": return model.xtcWritable
+            default: return model.twelveMicStatus == .live
+            }
         }
         a.pending = { device, input, field in model.pendingPreamp(deviceID: device, input: input, field: field) }
         a.inspect = { model.inspect($0) }
@@ -79,6 +83,9 @@ public struct PreampsView: View {
         if case let .unreachable(r) = model.xtStatus { xtReason = r }
         var micReason: String? = nil
         if case let .unreachable(r) = model.twelveMicStatus { micReason = r }
+        var xtcReason: String? = nil
+        if case let .unreachable(r) = model.xtcStatus { xtcReason = r }
+        let xtcPreamps = model.xtcStatus == .live ? (model.snapshot.devices["xtc"]?.preamps ?? []) : []
         return [
             PreampSection(id: "xt", deviceName: "MADIface XT", preamps: xtPreamps,
                           available: !xtPreamps.isEmpty && (model.xtStatus == .live || model.xtStatus == .offlineSaved),
@@ -90,6 +97,14 @@ public struct PreampsView: View {
                           note: model.twelveMicStatus == .live ? "实时读取自 12Mic。" : nil,
                           emptyHelp: "接上 12Mic（网线或 USB），在“连接”页确认地址，打开设备上的 STATE → remote → HTTP Remote，然后点“读取设备”。",
                           unreachableReason: micReason, loading: model.twelveMicStatus == .loading),
+            PreampSection(id: "xtc", deviceName: "OctaMic XTC", preamps: xtcPreamps,
+                          available: !xtcPreamps.isEmpty,
+                          note: model.xtcStatus == .live
+                              ? (model.xtcWritable ? "读取自 XTC（MIDI）。增益只有 0 dB 与 10–65 dB，1–9 dB 按 10 dB 发送。"
+                                                   : "读取自 XTC（MIDI），只读：在“连接”页允许本 App 改动 XTC 后才能修改。")
+                              : nil,
+                          emptyHelp: "在“连接”页的 XTC 一节选好 MIDI 端点，打开“读取 XTC”，然后点“读取设备”。",
+                          unreachableReason: xtcReason, loading: model.xtcStatus == .loading),
         ]
     }
 }

@@ -192,6 +192,7 @@ struct ConnectionView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
+                XTCConnectionCard(model: model)
                 Button("重新打开首次设置向导") { model.showOnboarding = true }
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("备份").font(Tokens.Font.cardTitle)
