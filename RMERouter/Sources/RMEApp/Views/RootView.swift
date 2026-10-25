@@ -214,16 +214,21 @@ struct Sidebar: View, Equatable {
     /// 页面项：圆角块，选中浅色底（不用系统蓝）。
     private func item(_ s: AppSection) -> some View {
         let on = selection == s
+        let gemini = UITheme.current == .gemini
         return Button { selection = s } label: {
             HStack(spacing: 10) {
-                Image(systemName: s.symbol).frame(width: 18)
-                    .foregroundStyle(on ? Tokens.Palette.accent : Tokens.Palette.textMuted)
+                Group {
+                    if on, let g = Tokens.sparkle { Image(systemName: s.symbol).foregroundStyle(g) }
+                    else { Image(systemName: s.symbol).foregroundStyle(on ? Tokens.Palette.accent : Tokens.Palette.textMuted) }
+                }
+                .frame(width: 18)
                 Text(s.title).font(.system(size: 13, weight: on ? .semibold : .regular))
                     .foregroundStyle(Tokens.Palette.text)
                 Spacer()
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(on ? Tokens.Palette.border.opacity(0.7) : .clear))
+            .padding(.horizontal, gemini ? 14 : 10).padding(.vertical, gemini ? 8 : 6)
+            .background(RoundedRectangle(cornerRadius: gemini ? 20 : 8)
+                .fill(on ? (gemini ? Tokens.Palette.accent.opacity(0.18) : Tokens.Palette.border.opacity(0.7)) : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -469,7 +474,11 @@ struct BrandHeader: View {
         HStack(spacing: Tokens.Space.s) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 0) {
-                Text("RME Router").font(.system(size: 14, weight: .semibold))
+                if let g = Tokens.sparkle {
+                    Text("RME Router").font(.system(size: 15, weight: .semibold, design: .rounded)).foregroundStyle(g)
+                } else {
+                    Text("RME Router").font(.system(size: 14, weight: .semibold))
+                }
                 Text("路由与监听").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
             }
         }
@@ -493,6 +502,7 @@ struct StatusPill: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 3)
             .background(Capsule().fill(Tokens.Palette.border.opacity(0.55)))
+            .overlay { if let g = Tokens.sparkle { Capsule().strokeBorder(g, lineWidth: 1.2) } }
         }
         .buttonStyle(.plain)
         .help("设备连接状态；点了打开“设置 → 连接”")

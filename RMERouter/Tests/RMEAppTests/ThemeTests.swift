@@ -6,6 +6,16 @@ import XCTest
 final class ThemeTests: XCTestCase {
     override func tearDown() { UITheme.current = .warm }
 
+    /// Gemini 风格才有渐变点缀和大圆角。
+    func testGeminiExtras() {
+        UITheme.current = .gemini
+        XCTAssertNotNil(Tokens.sparkle)
+        XCTAssertEqual(Tokens.Radius.card, 20)
+        UITheme.current = .warm
+        XCTAssertNil(Tokens.sparkle)
+        XCTAssertEqual(Tokens.Radius.card, 12)
+    }
+
     /// 主题、外观存进偏好，重开还在；切换时当前主题跟着变。
     func testPersists() {
         let d = UserDefaults(suiteName: "theme-\(UUID())")!
@@ -24,6 +34,8 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(UITheme.warm.value(.accent).1, 0xD9805E)
         XCTAssertEqual(UITheme.studio.value(.accent).0, 0x2F6FB5)
         XCTAssertEqual(UITheme.contrast.value(.bg).1, 0x121212)
+        XCTAssertEqual(UITheme.gemini.value(.accent).0, 0x1A73E8)
+        XCTAssertEqual(UITheme.allCases.count, 4)
         for t in UITheme.allCases {
             // 文字与底色要拉开：亮度差不小于默认主题的一半（粗略的对比检查）
             func lum(_ c: UInt32) -> Double { Double((c >> 16) & 0xFF) * 0.3 + Double((c >> 8) & 0xFF) * 0.59 + Double(c & 0xFF) * 0.11 }

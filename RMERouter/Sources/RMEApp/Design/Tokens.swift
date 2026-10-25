@@ -33,16 +33,27 @@ public enum Tokens {
     }
 
     public enum Radius {
-        public static let control: CGFloat = 8, card: CGFloat = 12
+        public static let control: CGFloat = 8
+        /// 卡片圆角随主题：Gemini 风格更圆（第 5.1 节）。
+        public static var card: CGFloat { UITheme.current == .gemini ? 20 : 12 }
+    }
+
+    /// 主题点缀渐变（只有 Gemini 风格有：蓝→紫→粉）；其他主题为 nil。
+    public static var sparkle: LinearGradient? {
+        guard UITheme.current == .gemini else { return nil }
+        return LinearGradient(colors: [Color(nsColor: NSColor(hex: 0x4285F4)), Color(nsColor: NSColor(hex: 0x9B72CB)),
+                                       Color(nsColor: NSColor(hex: 0xD96570))], startPoint: .leading, endPoint: .trailing)
     }
 }
 
 /// 视觉主题（文档第 5.1 节）。只换颜色，状态色意义不变。
 public enum UITheme: String, CaseIterable, Identifiable, Sendable {
-    case warm, studio, contrast
+    case warm, studio, contrast, gemini
     public var id: String { rawValue }
     public var title: String {
-        switch self { case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比" }
+        switch self {
+        case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比"; case .gemini: return "Gemini 风格"
+        }
     }
     public static let defaultsKey = "ui.theme"
 
@@ -82,6 +93,20 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             case .warn: return (0xB07A1E, 0xE0B04E)
             case .problem: return (0xC0392B, 0xEF6F61)
             case .unknown: return (0x9AA3AD, 0x66707B)
+            }
+        case .gemini:
+            switch t {
+            case .chrome: return (0xF0F4F9, 0x1E1F20)
+            case .bg: return (0xFFFFFF, 0x131314)
+            case .surface: return (0xF0F4F9, 0x1E1F20)
+            case .border: return (0xDDE3EA, 0x333537)
+            case .text: return (0x1F1F1F, 0xE3E3E3)
+            case .textMuted: return (0x5F6368, 0x9AA0A6)
+            case .accent: return (0x1A73E8, 0x8AB4F8)
+            case .ok: return (0x188038, 0x81C995)
+            case .warn: return (0xE37400, 0xFDD663)
+            case .problem: return (0xD93025, 0xF28B82)
+            case .unknown: return (0x9AA0A6, 0x5F6368)
             }
         case .contrast:
             switch t {
