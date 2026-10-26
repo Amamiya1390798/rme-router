@@ -56,7 +56,7 @@ final class InspectorTests: XCTestCase {
         model.traceTarget = ChannelRef("xt.mic.in", 2)
         XCTAssertEqual(model.inspectorTarget, ChannelRef("xt.mic.in", 2))
         model.inspect(ChannelRef("xt.phones.out", 1))
-        XCTAssertTrue(model.showInspector)
+        XCTAssertFalse(model.showInspector, "点东西只换内容，不自动打开检查器（2026-10-26 用户要求）")
         XCTAssertEqual(model.inspectorTarget, ChannelRef("xt.phones.out", 1))
     }
 }

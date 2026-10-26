@@ -91,8 +91,10 @@ public struct RootView: View {
             SendAcrossButton(model: model).labelStyle(.iconOnly).buttonStyle(.borderless)
             Button { withAnimation(.easeOut(duration: 0.15)) { model.showInspector.toggle() } } label: {
                 Image(systemName: "sidebar.right")
+                    .foregroundStyle(model.showInspector ? Tokens.Palette.accent : Tokens.Palette.text)
             }
-            .buttonStyle(.borderless).help("显示或隐藏右侧检查器")
+            .buttonStyle(.borderless).help(model.showInspector ? "隐藏右侧检查器（⌥⌘I）" : "显示右侧检查器（⌥⌘I）；点接口、通道条只换里面的内容，不会自动打开")
+            .keyboardShortcut("i", modifiers: [.option, .command])
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .disabled(model.xtStatus == .loading || model.twelveMicStatus == .loading)

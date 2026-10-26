@@ -37,8 +37,7 @@ extension AppModel {
     public var inspectorTarget: ChannelRef? { inspected ?? traceTarget }
 
     public func inspect(_ ref: ChannelRef) {
-        inspected = ref
-        showInspector = true
+        inspected = ref   // 只换检查器里显示的内容；开关检查器用顶栏按钮（⌥⌘I），点东西不会自动打开
     }
 
     public func inspectorInfo(_ ref: ChannelRef) -> InspectorInfo {

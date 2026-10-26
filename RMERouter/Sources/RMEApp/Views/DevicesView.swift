@@ -93,7 +93,6 @@ struct DevicesView: View {
     private func select(_ id: String?) {
         model.panelChannel = nil
         model.panelSelection = id
-        if id != nil { model.showInspector = true }
     }
 
     /// 选中接口时点了一条高亮的通道条：属于这个接口就只看这一路；否则退出接口选择，交给通道条照常选中。
