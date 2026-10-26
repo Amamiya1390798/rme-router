@@ -541,3 +541,4 @@ extension Color {
 public enum RackRender {
     @MainActor public static func rear(_ model: AppModel) -> some View { RackView(model: model, face: .rear, selected: .constant(nil)) }
 }
+
