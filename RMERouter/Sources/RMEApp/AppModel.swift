@@ -229,6 +229,9 @@ public final class AppModel {
     public var showConfirm = false
     /// 首次使用向导（阶段 D2）：没走完过就在启动时打开。
     public var showOnboarding = false
+    /// 读不到 TotalMix 时弹的 OSC 设置小窗；每次启动最多自动弹一次，之后点状态胶囊再看。
+    public var showOSCHelp = false
+    @ObservationIgnored var oscHelpAutoShown = false
     public var onboardingDone: Bool {
         get { defaults.bool(forKey: "onboarding.done") }
         set { defaults.set(newValue, forKey: "onboarding.done") }
@@ -398,6 +401,7 @@ public final class AppModel {
             await adapter.client.stop()
             self.adapter = nil
             xtStatus = .unreachable(Self.describe(error))
+            if !oscHelpAutoShown, !showOnboarding, !PerfProbe.enabled { oscHelpAutoShown = true; showOSCHelp = true }
         }
     }
 

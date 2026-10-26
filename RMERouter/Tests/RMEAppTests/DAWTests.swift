@@ -77,3 +77,16 @@ final class MainCardNameTests: XCTestCase {
         XCTAssertFalse(s.uses(nil).input)
     }
 }
+
+final class TotalMixPortsTests: XCTestCase {
+    func testParseListeningPortsOnly() {
+        let out = """
+        COMMAND     PID    USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+        TotalmixF 17161 amamiya    3u  IPv4 0xf97d230c52716421      0t0  UDP *:7009
+        TotalmixF 17161 amamiya    9u  IPv4 0x70fbbfb592fcb1cc      0t0  UDP *:7011
+        TotalmixF 17161 amamiya   10u  IPv4  0xf152fa90d2104f2      0t0  UDP 127.0.0.1:49649->127.0.0.1:9011
+        """
+        XCTAssertEqual(TotalMixPorts.parse(out), [7009, 7011])
+        XCTAssertEqual(TotalMixPorts.parse(""), [])
+    }
+}

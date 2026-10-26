@@ -33,6 +33,7 @@ public struct RootView: View {
         .ignoresSafeArea()
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .sheet(item: $model.eqEditing) { t in EQEditor(model: model, target: t) { model.eqEditing = nil } }
+        .sheet(isPresented: $model.showOSCHelp) { OSCHelpSheet(model: model) { model.showOSCHelp = false } }
         .sheet(isPresented: $model.showOnboarding) {
             OnboardingSheet(model: model) {
                 model.onboardingDone = true
@@ -494,6 +495,7 @@ struct StatusPill: View {
     var body: some View {
         let (dot, text) = summary
         Button {
+            if case .unreachable = model.xtStatus { model.showOSCHelp = true; return }
             model.settingsTab = .connection
             model.section = .settings
         } label: {
@@ -506,7 +508,7 @@ struct StatusPill: View {
             .overlay { if let g = Tokens.sparkle { Capsule().strokeBorder(g, lineWidth: 1.2) } }
         }
         .buttonStyle(.plain)
-        .help("设备连接状态；点了打开“设置 → 连接”")
+        .help("设备连接状态；点了打开“设置 → 连接”（读不到 TotalMix 时打开设置提示）")
     }
 
     private var summary: (Color, String) {
