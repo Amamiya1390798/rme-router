@@ -140,6 +140,9 @@ public final class AppModel {
         NSApplication.shared.appearance = a == .system ? nil : NSAppearance(named: a == .light ? .aqua : .darkAqua)
     }
 
+    /// 正在编辑 EQ 的通道（第 7.8 节）；非 nil 时弹出 EQ 窗口。
+    public var eqEditing: EQTarget?
+
     /// 屏蔽的通道条（第 6.4.5 节）：只影响显示，存在本机偏好里。
     public internal(set) var hiddenStrips: Set<TotalMixChannel> = [] {
         didSet { if let d = try? JSONEncoder().encode(hiddenStrips) { defaults.set(d, forKey: Self.hiddenStripsKey) } }

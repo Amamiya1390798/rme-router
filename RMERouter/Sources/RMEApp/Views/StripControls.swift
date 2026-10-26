@@ -9,6 +9,8 @@ public struct StripActions {
     public var pending: (ChannelRef, TotalMixStripParam) -> Double? = { _, _ in nil }
     /// 返回错误说明；nil 表示已加入待应用（快速方式下由调用方立即发送）。
     public var stage: (ChannelRef, TotalMixStripParam, Double) -> String? = { _, _, _ in nil }
+    /// 打开 EQ 窗口（第 7.8 节）。
+    public var openEQ: (ChannelRef) -> Void = { _ in }
     public init() {}
 }
 
@@ -18,6 +20,10 @@ extension AppModel {
         var a = StripActions()
         a.current = { [unowned self] in self.stripValue($0, $1) }
         a.pending = { [unowned self] in self.pendingStrip($0, $1) }
+        a.openEQ = { [unowned self] ref in
+            let name = (self.xtStrips(.input) + self.xtStrips(.playback) + self.xtStrips(.output)).first { $0.ref == ref }?.name
+            self.eqEditing = EQTarget(ref: ref, name: name ?? ref.description)
+        }
         a.stage = { [unowned self] ref, p, v in
             if let e = self.stageStrip(ref, p, v) { return e.text }
             Task { await self.commitIfQuick() }
@@ -57,6 +63,13 @@ struct StripControls: View {
                         if has.contains(.width) { widthChip }
                         if has.contains(.msproc) { toggleChip(.msproc, on: "M/S 开", off: "M/S 关", help: "M/S 处理：单声道信息送左、立体声信息送右") }
                         if has.contains(.autoset) { toggleChip(.autoset, on: "自动增益 开", off: "自动增益 关", help: "自动降增益防过载，保持约 6 dB 余量") }
+                        if has.contains(.eqEnable) {
+                            let on = (value(.eqEnable).shown ?? 0) >= 0.5
+                            chip(on ? "EQ 开…" : "EQ…", color: on ? Tokens.Palette.accent : Tokens.Palette.textMuted, pending: value(.eqEnable).pending) {
+                                actions.openEQ(ref)
+                            }
+                            .help("打开 EQ（3 段 + 低切）")
+                        }
                         if has.contains(.talkbacksel) { toggleChip(.talkbacksel, on: "收对讲", off: "不收对讲", help: "这个输出是否接收对讲信号") }
                         Spacer(minLength: 0)
                     }
@@ -84,7 +97,7 @@ struct StripControls: View {
         .help(on ? "关掉：录音通道恢复为原来的硬件输入" : "把这个输出的混音送进电脑同号录音通道（顶替那一路硬件输入，需要确认）")
     }
 
-    static let secondRow: [TotalMixStripParam] = [.fxsend, .fxreturn, .width, .msproc, .autoset, .talkbacksel]
+    static let secondRow: [TotalMixStripParam] = [.fxsend, .fxreturn, .width, .msproc, .autoset, .talkbacksel, .eqEnable]
 
     private func toggleChip(_ p: TotalMixStripParam, on onText: String, off offText: String, help: String) -> some View {
         let v = value(p), on = (v.shown ?? 0) >= 0.5

@@ -208,7 +208,8 @@ extension AppModel {
         for bus in [TotalMixBus.input, .playback, .output] {
             for s in xtStrips(bus) {
                 guard let ref = s.ref else { continue }
-                for p in [TotalMixStripParam.mute, .phase, .volume, .balpan, .loopback, .fxsend, .fxreturn, .width, .msproc, .autoset, .talkbacksel] where p.applies(to: bus) {
+                for p in [TotalMixStripParam.mute, .phase, .volume, .balpan, .loopback, .fxsend, .fxreturn, .width, .msproc, .autoset, .talkbacksel]
+                    + TotalMixStripParam.allCases.filter { $0.isEQ && $0.isWritable } where p.applies(to: bus) {
                     if let v = stripValue(ref, p) { out.append(.init(ref: ref, param: p, value: v)) }
                 }
                 if s.tm.number % 2 == 1, let st = tmState.isStereo(s.tm) {

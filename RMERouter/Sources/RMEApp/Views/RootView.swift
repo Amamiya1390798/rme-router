@@ -32,6 +32,7 @@ public struct RootView: View {
         .background(Tokens.Palette.chrome)
         .ignoresSafeArea()
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
+        .sheet(item: $model.eqEditing) { t in EQEditor(model: model, target: t) { model.eqEditing = nil } }
         .sheet(isPresented: $model.showOnboarding) {
             OnboardingSheet(model: model) {
                 model.onboardingDone = true

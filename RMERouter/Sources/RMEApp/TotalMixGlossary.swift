@@ -36,7 +36,7 @@ public enum TotalMixGlossary {
             R(en: "Fader", zh: "推子：这一路送到当前选中输出的电平（不是总音量）", app: .done, appWhere: "通道条上的电平数字"),
             R(en: "T", zh: "Trim：推子一次改这一路送到所有输出的电平", app: .no),
             R(en: "⚙ (Settings)", zh: "打开这条的设置面板", app: .info),
-            R(en: "EQ", zh: "均衡器", app: .planned),
+            R(en: "EQ", zh: "均衡器：3 段参数 EQ + 低切", note: "类型、低切斜率暂只读", app: .done, appWhere: "通道条“EQ”按钮"),
             R(en: "D", zh: "动态：压缩 / 扩展 / 自动电平", app: .planned),
             R(en: "底部输出名 ⌄", zh: "推子当前送去的输出", app: .done, appWhere: "设备页点一个输出条"),
         ]),

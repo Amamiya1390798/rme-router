@@ -92,6 +92,11 @@ public struct PendingStripChange: Identifiable, Equatable, Sendable {
             let off = TotalMixFader.offThresholdDB
             return (a <= off && b <= off) || abs(a - b) < 0.05
         case .width: return abs(a - b) < 0.005
+        case .eqEnable, .lcEnable: return (a >= 0.5) == (b >= 0.5)
+        case .eqB1Gain, .eqB2Gain, .eqB3Gain: return abs(a - b) < 0.05
+        case .eqB1Freq, .eqB2Freq, .eqB3Freq, .lcFreq: return abs(a - b) <= max(0.5, a * 0.002)
+        case .eqB1Q, .eqB2Q, .eqB3Q: return abs(a - b) < 0.01
+        case .eqB1Type, .eqB3Type, .lcSlope: return a.rounded() == b.rounded()
         }
     }
 }
@@ -144,6 +149,7 @@ extension AppModel {
         guard deviceID(of: ref) == "xt" else { return .notTotalMix }
         guard let tm0 = tmChannel(for: ref) else { return .notMapped(ref) }
         guard param.applies(to: tm0.bus) else { return .notSupported("\(ref) 没有\(param.label)（只有输出有）") }
+        guard param.isWritable else { return .notSupported("\(param.label)的取值含义还没核对，暂时只读") }
         let tm = tmState.stripTarget(tm0, param)
         let target = param.clamp(value)
         let stereo = param != .stereo && (tm != tm0 || (!param.isPerSide && tmState.isStereo(tm) == true))

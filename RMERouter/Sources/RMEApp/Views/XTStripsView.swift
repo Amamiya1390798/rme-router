@@ -495,6 +495,7 @@ struct MiniStripButtons: View {
                 chip("Ø", .phase, on: Tokens.Palette.warn)
                 // 送电脑录音（只有输出有；TotalMix 没回报这一项时不显示）
                 if model.stripValue(ref, .loopback) != nil { chip("录", .loopback, on: Tokens.Palette.problem) }
+                if model.stripValue(ref, .eqEnable) != nil { eqChip }
             }
             if let s = strip, s.tm.number % 2 == 1, canPair(s) { pairChip(s) }
         }
@@ -519,6 +520,19 @@ struct MiniStripButtons: View {
         }
         .buttonStyle(.plain)
         .help(s.stereo ? "拆成两个单声道（\(s.tm.number)、\(s.tm.number + 1)；需确认）" : "与 \(s.tm.number + 1) 合并成立体声（需确认）")
+    }
+
+    /// EQ：开着时高亮；点了打开 EQ 窗口（第 7.8 节）。
+    private var eqChip: some View {
+        let on = ((model.pendingStrip(ref, .eqEnable) ?? model.stripValue(ref, .eqEnable)) ?? 0) >= 0.5
+        return Button { model.eqEditing = EQTarget(ref: ref, name: strip?.name ?? ref.description) } label: {
+            Text("EQ").font(.system(size: 9, weight: .semibold))
+                .frame(width: 22, height: 15)
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(on ? Tokens.Palette.accent.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
+                .foregroundStyle(on ? Tokens.Palette.text : Tokens.Palette.textMuted)
+        }
+        .buttonStyle(.plain)
+        .help(on ? "EQ 开着；点了调整" : "打开 EQ（3 段 + 低切）")
     }
 
     private func chip(_ label: String, _ p: TotalMixStripParam, on color: Color) -> some View {

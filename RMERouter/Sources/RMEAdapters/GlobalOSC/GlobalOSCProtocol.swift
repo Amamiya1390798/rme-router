@@ -166,6 +166,27 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
     case loopback
     /// E10（第 7.8 节）：送效果（dB）、效果返回（dB）、立体声宽度（-1…+1）、M/S 处理、自动增益、输出收对讲。
     case fxsend, fxreturn, width, msproc, autoset, talkbacksel
+    /// EQ 与低切（第 7.8 节）：三段参数 EQ + 低切。类型与斜率是序号，含义未核对，只读。
+    case eqEnable = "eq/enable"
+    case eqB1Gain = "eq/band1gain", eqB1Freq = "eq/band1freq", eqB1Q = "eq/band1q"
+    case eqB2Gain = "eq/band2gain", eqB2Freq = "eq/band2freq", eqB2Q = "eq/band2q"
+    case eqB3Gain = "eq/band3gain", eqB3Freq = "eq/band3freq", eqB3Q = "eq/band3q"
+    case eqB1Type = "eq/band1type", eqB3Type = "eq/band3type"
+    case lcEnable = "lowcut/enable", lcFreq = "lowcut/freq", lcSlope = "lowcut/slope"
+
+    /// 三段 EQ 的（增益, 频率, Q）参数，按段号 1…3。
+    public static func eqBand(_ n: Int) -> (gain: TotalMixStripParam, freq: TotalMixStripParam, q: TotalMixStripParam) {
+        switch n {
+        case 1: return (.eqB1Gain, .eqB1Freq, .eqB1Q)
+        case 2: return (.eqB2Gain, .eqB2Freq, .eqB2Q)
+        default: return (.eqB3Gain, .eqB3Freq, .eqB3Q)
+        }
+    }
+
+    /// 能写：序号含义没有出处的（类型、斜率）只读。
+    public var isWritable: Bool { self != .eqB1Type && self != .eqB3Type && self != .lcSlope }
+
+    public var isEQ: Bool { rawValue.hasPrefix("eq/") || rawValue.hasPrefix("lowcut/") }
 
     /// 这一总线上有没有这个参数（协议表 + 实测：输入、回放没有 volume / balpan）。
     public func applies(to bus: TotalMixBus) -> Bool {
@@ -174,6 +195,7 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .mute, .phase, .stereo: return true
         case .fxsend, .width, .msproc: return bus != .output
         case .autoset: return bus == .input
+        default: return true   // EQ、低切：输入、回放、输出都有
         }
     }
 
@@ -191,8 +213,18 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .msproc: return "M/S 处理"
         case .autoset: return "自动增益"
         case .talkbacksel: return "收对讲"
+        case .eqEnable: return "EQ"
+        case .eqB1Gain, .eqB2Gain, .eqB3Gain: return "EQ 第 \(bandNumber) 段增益"
+        case .eqB1Freq, .eqB2Freq, .eqB3Freq: return "EQ 第 \(bandNumber) 段频率"
+        case .eqB1Q, .eqB2Q, .eqB3Q: return "EQ 第 \(bandNumber) 段 Q"
+        case .eqB1Type, .eqB3Type: return "EQ 第 \(bandNumber) 段类型"
+        case .lcEnable: return "低切"
+        case .lcFreq: return "低切频率"
+        case .lcSlope: return "低切斜率"
         }
     }
+
+    public var bandNumber: Int { rawValue.contains("band1") ? 1 : rawValue.contains("band2") ? 2 : 3 }
 
     /// 截到协议允许的范围；音量 -65 dB 及以下为“关”（-300）。
     public func clamp(_ v: Double) -> Double {
@@ -203,6 +235,13 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .fxsend: return v <= TotalMixFader.offThresholdDB ? Double(TotalMixWrite.offDB) : min(v, TotalMixWrite.maxDB)
         case .fxreturn: return v <= TotalMixFader.offThresholdDB ? TotalMixFader.offThresholdDB : min(v, TotalMixWrite.maxDB)
         case .width: return min(max(v, -1), 1)
+        case .eqEnable, .lcEnable: return v >= 0.5 ? 1 : 0
+        // 范围出自 TotalMix 帮助第 3.5 节
+        case .eqB1Gain, .eqB2Gain, .eqB3Gain: return min(max(v, -20), 20)
+        case .eqB1Freq, .eqB2Freq, .eqB3Freq: return min(max(v, 20), 20000)
+        case .eqB1Q, .eqB2Q, .eqB3Q: return min(max(v, 0.7), 5.0)
+        case .lcFreq: return min(max(v, 20), 500)
+        case .eqB1Type, .eqB3Type, .lcSlope: return v.rounded()
         }
     }
 
@@ -218,7 +257,11 @@ public enum TotalMixStripParam: String, CaseIterable, Sendable, Codable {
         case .loopback: return v >= 0.5 ? "送录音" : "关"
         case .fxsend, .fxreturn: return v > TotalMixFader.offThresholdDB ? String(format: "%.1f dB", v) : "关"
         case .width: return String(format: "%+.2f", v)
-        case .msproc, .autoset, .talkbacksel: return v >= 0.5 ? "开" : "关"
+        case .msproc, .autoset, .talkbacksel, .eqEnable, .lcEnable: return v >= 0.5 ? "开" : "关"
+        case .eqB1Gain, .eqB2Gain, .eqB3Gain: return String(format: "%+.1f dB", v)
+        case .eqB1Freq, .eqB2Freq, .eqB3Freq, .lcFreq: return v >= 1000 ? String(format: "%.1f kHz", v / 1000) : String(format: "%.0f Hz", v)
+        case .eqB1Q, .eqB2Q, .eqB3Q: return String(format: "Q %.1f", v)
+        case .eqB1Type, .eqB3Type, .lcSlope: return "序号 \(Int(v))"
         }
     }
 }
