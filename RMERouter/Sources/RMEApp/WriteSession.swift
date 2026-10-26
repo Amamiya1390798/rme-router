@@ -260,7 +260,8 @@ extension AppModel {
     public func stagePreamp(deviceID: String, input: ChannelRef, field: PreampField, value: PreampValue) -> StageError? {
         var value = value
         if case let .gain(g) = value {
-            value = .gain(min(max(g, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+            let r = PreampField.gainRange(device: deviceID)
+            value = .gain(min(max(g, r.lowerBound), r.upperBound))
         }
         var tmInput: TotalMixChannel? = nil
         switch deviceID {

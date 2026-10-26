@@ -559,6 +559,14 @@ struct BrandName: View {
 struct StudioConfigCard: View {
     @Bindable var model: AppModel
 
+    static func note(_ c: MainCard) -> String {
+        switch c {
+        case .madifaceXT: return "MADIface XT：完整档案（接口名、面板图、按位置对照）。"
+        case .ufx3: return "Fireface UFX III：接口名按官方手册（Line 1–8、Mic 9–12、AES、ADAT 1/2、MADI，话放增益到 75 dB）；TotalMix 通道顺序按手册推断，接上真机后核对；还没有面板图。"
+        case .generic: return "通用：不需要型号资料，任何 TotalMix FX 设备都能用；TotalMix 第 n 路就是主卡第 n 路，没有面板图，接线在“接线”里自己加。"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.m) {
             Text("设备组成").font(Tokens.Font.cardTitle)
@@ -570,9 +578,7 @@ struct StudioConfigCard: View {
                 .labelsHidden().frame(width: 260)
             }
             .font(Tokens.Font.body)
-            Text(model.studioConfig.mainCard == .madifaceXT
-                 ? "MADIface XT：完整档案（接口名、面板图、按位置对照）。"
-                 : "通用：不需要型号资料，任何 TotalMix FX 设备都能用；TotalMix 第 n 路就是主卡第 n 路，没有面板图，接线在“接线”里自己加。")
+            Text(Self.note(model.studioConfig.mainCard))
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Tokens.Space.l) {
                 Text("扩展设备").foregroundStyle(Tokens.Palette.textMuted)

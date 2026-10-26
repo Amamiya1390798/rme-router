@@ -22,6 +22,7 @@ public enum DeviceModel: String, Codable, Sendable {
     case madifaceXT, twelveMic, octamicXTC, p16i, p16m
     /// 通用 TotalMix FX 设备（没有型号档案，文档第 6.4.6 节）
     case genericTotalMix
+    case firefaceUFX3
 }
 
 public struct Port: Codable, Sendable, Hashable, Identifiable {

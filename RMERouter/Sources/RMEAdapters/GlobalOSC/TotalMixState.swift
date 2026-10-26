@@ -13,8 +13,14 @@ public struct TotalMixChannelMap: Sendable, Equatable {
 
     public var deviceID: String
     public private(set) var entries: [TotalMixChannel: Entry] = [:]
-    /// 通用主卡（文档第 6.4.6 节）：不按型号对照，TotalMix 第 n 路 = `<设备>.in:n` / `<设备>.out:n`。
-    public var generic = false
+    /// 主卡型号决定按位置怎么对照（文档第 6.4.6 节）。
+    public enum Layout: String, Sendable, Equatable { case madifaceXT, ufx3, generic }
+    public var layout: Layout = .madifaceXT
+    /// 通用主卡：不按型号对照，TotalMix 第 n 路 = `<设备>.in:n` / `<设备>.out:n`。
+    public var generic: Bool {
+        get { layout == .generic }
+        set { layout = newValue ? .generic : .madifaceXT }
+    }
 
     public init(deviceID: String = "xt", confirmed: [TotalMixChannel: ChannelRef] = [:]) {
         self.deviceID = deviceID
@@ -43,6 +49,17 @@ public struct TotalMixChannelMap: Sendable, Equatable {
                 guard maxNumber > 0 else { continue }
                 for n in 1 ... maxNumber where entries[TotalMixChannel(bus, n)]?.evidence != .confirmed {
                     entries[TotalMixChannel(bus, n)] = Entry(ref: ChannelRef("\(deviceID).\(bus == .input ? "in" : "out")", n), evidence: .confirmed)
+                }
+            }
+            return
+        }
+        if layout == .ufx3 {
+            // UFX III：只按位置（默认通道名没有出处），记为推断
+            for bus in [TotalMixBus.input, .output] {
+                let maxNumber = state.channels.keys.filter { $0.bus == bus }.map(\.number).max() ?? 0
+                guard let refs = Self.ufx3Layout(bus: bus, maxNumber: maxNumber, deviceID: deviceID) else { continue }
+                for (n, ref) in refs.enumerated() where entries[TotalMixChannel(bus, n + 1)]?.evidence != .confirmed {
+                    entries[TotalMixChannel(bus, n + 1)] = Entry(ref: ref, evidence: .inferred)
                 }
             }
             return
@@ -93,6 +110,19 @@ public struct TotalMixChannelMap: Sendable, Equatable {
         var out: [ChannelRef] = []
         for (iface, n) in fixed { out += (1 ... n).map { ChannelRef("\(deviceID).\(iface).\(dir)", $0) } }
         for k in 1 ... 3 { out += (1 ... perPort).map { ChannelRef("\(deviceID).madi\(k).\(dir)", $0) } }
+        return out
+    }
+
+    /// Fireface UFX III 的 TotalMix 通道顺序（文档第 6.4.6 节，按手册 Core Audio 通道表推断）：
+    /// 模拟 12（输入：后 Line 1–8、前 Mic 9–12；输出：Line 1–8、耳机 9–12）、AES 2、ADAT 1/2 各 n、MADI m。
+    /// 单 / 双 / 四速：ADAT 每口 8 / 4 / 2、MADI 64 / 32 / 16，按总路数推出；推不出返回 nil。
+    public static func ufx3Layout(bus: TotalMixBus, maxNumber: Int, deviceID: String = "xt") -> [ChannelRef]? {
+        guard bus != .playback else { return nil }
+        let dir = bus == .input ? "in" : "out"
+        guard let (adat, madi) = [(8, 64), (4, 32), (2, 16)].first(where: { 12 + 2 + 2 * $0.0 + $0.1 == maxNumber }) else { return nil }
+        func refs(_ iface: String, _ n: Int) -> [ChannelRef] { (1 ... n).map { ChannelRef("\(deviceID).\(iface).\(dir)", $0) } }
+        var out = bus == .input ? refs("line", 8) + refs("mic", 4) : refs("an", 8) + refs("phones", 4)
+        out += refs("aes", 2) + refs("adat1", adat) + refs("adat2", adat) + refs("madi", madi)
         return out
     }
 

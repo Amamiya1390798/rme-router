@@ -350,7 +350,7 @@ public enum TotalMixWrite: Equatable, Sendable {
             precondition(input.bus == .input, "前级只在输入通道上")
             let v: Float
             switch (field, value) {
-            case let (.gain, .gain(g)): v = Float(min(max(g, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+            case let (.gain, .gain(g)): v = Float(min(max(g, PreampField.totalMixGainRange.lowerBound), PreampField.totalMixGainRange.upperBound))
             case let (.phantom, .flag(b)), let (.phase, .flag(b)): v = b ? 1 : 0
             default: preconditionFailure("字段与值类型不匹配：\(field) \(value)")
             }

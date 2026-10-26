@@ -239,7 +239,8 @@ struct PreampCard: View {
                         PreampGainEditor(title: "\(title)（\(preamp.input.description)）增益",
                                          current: preamp.gainDB.knownValue ?? 0,
                                          initial: pending(.gain).flatMap { if case let .gain(g) = $0 { return g } else { return nil } }
-                                                  ?? preamp.gainDB.knownValue ?? 0) { value in
+                                                  ?? preamp.gainDB.knownValue ?? 0,
+                                         range: PreampField.gainRange(device: deviceID)) { value in
                             if let v = value { error = actions.stage(deviceID, preamp.input, .gain, .gain(v)) }
                             editingGain = false
                         }
@@ -340,14 +341,17 @@ struct PreampCard: View {
 struct PreampGainEditor: View {
     var title: String
     var current: Double
+    var range: ClosedRange<Double>
     var onDone: (Double?) -> Void
     @State private var value: Double
 
-    init(title: String, current: Double, initial: Double, onDone: @escaping (Double?) -> Void) {
+    init(title: String, current: Double, initial: Double, range: ClosedRange<Double> = PreampField.gainRange,
+         onDone: @escaping (Double?) -> Void) {
         self.title = title
         self.current = current
+        self.range = range
         self.onDone = onDone
-        _value = State(initialValue: min(max(initial, PreampField.gainRange.lowerBound), PreampField.gainRange.upperBound))
+        _value = State(initialValue: min(max(initial, range.lowerBound), range.upperBound))
     }
 
     var body: some View {
@@ -358,7 +362,7 @@ struct PreampGainEditor: View {
                 Spacer()
                 Text(String(format: "当前 %.1f dB", current)).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
             }
-            Slider(value: $value, in: PreampField.gainRange, step: 0.5)
+            Slider(value: $value, in: range, step: 0.5)
             HStack {
                 Spacer()
                 Button("取消") { onDone(nil) }

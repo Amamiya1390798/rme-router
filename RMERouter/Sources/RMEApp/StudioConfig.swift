@@ -1,12 +1,24 @@
 import Foundation
+import RMEAdapters
 
 /// 主卡型号（文档第 6.4.6 节）。
 public enum MainCard: String, CaseIterable, Identifiable, Codable, Sendable {
-    case madifaceXT, generic
+    case madifaceXT, ufx3, generic
     public var id: String { rawValue }
-    public var title: String { self == .madifaceXT ? "MADIface XT" : "通用（任何 TotalMix FX 设备）" }
+    public var title: String {
+        switch self { case .madifaceXT: return "MADIface XT"; case .ufx3: return "Fireface UFX III"; case .generic: return "通用（任何 TotalMix FX 设备）" }
+    }
     /// 设备页、侧栏显示的名字。
-    public var deviceName: String { self == .madifaceXT ? "MADIface XT" : "主卡（TotalMix FX）" }
+    public var deviceName: String {
+        switch self { case .madifaceXT: return "MADIface XT"; case .ufx3: return "Fireface UFX III"; case .generic: return "主卡（TotalMix FX）" }
+    }
+    /// 话放增益上限（手册：XT 60 dB，UFX III 75 dB）。
+    public var gainMax: Double { self == .ufx3 ? 75 : 60 }
+
+    /// TotalMix 对照方式。
+    public var mapLayout: TotalMixChannelMap.Layout {
+        switch self { case .madifaceXT: return .madifaceXT; case .ufx3: return .ufx3; case .generic: return .generic }
+    }
 }
 
 /// 设备组成：主卡型号 + 打开的扩展设备。存本机偏好。

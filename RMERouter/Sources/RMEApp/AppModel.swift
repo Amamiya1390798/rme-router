@@ -145,6 +145,7 @@ public final class AppModel {
         didSet {
             guard studioConfig != oldValue else { return }
             StudioConfig.current = studioConfig
+            PreampField.totalMixGainMax = studioConfig.mainCard.gainMax
             if let d = try? JSONEncoder().encode(studioConfig) { defaults.set(d, forKey: StudioConfig.defaultsKey) }
             rebuildForStudioConfig(mainChanged: studioConfig.mainCard != oldValue.mainCard)
         }
@@ -295,6 +296,7 @@ public final class AppModel {
         self.snapshot = snapshot ?? StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
         studioConfig = defaults.data(forKey: StudioConfig.defaultsKey)
             .flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) } ?? StudioConfig()
+        PreampField.totalMixGainMax = studioConfig.mainCard.gainMax
         if StudioConfig.current != studioConfig {
             StudioConfig.current = studioConfig
             self.snapshot = StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
@@ -383,7 +385,7 @@ public final class AppModel {
         retired = []
         if adapter == nil {
             adapter = makeAdapter(settings)
-            adapter?.channelMap.generic = studioConfig.mainCard == .generic
+            adapter?.channelMap.layout = studioConfig.mainCard.mapLayout
         }
         guard let adapter else { return }
         do {

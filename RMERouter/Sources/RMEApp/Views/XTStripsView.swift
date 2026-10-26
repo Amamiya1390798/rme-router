@@ -653,7 +653,8 @@ struct StripGainChip: View {
         .help(error ?? "源头话放：\(model.snapshot.topology.device(sp.deviceID)?.name ?? sp.deviceID) \(sp.preamp.input)；点了改增益（先进待应用栏）")
         .popover(isPresented: $editing, arrowEdge: .bottom) {
             PreampGainEditor(title: "\(model.snapshot.topology.device(sp.deviceID)?.name ?? sp.deviceID) \(sp.preamp.input) 增益",
-                             current: sp.preamp.gainDB.knownValue ?? 0, initial: gain ?? 0) { value in
+                             current: sp.preamp.gainDB.knownValue ?? 0, initial: gain ?? 0,
+                             range: PreampField.gainRange(device: sp.deviceID)) { value in
                 if let v = value {
                     error = model.stagePreamp(deviceID: sp.deviceID, input: sp.preamp.input, field: .gain, value: .gain(v))?.text
                     if error == nil { Task { await model.commitIfQuick() } }

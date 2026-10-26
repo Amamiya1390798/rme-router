@@ -71,6 +71,11 @@ public enum PreampField: String, Codable, Sendable, CaseIterable {
     }
     /// 增益可写范围（第 7.2 节：先限定 0–60 dB）。
     public static let gainRange: ClosedRange<Double> = 0 ... 60
+    /// TotalMix 主卡话放的增益上限：XT 60 dB，UFX III 75 dB（手册 p.42）；随设备组成改（文档第 6.4.6 节）。
+    nonisolated(unsafe) public static var totalMixGainMax: Double = 60
+    public static var totalMixGainRange: ClosedRange<Double> { 0 ... totalMixGainMax }
+    /// 某台设备的话放增益范围。
+    public static func gainRange(device: String) -> ClosedRange<Double> { device == "xt" ? totalMixGainRange : gainRange }
 }
 
 /// 前级字段的值。

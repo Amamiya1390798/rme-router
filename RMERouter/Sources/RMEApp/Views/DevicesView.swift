@@ -204,7 +204,9 @@ struct RackView: View {
                 } else {
                     // 通用主卡（第 6.4.6 节）：没有面板图，显示一张卡片
                     NodeCard(title: model.snapshot.devices["xt"]?.settings["totalmix.device"]?.knownValue ?? model.studioConfig.mainCard.deviceName,
-                             lines: ["通用主卡：TotalMix 第 n 路 = 主卡第 n 路", "没有面板图；接线在“设置 → 接线”里加"],
+                             lines: model.studioConfig.mainCard == .ufx3
+                                ? ["Line 1–8、Mic 9–12、AES、ADAT 1/2、MADI", "还没有面板图；接线在“设置 → 接线”里改"]
+                                : ["通用主卡：TotalMix 第 n 路 = 主卡第 n 路", "没有面板图；接线在“设置 → 接线”里加"],
                              color: Tokens.Palette.accent)
                         .frame(width: 300)
                 }

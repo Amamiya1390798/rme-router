@@ -56,6 +56,23 @@ public enum StudioSetup {
     static func mainDevice(_ card: MainCard) -> Device {
         switch card {
         case .madifaceXT: return xtDevice
+        case .ufx3:
+            // 文档第 6.4.6 节，出处 Fireface UFX III 手册
+            return Device(id: "xt", model: .firefaceUFX3, name: card.deviceName, ports: [
+                port("xt.line.in", "Line 1–8（后）", .analog, .input, .trs, 8),
+                port("xt.mic.in", "Mic/Inst 9–12（前）", .analog, .input, .combo, 4),
+                port("xt.aes.in", "AES 输入", .aes, .input, .xlr, 2),
+                port("xt.adat1.in", "ADAT 1 输入", .adat, .input, .toslink, 8),
+                port("xt.adat2.in", "ADAT 2 输入", .adat, .input, .toslink, 8),
+                port("xt.madi.in", "MADI 输入", .madiOptical, .input, .sc, 64),
+                port("xt.playback.in", "电脑回放", .usb, .input, .usbB, 94),
+                port("xt.an.out", "Line 1–8", .analog, .output, .trs, 8),
+                port("xt.phones.out", "耳机 1–2（9–12）", .analog, .output, .trs, 4),
+                port("xt.aes.out", "AES 输出", .aes, .output, .xlr, 2),
+                port("xt.adat1.out", "ADAT 1 输出", .adat, .output, .toslink, 8),
+                port("xt.adat2.out", "ADAT 2 输出", .adat, .output, .toslink, 8),
+                port("xt.madi.out", "MADI 输出", .madiOptical, .output, .sc, 64),
+            ])
         case .generic:
             return Device(id: "xt", model: .genericTotalMix, name: card.deviceName, ports: [
                 port("xt.in", "主卡输入", .mixed, .input, .unspecified, genericChannels),
@@ -67,7 +84,7 @@ public enum StudioSetup {
 
     static func fullTopology(mainCard: MainCard) -> Topology {
         let xt = mainDevice(mainCard)
-        return Topology(devices: [xt] + expansionDevices, links: defaultLinks)
+        return Topology(devices: [xt] + expansionDevices, links: mainCard == .ufx3 ? ufx3Links : defaultLinks)
     }
 
     static let xtDevice = Device(id: "xt", model: .madifaceXT, name: "MADIface XT", ports: [
@@ -117,6 +134,12 @@ public enum StudioSetup {
         return [mic12, xtc, p16]
     }
 
+    /// UFX III 默认接线：12Mic MADI ↔ 主卡 MADI；XTC、P16 默认不接。
+    static let ufx3Links = [
+        Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi.in"),
+        Link(id: "L2", from: "xt.madi.out", to: "12mic.madi_optical.in"),
+    ]
+
     /// 默认接线（XT 档案下）；通用主卡没有具体接口，连到主卡的线不出现，在接线页自己加。
     static let defaultLinks = [
         Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi1.in"),
@@ -131,7 +154,13 @@ public enum StudioSetup {
     public static var capabilities: [RoutingCapability] {
         let config = StudioConfig.current
         var caps = allCapabilities.filter { config.has($0.deviceID) && $0.deviceID != "xt" }
-        if config.mainCard == .generic {
+        if config.mainCard == .ufx3 {
+            caps.insert(RoutingCapability(deviceID: "xt", domain: .totalMix,
+                                          inputPorts: ["xt.line.in", "xt.mic.in", "xt.aes.in", "xt.adat1.in", "xt.adat2.in", "xt.madi.in"],
+                                          outputPorts: ["xt.an.out", "xt.phones.out", "xt.aes.out", "xt.adat1.out", "xt.adat2.out", "xt.madi.out"],
+                                          granularity: .channel, kindIsMix: true, access: .readWrite, grade: .a,
+                                          reference: "TotalMix Global OSC /mix/…/fader（第 7.1 节），UFX III 档案"), at: 0)
+        } else if config.mainCard == .generic {
             caps.insert(RoutingCapability(deviceID: "xt", domain: .totalMix, inputPorts: ["xt.in", "xt.playback.in"], outputPorts: ["xt.out"],
                                           granularity: .channel, kindIsMix: true, access: .readWrite, grade: .a,
                                           reference: "TotalMix Global OSC /mix/…/fader（第 7.1 节），通用主卡"), at: 0)
