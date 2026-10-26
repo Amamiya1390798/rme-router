@@ -299,7 +299,7 @@ struct ConnectionView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.xl) {
+            LazyVStack(alignment: .leading, spacing: Tokens.Space.xl) {   // 懒加载：设置卡片多，切页时只建看得见的
                 ViewHeader(title: "连接", subtitle: model.confirmMode == .quick
                            ? "读取不会改动任何设置；当前为快速方式：改动点下即发送（48V、大幅抬高仍需确认）。"
                            : "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")

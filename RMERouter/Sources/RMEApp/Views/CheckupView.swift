@@ -41,7 +41,7 @@ public struct CheckupContent: View {
 
     public var body: some View {
         let counts = CheckupReport.counts(results)
-        VStack(alignment: .leading, spacing: Tokens.Space.xl) {
+        LazyVStack(alignment: .leading, spacing: Tokens.Space.xl) {   // 懒加载：规则卡片多，切页时只建看得见的
             ViewHeader(title: "体检", subtitle: summary(counts))
             StatusStrip(status: status, lastLoaded: lastLoaded, demoDevices: demoDevices, twelveMic: twelveMic)
             ForEach(results.filter { $0.status == .problem || $0.status == .undetermined }) { RuleCard(result: $0) }
