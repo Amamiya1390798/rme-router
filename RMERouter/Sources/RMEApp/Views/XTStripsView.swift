@@ -81,6 +81,7 @@ struct XTStripsView: View, Equatable {
                                 if pickClick(s, row: outputs) { return }
                                 output = s.tm
                                 source = nil
+                                if let ref = s.ref { model.inspect(ref) }
                             }
                             .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["out:\(s.tm.number)"] = $1 }
                             if let cs = p16ByOut[s.tm] {
@@ -127,6 +128,14 @@ struct XTStripsView: View, Equatable {
                     RouteLines(from: from, targets: sends.compactMap { t in anchors["out:\(t.output.number)"].map { (g[$0], t.dB) } }
                                + (s.tm.bus == .input ? (anchors["rec"].map { [(g[$0], Double?.none)] } ?? []) : []))
                 }
+                // 选中一条输出（没选来源）：画出所有送到它的输入 / 回放的线，线上标电平（和点来源时方向相反的同一种线）
+                if focus == nil, selectedSource == nil, output != nil, let c = current, let to = anchors["out:\(c.tm.number)"].map({ g[$0] }) {
+                    ForEach(all.compactMap { src in model.xtSend(from: src.tm, to: c.tm).map { (src, $0) } }, id: \.0.tm) { src, dB in
+                        if let a = anchors["src:\(src.tm.bus.rawValue):\(src.tm.number)"] {
+                            RouteLines(from: g[a], targets: [(to, dB)], labelAtSource: true)
+                        }
+                    }
+                }
             }
             .allowsHitTesting(false)
             .clipped()
@@ -140,7 +149,7 @@ struct XTStripsView: View, Equatable {
 
     /// P16 一格：P16 第 n 路 = 主卡 ADAT 输出第 n 路；点了选中那条输出（上两行就显示送到它的电平）。
     private func p16Cell(_ c: P16Cell, width w: CGFloat, current: XTStrip?) -> some View {
-        Button { if let o = c.output { output = o; source = nil } } label: {
+        Button { if let o = c.output { output = o; source = nil }; model.inspect(c.ref) } label: {
             VStack(spacing: 2) {
                 Text(w < 72 ? "\(c.number)" : "P16 \(c.number)").font(Tokens.Font.caption.weight(.semibold))
                 Text(verbatim: "\(c.number <= 8 ? "A" : "B")\(c.ref.channel)").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
@@ -305,6 +314,7 @@ struct XTStripsView: View, Equatable {
             if pickClick(s, row: row) { return }
             if focus != nil, onFocusPick?(s) == true { return }
             source = source == s.tm ? nil : s.tm
+            if let ref = s.ref { model.inspect(ref) }   // 检查器跟着点的通道条走
         }
         .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) {
             $0["src:\(s.tm.bus.rawValue):\(s.tm.number)"] = $1
@@ -370,6 +380,8 @@ struct RouteLines: View {
     var from: CGRect
     var targets: [(CGRect, Double?)]
     var opacity: Double = 1
+    /// 电平标在来源一端（多条线汇到同一个输出时，标在终点会叠在一起）。
+    var labelAtSource = false
 
     var body: some View {
         ZStack {
@@ -387,7 +399,7 @@ struct RouteLines: View {
                     Text(String(format: "%.1f", dB)).font(.system(size: 10, design: .monospaced))
                         .padding(.horizontal, 3).background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.surface))
                         .foregroundStyle(Tokens.Palette.accent)
-                        .position(x: b.x, y: b.y - 9)
+                        .position(x: labelAtSource ? a.x : b.x, y: labelAtSource ? a.y + 10 : b.y - 9)
                 }
             }
             Circle().fill(Tokens.Palette.accent).frame(width: 7, height: 7).position(x: from.midX, y: from.maxY)
