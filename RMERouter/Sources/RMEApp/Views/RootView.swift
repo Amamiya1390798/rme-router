@@ -304,6 +304,7 @@ struct ConnectionView: View {
                 ViewHeader(title: "连接", subtitle: model.confirmMode == .quick
                            ? "读取不会改动任何设置；当前为快速方式：改动点下即发送（48V、大幅抬高仍需确认）。"
                            : "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")
+                StudioConfigCard(model: model)
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("TotalMix FX（Global OSC）").font(Tokens.Font.cardTitle)
                     Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.s) {
@@ -551,5 +552,46 @@ struct BrandName: View {
                 .padding(.horizontal, 7).padding(.vertical, 2)
                 .background(Capsule().fill(t == .kimi ? Tokens.Palette.text : Tokens.Palette.accent))
         }
+    }
+}
+
+/// “设备组成”（第 6.4.6 节）：主卡型号、扩展设备开关。改了立即重建并重新读取。
+struct StudioConfigCard: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Text("设备组成").font(Tokens.Font.cardTitle)
+            HStack {
+                Text("主卡").foregroundStyle(Tokens.Palette.textMuted)
+                Picker("主卡", selection: $model.studioConfig.mainCard) {
+                    ForEach(MainCard.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden().frame(width: 260)
+            }
+            .font(Tokens.Font.body)
+            Text(model.studioConfig.mainCard == .madifaceXT
+                 ? "MADIface XT：完整档案（接口名、面板图、按位置对照）。"
+                 : "通用：不需要型号资料，任何 TotalMix FX 设备都能用；TotalMix 第 n 路就是主卡第 n 路，没有面板图，接线在“接线”里自己加。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Tokens.Space.l) {
+                Text("扩展设备").foregroundStyle(Tokens.Palette.textMuted)
+                ForEach(StudioConfig.expansionNames, id: \.id) { e in
+                    Toggle(e.name, isOn: Binding(
+                        get: { model.studioConfig.expansions.contains(e.id) },
+                        set: { on in
+                            var c = model.studioConfig
+                            if on { c.expansions.insert(e.id) } else { c.expansions.remove(e.id) }
+                            model.studioConfig = c
+                        }))
+                    .toggleStyle(.checkbox)
+                }
+            }
+            .font(Tokens.Font.body)
+            Text("关掉的设备不再读取，也不出现在设备页、接线和路径搜索里。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
     }
 }

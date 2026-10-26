@@ -41,8 +41,36 @@ public enum StudioSetup {
              connector: conn, singleSpeedChannels: n)
     }
 
-    public static func topology() -> Topology {
-        let xt = Device(id: "xt", model: .madifaceXT, name: "MADIface XT", ports: [
+    /// 按设备组成（第 6.4.6 节）建拓扑：主卡型号决定接口；关掉的扩展设备和连到它的线不出现。
+    public static func topology(_ config: StudioConfig = .current) -> Topology {
+        var t = fullTopology(mainCard: config.mainCard)
+        t.devices = t.devices.filter { config.has($0.id) }
+        let ports = Set(t.devices.flatMap(\.ports).map(\.id))
+        t.links = t.links.filter { ports.contains($0.from) && ports.contains($0.to) }
+        return t
+    }
+
+    /// 通用主卡的接口：TotalMix 第 n 路 = 主卡输入 / 输出第 n 路。路数上限按 TotalMix 最大通道数留足。
+    static let genericChannels = 256
+
+    static func mainDevice(_ card: MainCard) -> Device {
+        switch card {
+        case .madifaceXT: return xtDevice
+        case .generic:
+            return Device(id: "xt", model: .genericTotalMix, name: card.deviceName, ports: [
+                port("xt.in", "主卡输入", .mixed, .input, .unspecified, genericChannels),
+                port("xt.playback.in", "电脑回放", .usb, .input, .usbC, genericChannels),
+                port("xt.out", "主卡输出", .mixed, .output, .unspecified, genericChannels),
+            ])
+        }
+    }
+
+    static func fullTopology(mainCard: MainCard) -> Topology {
+        let xt = mainDevice(mainCard)
+        return Topology(devices: [xt] + expansionDevices, links: defaultLinks)
+    }
+
+    static let xtDevice = Device(id: "xt", model: .madifaceXT, name: "MADIface XT", ports: [
             port("xt.mic.in", "Mic 1–2", .analog, .input, .xlr, 2),
             port("xt.aes.in", "AES 输入", .aes, .input, .xlr, 2),
             port("xt.madi1.in", "MADI 1 输入", .madiOptical, .input, .sc, 64),
@@ -56,6 +84,8 @@ public enum StudioSetup {
             port("xt.madi2.out", "MADI 2 输出", .madiOptical, .output, .sc, 64),
             port("xt.madi3.out", "MADI 3 输出", .madiCoaxial, .output, .bnc, 64),
         ])
+
+    static var expansionDevices: [Device] {
         let mic12 = Device(id: "12mic", model: .twelveMic, name: "12Mic", ports: [
             port("12mic.analog.in", "Mic 1–12", .analog, .input, .combo, 12),
             port("12mic.madi_optical.in", "MADI 光口输入", .madiOptical, .input, .sfp, 64),
@@ -84,17 +114,34 @@ public enum StudioSetup {
             port("p16i.adat_a.in", "ADAT A", .adat, .input, .toslink, 8),
             port("p16i.adat_b.in", "ADAT B", .adat, .input, .toslink, 8),
         ])
-        return Topology(devices: [xt, mic12, xtc, p16], links: [
-            Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi1.in"),
-            Link(id: "L2", from: "xt.madi1.out", to: "12mic.madi_optical.in"),
-            Link(id: "L3", from: "xt.madi2.out", to: "xtc.madi.in"),
-            Link(id: "L4", from: "xtc.madi.out", to: "xt.madi2.in"),
-            Link(id: "L5", from: "xtc.adat1.out", to: "p16i.adat_a.in"),
-        ])
+        return [mic12, xtc, p16]
     }
 
+    /// 默认接线（XT 档案下）；通用主卡没有具体接口，连到主卡的线不出现，在接线页自己加。
+    static let defaultLinks = [
+        Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi1.in"),
+        Link(id: "L2", from: "xt.madi1.out", to: "12mic.madi_optical.in"),
+        Link(id: "L3", from: "xt.madi2.out", to: "xtc.madi.in"),
+        Link(id: "L4", from: "xtc.madi.out", to: "xt.madi2.in"),
+        Link(id: "L5", from: "xtc.adat1.out", to: "p16i.adat_a.in"),
+    ]
+
     /// 各设备能做的内部路由（文档第 7.5 节），路径搜索据此生成候选边。
-    public static let capabilities = [
+    /// 按设备组成过滤：关掉的设备没有路由能力；主卡能力按型号。
+    public static var capabilities: [RoutingCapability] {
+        let config = StudioConfig.current
+        var caps = allCapabilities.filter { config.has($0.deviceID) && $0.deviceID != "xt" }
+        if config.mainCard == .generic {
+            caps.insert(RoutingCapability(deviceID: "xt", domain: .totalMix, inputPorts: ["xt.in", "xt.playback.in"], outputPorts: ["xt.out"],
+                                          granularity: .channel, kindIsMix: true, access: .readWrite, grade: .a,
+                                          reference: "TotalMix Global OSC /mix/…/fader（第 7.1 节），通用主卡"), at: 0)
+        } else {
+            caps.insert(allCapabilities[0], at: 0)
+        }
+        return caps
+    }
+
+    static let allCapabilities = [
         RoutingCapability(deviceID: "xt", domain: .totalMix,
                           inputPorts: ["xt.mic.in", "xt.aes.in", "xt.madi1.in", "xt.madi2.in", "xt.madi3.in"],
                           outputPorts: ["xt.an.out", "xt.aes.out", "xt.phones.out", "xt.madi1.out", "xt.madi2.out", "xt.madi3.out"],
@@ -112,7 +159,9 @@ public enum StudioSetup {
                           reference: "XTC Digital Routing，协议编号未知：只能在面板上设置"),
     ]
 
-    public static let terminals = [
+    public static var terminals: [TerminalConstraint] { allTerminals.filter { StudioConfig.current.has($0.deviceID) } }
+
+    static let allTerminals = [
         TerminalConstraint(deviceID: "p16i", allowedSampleRates: [44_100, 48_000], clockInputPort: "p16i.adat_a.in",
                            grade: .a, reference: "Behringer P16-I 产品资料"),
     ]
@@ -142,7 +191,7 @@ public enum StudioSetup {
             },
             controlPaths: [ControlPath(controller: "totalmix-aux", transport: .midiOverMadi(viaPort: "xtc.madi.in"),
                                        state: .notProbed, active: false)])
-        return ["12mic": mic12, "xtc": xtc]
+        return ["12mic": mic12, "xtc": xtc].filter { StudioConfig.current.has($0.key) }
     }
 
     /// XT 读取前的占位快照（无路由）。

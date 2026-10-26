@@ -13,6 +13,8 @@ public struct TotalMixChannelMap: Sendable, Equatable {
 
     public var deviceID: String
     public private(set) var entries: [TotalMixChannel: Entry] = [:]
+    /// 通用主卡（文档第 6.4.6 节）：不按型号对照，TotalMix 第 n 路 = `<设备>.in:n` / `<设备>.out:n`。
+    public var generic = false
 
     public init(deviceID: String = "xt", confirmed: [TotalMixChannel: ChannelRef] = [:]) {
         self.deviceID = deviceID
@@ -34,6 +36,17 @@ public struct TotalMixChannelMap: Sendable, Equatable {
     ///    解析不出时，用同号回放的名字——回放 n 与输出 n 是同一个硬件口，回放名保持默认。
     /// 2. 立体声对的右声道 TotalMix 不发名字：左声道为 `:c` 时右声道记为 `:c+1`。
     public mutating func infer(from state: TotalMixState) {
+        if generic {
+            // 按定义映射（不看名字、不按 XT 顺序）：TotalMix 第 n 路就是主卡第 n 路
+            for bus in [TotalMixBus.input, .output] {
+                let maxNumber = state.channels.keys.filter { $0.bus == bus }.map(\.number).max() ?? 0
+                guard maxNumber > 0 else { continue }
+                for n in 1 ... maxNumber where entries[TotalMixChannel(bus, n)]?.evidence != .confirmed {
+                    entries[TotalMixChannel(bus, n)] = Entry(ref: ChannelRef("\(deviceID).\(bus == .input ? "in" : "out")", n), evidence: .confirmed)
+                }
+            }
+            return
+        }
         let names = state.names
         var byName: [TotalMixChannel: ChannelRef] = [:]
         for (ch, name) in names where ch.bus != .playback {

@@ -2,20 +2,26 @@ import Foundation
 
 public enum PortType: String, Codable, Sendable {
     case madiOptical, madiCoaxial, adat, aes, analog, ultranet, usb, wordClock, ethernet
+    /// 通用主卡（文档第 6.4.6 节）：不知道具体是哪种接口，和任何类型都能连。
+    case mixed
 
     /// 哪些端口类型之间可以直接连线。MADI 光纤与 ADAT TOSLINK 都是光，但不能互通（问题 8）。
-    public func canConnect(to other: PortType) -> Bool { self == other }
+    public func canConnect(to other: PortType) -> Bool { self == other || self == .mixed || other == .mixed }
 }
 
 /// 物理连接器。SC 与 LC 都是 MADI 多模光纤，只是接头不同，需转接跳线，不算类型错误。
 public enum Connector: String, Codable, Sendable {
     case sc, lc, sfp, bnc, toslink, rj45, xlr, trs, combo, dsub, usbB, usbC
+    /// 通用主卡：接头未知
+    case unspecified
 }
 
 public enum Direction: String, Codable, Sendable { case input, output }
 
 public enum DeviceModel: String, Codable, Sendable {
     case madifaceXT, twelveMic, octamicXTC, p16i, p16m
+    /// 通用 TotalMix FX 设备（没有型号档案，文档第 6.4.6 节）
+    case genericTotalMix
 }
 
 public struct Port: Codable, Sendable, Hashable, Identifiable {

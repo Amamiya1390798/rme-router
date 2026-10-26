@@ -140,6 +140,16 @@ public final class AppModel {
         NSApplication.shared.appearance = a == .system ? nil : NSAppearance(named: a == .light ? .aqua : .darkAqua)
     }
 
+    /// 设备组成（第 6.4.6 节）：主卡型号、打开的扩展设备。改了立即重建并重新读取。
+    public var studioConfig = StudioConfig() {
+        didSet {
+            guard studioConfig != oldValue else { return }
+            StudioConfig.current = studioConfig
+            if let d = try? JSONEncoder().encode(studioConfig) { defaults.set(d, forKey: StudioConfig.defaultsKey) }
+            rebuildForStudioConfig(mainChanged: studioConfig.mainCard != oldValue.mainCard)
+        }
+    }
+
     /// 正在编辑 EQ 的通道（第 7.8 节）；非 nil 时弹出 EQ 窗口。
     public var eqEditing: EQTarget?
 
@@ -283,6 +293,12 @@ public final class AppModel {
             settings = OSCSettings()
         }
         self.snapshot = snapshot ?? StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
+        studioConfig = defaults.data(forKey: StudioConfig.defaultsKey)
+            .flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) } ?? StudioConfig()
+        if StudioConfig.current != studioConfig {
+            StudioConfig.current = studioConfig
+            self.snapshot = StudioSetup.snapshot(xt: StudioSetup.emptyXT(reason: "尚未读取"), links: linkStore.load())
+        }
         // 主题、外观（init 里不触发 didSet：外观由 App 启动时调 applyAppearance）
         theme = defaults.string(forKey: UITheme.defaultsKey).flatMap(UITheme.init(rawValue:)) ?? .warm
         UITheme.current = theme
@@ -312,6 +328,7 @@ public final class AppModel {
 
     /// 从 12Mic 读取一次（JSON，请求体全为 null）。读不到时保留演示数据。
     public func refreshTwelveMic() async {
+        guard studioConfig.has("12mic") else { twelveMicStatus = .notLoaded; return }   // 没有接 12Mic（设备组成里关掉了）
         guard let url = URL(string: twelveMicURL.trimmingCharacters(in: .whitespaces)), url.host != nil else {
             twelveMicStatus = .unreachable("12Mic 地址无效：\(twelveMicURL)")
             return
@@ -333,6 +350,25 @@ public final class AppModel {
         twelveMicStatus = .live
     }
 
+    /// 设备组成变了：按新组成重建拓扑与能力（接线表里连到已关设备的线不显示）；主卡换了要重建对照表并重读。
+    func rebuildForStudioConfig(mainChanged: Bool) {
+        let xt = mainChanged ? StudioSetup.emptyXT(reason: "换了主卡，正在重新读取") : (snapshot.devices["xt"] ?? StudioSetup.emptyXT(reason: "尚未读取"))
+        var others = snapshot.devices.filter { $0.key != "xt" && studioConfig.has($0.key) }
+        for (id, d) in StudioSetup.demoDevices() where others[id] == nil { others[id] = d }
+        snapshot = StudioSetup.snapshot(xt: xt, others: others, links: linkStore.load())
+        panelSelection = nil
+        focusCache = nil; outputsCache = nil; stripPreampCache = nil; loopbackCache = nil
+        if mainChanged {
+            if let a = adapter { retired.append(a) }
+            adapter = nil
+            tmState = TotalMixState()
+            xtMap = TotalMixChannelMap()
+            lastLoaded = nil
+        }
+        if !studioConfig.has("xtc") { xtcSettings.readEnabled = false }
+        Task { await refresh() }
+    }
+
     /// 只换设备快照，其余（拓扑、约束）不变。
     func replaceDevices(_ devices: [String: DeviceSnapshot]) {
         snapshot = SystemSnapshot(topology: snapshot.topology, devices: devices, capabilities: snapshot.capabilities,
@@ -345,7 +381,10 @@ public final class AppModel {
         xtStatus = .loading
         for old in retired { await old.client.stop() }
         retired = []
-        if adapter == nil { adapter = makeAdapter(settings) }
+        if adapter == nil {
+            adapter = makeAdapter(settings)
+            adapter?.channelMap.generic = studioConfig.mainCard == .generic
+        }
         guard let adapter else { return }
         do {
             let xt = try await adapter.snapshot()

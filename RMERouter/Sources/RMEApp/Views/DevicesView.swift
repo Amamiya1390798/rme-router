@@ -199,12 +199,22 @@ struct RackView: View {
         VStack(alignment: .leading, spacing: 64) {
             unit("12mic").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:0"] = $1 }
             HStack(alignment: .center, spacing: Tokens.Space.l) {
-                unit("xt").frame(maxWidth: 560)
+                if PanelLayout.panel("xt", face) != nil, model.studioConfig.mainCard == .madifaceXT {
+                    unit("xt").frame(maxWidth: 560)
+                } else {
+                    // 通用主卡（第 6.4.6 节）：没有面板图，显示一张卡片
+                    NodeCard(title: model.snapshot.devices["xt"]?.settings["totalmix.device"]?.knownValue ?? model.studioConfig.mainCard.deviceName,
+                             lines: ["通用主卡：TotalMix 第 n 路 = 主卡第 n 路", "没有面板图；接线在“设置 → 接线”里加"],
+                             color: Tokens.Palette.accent)
+                        .frame(width: 300)
+                }
                 MacNodeCard(model: model).frame(width: 170)
                     .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:mac"] = $1 }
-                NodeCard(title: "Behringer P16-I", lines: ["ADAT A 输入", "ADAT B 输入"], color: Color(hex: 0x6AA6C9))
-                    .frame(width: 170)
-                    .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:p16i"] = $1 }
+                if model.studioConfig.has("p16i") {
+                    NodeCard(title: "Behringer P16-I", lines: ["ADAT A 输入", "ADAT B 输入"], color: Color(hex: 0x6AA6C9))
+                        .frame(width: 170)
+                        .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["node:p16i"] = $1 }
+                }
                 Spacer(minLength: 0)
             }
             .transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:1"] = $1 }
@@ -223,7 +233,8 @@ struct RackView: View {
     }
 
     @ViewBuilder private func unit(_ deviceID: String) -> some View {
-        if let panel = PanelLayout.panel(deviceID, face) {
+        // 设备组成里关掉的不显示（第 6.4.6 节）
+        if model.studioConfig.has(deviceID), let panel = PanelLayout.panel(deviceID, face) {
             VStack(alignment: .leading, spacing: Tokens.Space.xs) {
                 HStack(spacing: Tokens.Space.s) {
                     Text(model.snapshot.topology.device(deviceID)?.name ?? deviceID).font(Tokens.Font.cardTitle)
@@ -342,8 +353,7 @@ struct CableLayer: View {
     }
 
     var body: some View {
-        let rows = (0 ..< Self.rowCount).compactMap { anchors["row:\($0)"] }
-        let routed = Self.route(cables, anchors: anchors, rows: rows)
+        let routed = Self.route(cables, anchors: anchors, rows: Self.rows(anchors))
         ZStack {
             ForEach(routed, id: \.cable.id) { r in
                 let on = highlight.map { $0.contains(r.cable.id) } ?? (selected == nil || r.cable.from == selected || r.cable.to == selected)
@@ -361,6 +371,13 @@ struct CableLayer: View {
                 }
             }
         }
+    }
+
+    /// 各行的框；只剩一行（扩展设备都关了）时在下面虚拟一行，线照样从下方的缝走。
+    static func rows(_ anchors: [String: CGRect]) -> [CGRect] {
+        let rows = (0 ..< rowCount).compactMap { anchors["row:\($0)"] }
+        guard rows.count == 1, let r = rows.first else { return rows }
+        return rows + [CGRect(x: r.minX, y: r.maxY + 64, width: r.width, height: 1)]
     }
 
     struct Routed { var cable: CableSpec; var points: [CGPoint]; var labelAt: CGPoint }

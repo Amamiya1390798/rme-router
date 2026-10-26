@@ -50,7 +50,7 @@ public struct StreamFormat: Codable, Sendable, Hashable {
             return 8 / s.rawValue                       // 8/4/2（S/MUX）
         case .aes:
             return 2
-        case .analog, .ultranet, .usb, .wordClock, .ethernet:
+        case .analog, .ultranet, .usb, .wordClock, .ethernet, .mixed:
             return nil
         }
     }
