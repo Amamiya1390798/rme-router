@@ -316,6 +316,8 @@ struct GainEditor: View {
     var title: String
     var panCurrent: Double?
     var onDone: (Double?, Double?) -> Void
+    /// 给了就由它处理“取消”（批量设置时“当前值”没有意义，不能拿它当结果）。
+    var onCancel: (() -> Void)? = nil
     @State private var value: Double
     @State private var pan: Double
 
@@ -332,6 +334,12 @@ struct GainEditor: View {
 
     init(current: Double?, initial: Double?, title: String, onDone: @escaping (Double?) -> Void) {
         self.init(current: current, initial: initial, title: title, pan: nil) { dB, _ in onDone(dB) }
+    }
+
+    /// 批量设置用：取消单独处理。
+    init(batchTitle title: String, initial: Double, onCancel: @escaping () -> Void, onDone: @escaping (Double?) -> Void) {
+        self.init(current: nil, initial: initial, title: title, pan: nil) { dB, _ in onDone(dB) }
+        self.onCancel = onCancel
     }
 
     private var isOff: Bool { value <= TotalMixFaderUI.off }
@@ -362,7 +370,7 @@ struct GainEditor: View {
                 Button("关") { value = TotalMixFaderUI.off }
                 Button("0 dB") { value = 0 }
                 Spacer()
-                Button("取消") { onDone(current, nil) }
+                Button("取消") { if let onCancel { onCancel() } else { onDone(current, nil) } }
                 Button(ConfirmMode.current.applyLabel) { onDone(isOff ? nil : value, panCurrent == nil ? nil : pan) }
                     .keyboardShortcut(.defaultAction)
             }

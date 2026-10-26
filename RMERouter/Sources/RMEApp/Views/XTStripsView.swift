@@ -38,6 +38,8 @@ struct XTStripsView: View, Equatable {
     /// 搜索跳到的被屏蔽条：临时显示，直到下次跳转。
     @State private var revealed: Set<TotalMixChannel> = []
     @State private var flash: TotalMixChannel?
+    @State private var batchGain = false
+    @State private var batchError: String?
 
     var body: some View {
         // 每次重绘只算一次（以前每条通道条都重新算一遍输出列表）
@@ -144,16 +146,44 @@ struct XTStripsView: View, Equatable {
         picked = []
     }
 
-    private var pickBar: some View {
+    private func batchMute(_ on: Bool) {
+        batchError = model.stageBatchMute(picked, on: on)
+        Task { await model.commitIfQuick() }
+    }
+
+    private func batchSend(_ dB: Double?, to output: XTStrip) {
+        batchError = model.stageBatchSend(picked, to: output.tm, dB: dB)
+        Task { await model.commitIfQuick() }
+    }
+
+    private func pickBar(current: XTStrip?) -> some View {
         let hiddenPicked = picked.filter(model.hiddenStrips.contains)
+        let pickedSources = picked.filter { $0.bus != .output }
         return HStack(spacing: Tokens.Space.s) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(nsColor: .controlAccentColor))
             Text("已选 \(picked.count) 条").font(Tokens.Font.caption)
             if hiddenPicked.count < picked.count { Button("屏蔽 ⌘⇧H", action: hidePicked).controlSize(.small) }
             if !hiddenPicked.isEmpty { Button("取消屏蔽 ⌘⇧U", action: unhidePicked).controlSize(.small) }
+            Button("静音") { batchMute(true) }.controlSize(.small)
+            Button("取消静音") { batchMute(false) }.controlSize(.small)
+            if let o = current, !pickedSources.isEmpty {
+                Button("送到 \(o.name)…") { batchGain = true }.controlSize(.small)
+                    .help("所选 \(pickedSources.count) 条来源送到「\(o.name)」的电平设成同一个值")
+                    .popover(isPresented: $batchGain, arrowEdge: .bottom) {
+                        GainEditor(batchTitle: "所选 \(pickedSources.count) 条 → \(o.name)", initial: -30,
+                                   onCancel: { batchGain = false }) { dB in
+                            batchSend(dB, to: o)
+                            batchGain = false
+                        }
+                    }
+            }
             Button("取消选择") { picked = [] }.controlSize(.small)
-            Text("⌘ 单击加选 · ⇧ 单击连选 · ⌘A 全选 · 屏蔽只影响显示").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
-                .lineLimit(1)
+            if let batchError {
+                Text(batchError).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem).lineLimit(1)
+            } else {
+                Text("⌘ 单击加选 · ⇧ 单击连选 · ⌘A 全选 · 屏蔽只影响显示").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -198,7 +228,7 @@ struct XTStripsView: View, Equatable {
             Text("MADIface XT · 通道条").font(Tokens.Font.cardTitle)
             // 多选时这一行换成多选操作（不加新行，免得通道条往下跳、点偏）
             if !picked.isEmpty {
-                pickBar
+                pickBar(current: current)
             } else if let s {
                 let names = sends.map { t in "\(outputs.first { $0.tm == t.output }?.name ?? "\(t.output)") \(String(format: "%.1f", t.dB))" }
                 let rec = s.tm.bus == .input ? ["电脑录音 \(recordingText(s))"] : []

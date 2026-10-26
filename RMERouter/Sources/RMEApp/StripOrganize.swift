@@ -18,6 +18,33 @@ extension AppModel {
         if !hiddenStrips.isEmpty { hiddenStrips = [] }
     }
 
+    /// 批量静音 / 取消静音（第 6.4.5 节）。返回出错说明（第一条）；nil 表示都已加入待应用。
+    @discardableResult
+    public func stageBatchMute(_ chs: Set<TotalMixChannel>, on: Bool) -> String? {
+        var err: String?
+        for s in xtStrips(.input) + xtStrips(.playback) + xtStrips(.output) where chs.contains(s.tm) {
+            guard let ref = s.ref else { continue }
+            if let e = stageStrip(ref, .mute, on ? 1 : 0), err == nil { err = "\(s.name)：\(e.text)" }
+        }
+        return err
+    }
+
+    /// 批量：这些来源条送到某个输出的电平设成同一个值（nil = 关；没有发送的新建）。输出条会被忽略。
+    @discardableResult
+    public func stageBatchSend(_ chs: Set<TotalMixChannel>, to output: TotalMixChannel, dB: Double?) -> String? {
+        guard let dst = xtStrips(.output).first(where: { $0.tm == output })?.ref else { return "找不到输出 \(output)" }
+        var err: String?
+        for s in xtStrips(.input) + xtStrips(.playback) where chs.contains(s.tm) {
+            guard let src = s.ref else { continue }
+            let exists = xtSend(from: s.tm, to: output) != nil
+            let e: StageError?
+            if exists || dB == nil { e = stageGain(source: src, destination: dst, dB: dB) }
+            else { e = stageNewSend(source: src, destination: dst, dB: dB!) }
+            if let e, err == nil { err = "\(s.name)：\(e.text)" }
+        }
+        return err
+    }
+
     /// 搜索通道条：名字、源头（“12Mic Mic 1”）、通道号（“输入 9”“回放 3”“输出 7”，也认 in / pb / out）。
     /// 名字开头匹配的排前面；最多 limit 条。被屏蔽的也能搜到。
     public func searchStrips(_ query: String, limit: Int = 8) -> [StripHit] {

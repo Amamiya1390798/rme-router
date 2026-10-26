@@ -49,4 +49,19 @@ final class StripOrganizeTests: XCTestCase {
         XCTAssertTrue(hit?.detail.contains("已屏蔽") == true)
         XCTAssertLessThanOrEqual(m.searchStrips("m", limit: 3).count, 3)
     }
+
+    /// 批量静音、批量设发送电平：一批改动，发送后回读；撤销整批。
+    func testBatch() async throws {
+        let m = await loaded(UserDefaults(suiteName: "batch-\(UUID())")!)
+        let mic1 = TotalMixChannel(.input, 1), m2 = TotalMixChannel(.input, 69), phones = TotalMixChannel(.output, 5)
+        XCTAssertNil(m.stageBatchMute([mic1, m2], on: true))
+        XCTAssertEqual(m.pendingStrips.count, 2)
+        XCTAssertNil(m.stageBatchSend([mic1, m2, phones], to: phones, dB: -20))
+        XCTAssertEqual(m.pending.count, 2, "输出条被忽略，两条来源各一条发送")
+        let applied = await m.applyPending(confirmation: ConfirmationGate.userConfirmed(m.allPendingOperations))
+        let batch = try XCTUnwrap(applied)
+        XCTAssertTrue(batch.outcomes.values.allSatisfy { $0 == .verified })
+        XCTAssertEqual(m.xtSend(from: mic1, to: phones) ?? 0, -20, accuracy: 0.1)
+        XCTAssertEqual(m.stripValue(ChannelRef("xt.mic.in", 1), .mute), 1)
+    }
 }
