@@ -44,7 +44,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
     <key>NSHighResolutionCapable</key><true/>
-    <key>NSHumanReadableCopyright</key><string>© 2026 amamiya. 二次元模式美术 CC BY-NC-SA 4.0（上善、ZipZipPipe、Small-tailqwq）</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 amamiya (cly20041110@gmail.com). 二次元模式美术 CC BY-NC-SA 4.0（上善、ZipZipPipe、Small-tailqwq）</string>
 </dict>
 </plist>
 PLIST
