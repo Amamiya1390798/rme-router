@@ -87,6 +87,9 @@ struct XTStripsView: View, Equatable {
                                 HStack(spacing: 4) {
                                     ForEach(cs) { c in p16Cell(c, width: cs.count > 1 ? 34 : 72, current: current) }
                                 }
+                            } else if p16Cells != nil {
+                                // 每条都留出同样高度：懒加载行按先建出来的条定高，不留会把后面的 P16 格裁掉
+                                Color.clear.frame(width: 72, height: 52)
                             }
                         }
                         .id(s.tm)
@@ -553,7 +556,10 @@ struct MiniStripButtons: View {
                     if hasEQ { eqChip }
                 }
             }
-            if let s = strip, s.tm.number % 2 == 1, canPair(s) { pairChip(s) }
+            if let s = strip {
+                // 没有立体声按钮的条也占同样高度，一行里的条一样高（下面挂的 P16 格才对齐）
+                if s.tm.number % 2 == 1, canPair(s) { pairChip(s) } else { pairChip(s).hidden().disabled(true) }
+            }
         }
     }
 
