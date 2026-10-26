@@ -1,9 +1,100 @@
 {
- "note": "Claude 看板娘（第 5.1.2 节）。形象由 amamiya 提供（2026-10-27）；其余素材按 docs/二次元素材-Claude.md 出图后放进来。",
- "files": {
-  "maid-left.png": {
-   "source": "用户提供的立绘，抠掉白底、缩到 1100 px 高",
-   "sha256": "01496355a5659eaada46bf2530670fbf4d4ae9a3ef8d303b23dc723c270f3310"
-  }
- }
+  "note": "Claude 看板娘：形象由用户提供；本组 10 张素材于 2026-10-27 使用 OpenAI 内置 image_gen 参考原立绘生成，按 docs/二次元素材-Claude.md 导出。",
+  "files": {
+    "maid-left.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "d768b7f2d6731b07ba5e7f7e38532937bec10725935b8caee875ebfdb0528603",
+      "width": 930,
+      "height": 1691,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: identity-preserve. Create maid-left.png, a polished full-body anime character cutout based on the attached reference. Preserve precisely her face, long straight orange hair, amber eyes, scholarly calm expression, cream high-collar ruffled full-length dress, black waist corset and bows, orange hanging sash panels, gold tassels, sunflower/daisy radial orange brooches, cream lace-up boots and dark brown hardcover book. Refine the illustration with clean delicate outlines and soft cel shading; natural anatomy and hands. Standing upright, book held near chest, complete silhouette and both shoes visible, centered, shoes close to bottom edge, no cropping. Warm restrained palette #F7F1E8 #FFFBF5 #C15F3C #D97757 #C9A15A #1F1A17. Portrait image 1100x2000 or smaller, approximately 0.55 width/height. True transparent background including hair gaps, no white halo, no floor/shadow/background, no letters or watermark."
+    },
+    "maid-right.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "016e8a374a0d3c271432408875c5c5495c25587a317fcd2f327729642d78c38b",
+      "width": 921,
+      "height": 1708,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: identity-preserve. Reference image is the exact character identity and clothing design. Preserve orange long straight hair, amber eyes, orange daisy/sunflower hair brooch, black hair ribbon with cream hanging ribbon and gold tassels, high-collar cream ruffled scholar maid dress, black waist and bows, terracotta panels, gold trim, dark brown book. Clean polished anime illustration, restrained warm palette #F7F1E8 #FFFBF5 #C15F3C #D97757 #C9A15A #1F1A17. Actual transparent background with transparent hair gaps. No text, watermark, scenery or ground shadow. Full-body second pose, quietly looking down at an open book held in both hands, body in gentle three-quarter turn toward viewer's LEFT. Same outfit, full long dress and both boots visible. Centered complete silhouette with small margins and feet near bottom. Portrait 1000x1900 maximum."
+    },
+    "face-delighted.png": {
+      "source": "OpenAI 内置 image_gen；图1为 Claude 人设参考，图2仅为 Q 版画风参考",
+      "sha256": "529320058d429acfd84d12305e7bb31e9b830d7187cd5b5dc5d50851d4c1cae0",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Create ONE centered full-body delighted chibi sticker of the orange-haired Claude scholar-maid.\nREFERENCE ROLES: Image 1 is the ONLY CHARACTER IDENTITY and COSTUME reference. Image 2 is ONLY the DRAWING STYLE and CHIBI PROPORTION reference; it depicts a DIFFERENT blue whale character. Transfer its compact rounded chibi construction, clean dark outlines, restrained cel shading and simplified small clothing details, NOT its character features.\nCharacter identity from image 1: SHORT orange bob ending at shoulders, side-swept bangs, one curved ahoge, orange radial daisy/sunflower hair ornament on viewer's right, black bow with cream ribbon and gold tassel; cream high-collar ruffled dress, small shoulder cape, narrow black waist corset, black bows, orange sash panels, radial orange flower brooches, tiny gold tassels, cream socks and cream lace-up ankle boots. Simplify embroidery into just a few tiny motifs. Keep orange/cream/black/gold palette. No blue hair, no whale tail, no fins, no animal ears, no whale symbols, no maid headband from reference 2.\nUse the compact, charming front-view proportions of image 2: approximately TWO heads tall, round head about half of full character height, no visible neck, tiny narrow shoulders and torso, short arms and short legs. Clearly visible entire small body, skirt and TWO feet, not a portrait. Smile naturally with CLOSED happy upside-down U shaped eyes, a small open delighted mouth and soft round cheek blush. TWO small mitten hands raised near cheeks, BOTH attached naturally to visible short bent sleeve-covered arms originating at tiny shoulders. Exactly two arms, no extra or floating hands, no realistic fingers. A few tiny warm gold sparkles around head. Gentle lively joy, balanced anatomy and relaxed pose.\nClean sticker illustration matching reference 2's visual economy: consistent dark-brown outline, flat base colors with one simple shadow tone, tiny restrained highlights, no painterly gradients or realistic rendering. Single FRONT VIEW only, not three views or a model sheet. Square composition with 8% padding around whole figure and sparkles. TRUE transparent background including gaps; no white background, no scene, no text, logo or watermark. Final export target 512x512."
+    },
+    "palace-day.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "8fd0fe94d27e702efe44ae8293f27d483c09693ef587bb7a034e7c2dead4725b",
+      "width": 1600,
+      "height": 1000,
+      "transparent": false,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: stylized-concept. Create a final UI background illustration, exact 1600x1000 landscape, 16:10. Quiet old scholarly library in warm afternoon: tall wooden bookshelves along left and right sides, arched window on right, warm sun patches, small desk low on left with an open book and potted sunflowers. Airy pale cream #F7F1E8 #FFFBF5 dominates, restrained terracotta #D97757 #C15F3C and muted gold #C9A15A accents. Beautiful delicate anime background painting, low contrast, soft diffused light. Center 60 percent uncluttered pale wall/floor negative space for opaque UI overlays, details at edges. No characters or people, no writing, no letters, no watermark."
+    },
+    "face-sleepy.png": {
+      "source": "OpenAI 内置 image_gen；参考用户确认的开心版 SD 贴纸制作同系列变体",
+      "sha256": "c7156c0e6dded8b23b98b7dba90f3fd3bf716ac3548e7c7ba4d3dda29e289411",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: identity-preserve. The attached approved delighted sticker is the MASTER reference for this exact character and drawing style. Create ONE different-expression sticker from the SAME SET. Preserve the short shoulder-length orange bob, curved ahoge, orange radial sunflower hair clip on viewer's right, black bow, cream ribbon, small gold tassel; cream ruffled high-collar dress and small cape, black fitted waist, black bows with orange radial flowers, orange sash panels, cream socks and cream lace-up boots. Preserve approximately TWO heads tall, huge rounded head, no visible neck, tiny narrow shoulders and torso, short naturally connected arms, small mitten hands and short legs. Clean dark-brown outlines, simple warm cel shading, restrained highlights and simplified delicate floral motifs exactly matching master. Keep whole character including two feet inside square with generous transparent padding. True alpha transparency including gaps. No text, letters, watermark, scenery or floor. No extra limbs or detached hands, no long adult proportions. Same scale and costume as master, with amber irises when eyes are open. Final output 512x512 target. Expression: peacefully sleepy, gently closed eyelids, relaxed eyebrows, tiny softly closed mouth, light blush. Full-body seated pose, legs tucked in front with both small cream boots visible below skirt. A CLOSED small dark-brown book with a simple radial orange flower rests horizontally on her lap. BOTH short forearms rest across the top of the book, mittens adjacent and visibly connected to sleeves; her head tilts gently forward and one cheek rests on the soft forearms. Make the support physically plausible and the pose easy to read, no head embedded in book, no crossed tangled arms, no exposed fingers, no open mouth. No sparkles. Sweet compact rounded sleepy sticker, never a cropped bust."
+    },
+    "face-determined.png": {
+      "source": "OpenAI 内置 image_gen；参考用户确认的开心版 SD 贴纸制作同系列变体",
+      "sha256": "3e353893a4b7f3dc32a3869a4ffb6fca86a5a847a62acfdb4b6c2854b800e3cb",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: identity-preserve. The attached approved delighted sticker is the MASTER reference for this exact character and drawing style. Create ONE different-expression sticker from the SAME SET. Preserve the short shoulder-length orange bob, curved ahoge, orange radial sunflower hair clip on viewer's right, black bow, cream ribbon, small gold tassel; cream ruffled high-collar dress and small cape, black fitted waist, black bows with orange radial flowers, orange sash panels, cream socks and cream lace-up boots. Preserve approximately TWO heads tall, huge rounded head, no visible neck, tiny narrow shoulders and torso, short naturally connected arms, small mitten hands and short legs. Clean dark-brown outlines, simple warm cel shading, restrained highlights and simplified delicate floral motifs exactly matching master. Keep whole character including two feet inside square with generous transparent padding. True alpha transparency including gaps. No text, letters, watermark, scenery or floor. No extra limbs or detached hands, no long adult proportions. Same scale and costume as master, with amber irises when eyes are open. Final output 512x512 target. Expression: quietly determined and ready to act. Amber eyes open, bright attentive gaze, mildly focused eyebrows, tiny confident closed smile and soft blush. Full-body standing upright with both feet planted naturally; TWO short bent arms with small rounded mitten fists raised beside the upper torso in a gentle 'ready!' pose, elbows and sleeves visibly connecting each hand to the small shoulders. No pointing fingers, no glasses, no book. Exactly two arms, two mittens, two legs. One or two very small gold sparkles near head. Confident and cute, not angry or aggressive. Preserve narrow shoulders and full figure, no portrait crop."
+    },
+    "palace-night.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "e3189d2fceb79199044a6f6d75a4b01cc8d07f6c1d7f1ce84e9fef35b33de4e2",
+      "width": 1600,
+      "height": 1000,
+      "transparent": false,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: lighting-weather. Edit the reference daytime library into the SAME ROOM at NIGHT. Keep identical camera angle, bookcases at edges, tall arched window on right, desk at lower left with open book and sunflowers, empty center 60 percent for UI overlay. Turn off daylight; add a small warm table lamp on the desk. Very dark warm brown #221A16 #2D231E overall, muted gold #C9A15A lamp light localized at left, subdued deep blue night visible outside window, subtle bookcase silhouettes. Center should stay very dark and low contrast. Same delicate anime illustration style. Landscape exact 1600x1000. No people, no letters, no watermark."
+    },
+    "lace-tile.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "d7e3333054c870cf34e89f3ee10b2305afd014f3624971b819d18763e88c86ae",
+      "width": 120,
+      "height": 72,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: stylized-concept. Production UI border tile: ONE repeatable horizontal cream-white lace band with thin straight terracotta orange line along top. Transparent background and transparent lace holes. Flat vector-like clean antialiased ornament, not photograph. Output 120x72 ratio 5:3, one tile with a symmetrical scalloped cream lace repeat hanging from a continuous perfectly horizontal top band. Cream #FFFBF5 #F7F1E8, thin line #D97757. Left and right must seamlessly connect, exact same profile at both vertical edges, no side margins, tile extends all the way through left and right canvas boundaries. Restrained simple lace visible when reduced to 120x72. No words, watermarks, shadow or colored backdrop."
+    },
+    "trim-tile.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "1849ab0731a48ac1eb4cb7d914dd6efe52212dadd9f69a91375e9360beb663de",
+      "width": 384,
+      "height": 30,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: stylized-concept. Production UI horizontal seamless trim tile for bottom edge of cards. Exact extremely wide shallow canvas 384x30 (12.8:1). A single thin black ribbon #1F1A17 horizontally across full width, edged by hairline gold #C9A15A above and below; three evenly spaced tiny simple radial terracotta orange daisy flowers #C15F3C #D97757 decorating it. Flat vector-like clean minimal design, uniform thickness, no perspective, no folds, no shadows. Transparent outside ribbon and flower silhouettes. Both vertical canvas edges must have identical black/gold stripe profile so this tiles horizontally without seams; no margins at left/right. No text or watermark."
+    },
+    "corner.png": {
+      "source": "OpenAI image_gen（内置工具）生成；角色依照用户参考，导出尺寸适配",
+      "sha256": "a31038f3931172dac3b5409caf2faf8bcd21457af9db61dafc0b8c328f5ced88",
+      "width": 400,
+      "height": 400,
+      "transparent": true,
+      "generated_at": "2026-10-27",
+      "prompt": "Use case: stylized-concept. Production UI top-right corner ornament on a 400x400 square transparent canvas. Thin elegant muted gold #C9A15A scrollwork forming a restrained L following the TOP and RIGHT edges, a small terracotta orange radial sunflower/daisy at their junction near top-right, with one tiny Claude Code Clawd pixel crab mascot tucked next to the flower: terracotta blocky rectangular body, two black square eyes and short square legs, clean retro pixel-art silhouette. Keep all decoration confined to top and right edges and upper-right quadrant; bottom-left and central area transparent, lots of negative space. Flat elegant vector-like gold foliage, subtle pixel accent. No other characters, no text or watermark. True alpha transparency."
+    }
+  },
+  "previous_maid_left": {
+    "source": "用户提供的立绘，抠掉白底、缩到 1100 px 高",
+    "sha256": "01496355a5659eaada46bf2530670fbf4d4ae9a3ef8d303b23dc723c270f3310"
+  },
+  "generator": "OpenAI built-in image_gen"
 }

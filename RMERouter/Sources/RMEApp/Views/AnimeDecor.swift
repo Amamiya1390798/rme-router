@@ -21,10 +21,10 @@ enum AnimeSkin: String, Sendable {
             ("女仆鲸鱼娘二创", "ZipZipPipe", "https://www.pixiv.net/users/18604994"),
             ("深海女仆工坊皮肤", "Small-tailqwq", "https://github.com/Small-tailqwq/dsh-deep-whale"),
         ]
-        case .claude: return [("形象", "amamiya", "mailto:cly20041110@gmail.com")]
+        case .claude: return [("形象", "amamiya", "mailto:cly20041110@gmail.com"), ("出图（按原形象）", "OpenAI image_gen", "")]
         }
     }
-    var licenseNote: String { self == .whale ? "· CC BY-NC-SA 4.0，仅限非商用" : "· 立绘由作者提供，随 App 分发" }
+    var licenseNote: String { self == .whale ? "· CC BY-NC-SA 4.0，仅限非商用" : "· 非商用同人，随 App 分发" }
 }
 
 enum AnimeArt {

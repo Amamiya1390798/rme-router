@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Claude 手画的 Q 版“开心”草稿（矢量，2026-10-27）；正式图仍以 GPT 出图为准 -->
+  <defs>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8895F"/><stop offset="1" stop-color="#C9623A"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#3A2418" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 后发 -->
+    <path d="M118 230 C96 330 104 420 150 470 L196 440 C170 400 168 330 176 270 Z" fill="url(#hair)"/>
+    <path d="M394 230 C416 330 408 420 362 470 L316 440 C342 400 344 330 336 270 Z" fill="url(#hair)"/>
+    <!-- 身体：奶白裙 + 黑腰封 -->
+    <path d="M196 392 C170 410 160 452 168 492 L344 492 C352 452 342 410 316 392 Z" fill="#FBF4EA"/>
+    <path d="M186 452 L326 452 L330 474 L182 474 Z" fill="#1F1A17"/>
+    <path d="M246 452 L266 452 L272 500 L240 500 Z" fill="#D97757"/>
+    <!-- 抬起的小手 -->
+    <circle cx="150" cy="384" r="26" fill="#FFF1E6"/>
+    <circle cx="362" cy="384" r="26" fill="#FFF1E6"/>
+    <!-- 领口 -->
+    <path d="M214 384 Q256 418 298 384 L292 404 Q256 430 220 404 Z" fill="#FBF4EA"/>
+    <!-- 脸 -->
+    <ellipse cx="256" cy="250" rx="150" ry="140" fill="#FFF1E6"/>
+    <!-- 刘海 -->
+    <path d="M104 236 C104 128 174 82 256 82 C338 82 408 128 408 236
+             C382 200 360 176 340 168 C334 196 318 212 296 220
+             C300 196 292 176 278 164 C264 196 236 214 204 220
+             C214 200 214 180 208 166 C184 186 152 204 104 236 Z" fill="url(#hair)"/>
+    <!-- 呆毛 -->
+    <path d="M250 84 C244 52 266 34 290 40 C268 46 264 62 270 84" fill="url(#hair)"/>
+  </g>
+  <!-- 发夹：放射状小花 -->
+  <g transform="translate(360 150)">
+    <g fill="#D97757" stroke="#3A2418" stroke-width="4">
+      <ellipse cx="0" cy="-22" rx="8" ry="16"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(45)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(90)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(135)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(225)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(270)"/>
+      <ellipse cx="0" cy="-22" rx="8" ry="16" transform="rotate(315)"/>
+    </g>
+    <circle r="11" fill="#C9A15A" stroke="#3A2418" stroke-width="4"/>
+  </g>
+  <!-- 开心眼：倒 U -->
+  <g fill="none" stroke="#3A2418" stroke-width="9" stroke-linecap="round">
+    <path d="M176 270 Q200 240 224 270"/>
+    <path d="M288 270 Q312 240 336 270"/>
+  </g>
+  <!-- 腮红 -->
+  <ellipse cx="180" cy="304" rx="24" ry="13" fill="#F2A48A" opacity="0.7"/>
+  <ellipse cx="332" cy="304" rx="24" ry="13" fill="#F2A48A" opacity="0.7"/>
+  <!-- 张嘴笑 -->
+  <path d="M230 300 Q256 346 282 300 Z" fill="#B5452E" stroke="#3A2418" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M242 318 Q256 334 270 318 Q256 326 242 318 Z" fill="#F08A7A"/>
+  <!-- 闪光 -->
+  <g fill="#C9A15A">
+    <path d="M86 120 l8 20 l20 8 l-20 8 l-8 20 l-8 -20 l-20 -8 l20 -8 Z"/>
+    <path d="M430 300 l6 14 l14 6 l-14 6 l-6 14 l-6 -14 l-14 -6 l14 -6 Z"/>
+    <path d="M440 90 l5 11 l11 5 l-11 5 l-5 11 l-5 -11 l-11 -5 l11 -5 Z"/>
+  </g>
+</svg>
