@@ -14,7 +14,7 @@ public struct ScenesView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "场景", subtitle: "把整套设置（TotalMix 发送与通道条、前级、12Mic 和 XTC 路由）存下来，之后对比或恢复。恢复前一定会让你确认。")
+                ViewHeader(title: "场景", subtitle: "把整套设置（TotalMix 发送与通道条、前级、12Mic 和 XTC 路由）存下来，之后对比或恢复。恢复前一定会让你确认。", mood: model.scenes.isEmpty ? .sleepy : .delighted)
                 saveCard
                 ForEach(errors, id: \.self) { Text($0).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
                 if model.scenes.isEmpty {
@@ -25,7 +25,7 @@ public struct ScenesView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
         .confirmationDialog("删除场景“\(deleting?.name ?? "")”？", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("删除", role: .destructive) { if let d = deleting { model.deleteScene(d.id) }; deleting = nil }
         } message: {

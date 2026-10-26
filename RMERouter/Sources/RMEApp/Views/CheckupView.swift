@@ -14,7 +14,7 @@ public struct CheckupView: View {
                            lastLoaded: model.lastLoaded, demoDevices: demoNames, twelveMic: model.twelveMicStatus)
                 .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 
     private var demoNames: [String] {

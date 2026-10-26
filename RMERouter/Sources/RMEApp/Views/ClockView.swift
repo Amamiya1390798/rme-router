@@ -14,7 +14,7 @@ public struct ClockView: View {
                 .sorted { ClockReport.summaryRules.firstIndex(of: $0.id)! < ClockReport.summaryRules.firstIndex(of: $1.id)! })
                 .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 }
 
@@ -30,7 +30,7 @@ public struct ClockContent: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-            ViewHeader(title: "时钟", subtitle: "整个系统只能有一个时钟主机，其余设备跟随它；所有设备的采样率要一致。读不到的项标“需人工确认”。")
+            ViewHeader(title: "时钟", subtitle: "整个系统只能有一个时钟主机，其余设备跟随它；所有设备的采样率要一致。读不到的项标“需人工确认”。", mood: .determined)
             summaryCard
             ForEach(rows) { DeviceClockCard(row: $0) }
         }

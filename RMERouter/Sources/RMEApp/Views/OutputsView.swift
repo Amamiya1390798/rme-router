@@ -18,7 +18,7 @@ public struct OutputsView: View {
                 .padding(Tokens.Space.xl)
             }
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 
     private var actions: OutputActions {
@@ -87,7 +87,7 @@ public struct OutputsContent: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xl) {
             HStack(alignment: .top) {
-                ViewHeader(title: "输出", subtitle: "每个在用的输出现在送出什么。点一路来源可以看它的完整路径。")
+                ViewHeader(title: "输出", subtitle: "每个在用的输出现在送出什么。点一路来源可以看它的完整路径。", mood: status == .live ? .delighted : .sleepy)
                 Toggle("只看有信号", isOn: onlySignal ?? .constant(false)).toggleStyle(.switch).controlSize(.small)
                     .font(Tokens.Font.body).fixedSize()
                     .disabled(onlySignal == nil)

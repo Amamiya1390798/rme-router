@@ -26,7 +26,7 @@ public struct SignalFlowView: View {
                 }
             }
             .frame(minWidth: 420)
-            .background(Tokens.Palette.bg)
+            .pageBackground()
         }
     }
 

@@ -8,12 +8,12 @@ struct GlossaryView: View {
         let sections = TotalMixGlossary.search(query)
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "TotalMix 对照", subtitle: "TotalMix 里每个菜单、设置、按钮是什么意思，在本 App 里能不能做。出处：TotalMix 自带帮助与程序里的文字。")
+                ViewHeader(title: "TotalMix 对照", subtitle: "TotalMix 里每个菜单、设置、按钮是什么意思，在本 App 里能不能做。出处：TotalMix 自带帮助与程序里的文字。", mood: .sleepy)
                 HStack(spacing: Tokens.Space.m) {
                     TextField("搜索，例如 Send Level、对讲、Talkback", text: $query).textFieldStyle(.roundedBorder).frame(maxWidth: 320)
                     legend(.done); legend(.required); legend(.planned); legend(.no)
                 }
-                if ["claude", "克克", "小克"].contains(query.trimmingCharacters(in: .whitespaces).lowercased()) {
+                if UITheme.current == .claudeAnime, ["claude", "克克", "小克"].contains(query.trimmingCharacters(in: .whitespaces).lowercased()) {
                     ClaudeSelfPortrait(size: 160)   // 彩蛋
                 } else if sections.isEmpty {
                     Text("没找到").font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
@@ -49,7 +49,7 @@ struct GlossaryView: View {
             .frame(maxWidth: 920, alignment: .leading)
             .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 
     private static func label(_ a: GlossaryRow.App) -> (String, Color) {

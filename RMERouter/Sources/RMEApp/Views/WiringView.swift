@@ -14,7 +14,7 @@ public struct WiringView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                ViewHeader(title: "接线", subtitle: "设备之间实际接了哪些线。信号流、体检、时钟、跨设备送声都按这张表计算；改动立即保存。")
+                ViewHeader(title: "接线", subtitle: "设备之间实际接了哪些线。信号流、体检、时钟、跨设备送声都按这张表计算；改动立即保存。", mood: .determined)
                 linkList
                 addCard
                 HStack {
@@ -27,7 +27,7 @@ public struct WiringView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
         .confirmationDialog("恢复默认接线？", isPresented: $confirmReset) {
             Button("恢复默认", role: .destructive) { model.resetLinks() }
         } message: {

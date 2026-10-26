@@ -46,7 +46,7 @@ public struct PreampsView: View {
                 .padding(Tokens.Space.xl)
             }
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 
     private var actions: PreampActions {
@@ -127,7 +127,7 @@ public struct PreampsContent: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-            ViewHeader(title: "前级", subtitle: "每一路话放的增益、48V、相位和标签。改动先进待应用栏，确认后才发送；点卡片空白处看这一路送到哪里。")
+            ViewHeader(title: "前级", subtitle: "每一路话放的增益、48V、相位和标签。改动先进待应用栏，确认后才发送；点卡片空白处看这一路送到哪里。", mood: .determined)
             ForEach(sections) { section in
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     HStack(spacing: Tokens.Space.s) {

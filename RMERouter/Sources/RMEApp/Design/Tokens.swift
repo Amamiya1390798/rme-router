@@ -399,4 +399,9 @@ struct PanelAtmosphere: View {
 
 extension View {
     func card() -> some View { modifier(CardBackground()) }
+
+    /// 页面底色：二次元模式下透明（露出面板后面的背景图），顶栏半透明；其他主题照常用 bg。
+    func pageBackground(bar: Bool = false) -> some View {
+        background(UITheme.current.isAnime ? Tokens.Palette.bg.opacity(bar ? 0.55 : 0) : Tokens.Palette.bg)
+    }
 }

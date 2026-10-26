@@ -283,7 +283,7 @@ struct PageTabs<Tab: Hashable & Identifiable & CaseIterable & TitledTab, Content
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             .padding(.vertical, Tokens.Space.s)
             .frame(maxWidth: .infinity)
-            .background(Tokens.Palette.bg)
+            .pageBackground(bar: true)
             Divider()
             content()
         }
@@ -313,7 +313,8 @@ struct ConnectionView: View {
             LazyVStack(alignment: .leading, spacing: Tokens.Space.xl) {   // 懒加载：设置卡片多，切页时只建看得见的
                 ViewHeader(title: "连接", subtitle: model.confirmMode == .quick
                            ? "读取不会改动任何设置；当前为快速方式：改动点下即发送（48V、大幅抬高仍需确认）。"
-                           : "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。")
+                           : "读取不会改动任何设置；改动只在“待应用”栏确认后才发送。",
+                           mood: model.xtStatus == .live ? .delighted : .sleepy)
                 StudioConfigCard(model: model)
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
                     Text("TotalMix FX（Global OSC）").font(Tokens.Font.cardTitle)
@@ -418,7 +419,7 @@ struct ConnectionView: View {
             .frame(maxWidth: 640, alignment: .leading)
             .padding(Tokens.Space.xl)
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
     }
 
     static let steps = [
@@ -495,7 +496,7 @@ struct BrandHeader: View {
         HStack(spacing: Tokens.Space.s) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 26, height: 26)
                 // 彩蛋：连点 5 下
-                .onTapGesture { taps += 1; if taps >= 5 { taps = 0; egg = true } }
+                .onTapGesture { guard UITheme.current == .claudeAnime else { return }; taps += 1; if taps >= 5 { taps = 0; egg = true } }
                 .popover(isPresented: $egg, arrowEdge: .trailing) { ClaudeSelfPortrait { egg = false } }
             VStack(alignment: .leading, spacing: 0) {
                 BrandName()

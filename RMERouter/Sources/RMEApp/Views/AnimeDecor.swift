@@ -180,10 +180,10 @@ struct AnimeSidebarDecor: View {
     var body: some View {
         ZStack {
             if let corner = AnimeArt.image("corner") {
+                // 右上角（左上角被红黄绿三个窗口按钮挡住）；素材本身就是右上角的角花
                 Image(nsImage: corner).resizable().frame(width: 70, height: 70)
-                    .scaleEffect(x: -1, y: 1)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.top, 2).padding(.leading, 2).opacity(0.8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 2).padding(.trailing, 2).opacity(0.8)
             } else if UITheme.current.animeSkin == .claude {
                 PixelFlower().frame(width: 28, height: 28)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -321,7 +321,7 @@ struct CrabBadge: View {
 }
 
 /// 彩蛋（2026-10-27 用户：“你画的自己找几个地方藏进去”）：Claude 手画的 Q 版自画像（矢量）。
-/// 入口：连点侧栏左上角 App 图标 5 下；在“TotalMix 对照”里搜 claude / 克克。不分主题都能触发。
+/// 入口：连点侧栏左上角 App 图标 5 下；在“TotalMix 对照”里搜 claude / 克克。只在 Claude 看板娘主题下触发。
 struct ClaudeSelfPortrait: View {
     var size: CGFloat = 220
     var close: (() -> Void)? = nil

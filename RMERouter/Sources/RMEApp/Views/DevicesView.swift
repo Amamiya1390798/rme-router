@@ -69,7 +69,7 @@ struct DevicesView: View {
             }
             }
         }
-        .background(Tokens.Palette.bg)
+        .pageBackground()
         .onExitCommand { select(nil) }
         .onChange(of: model.panelSelection) { showAll = false; hoverEdge = nil }
         .confirmationDialog(linkProposal.map { "在接线表里加一根线：\(name($0.from)) ⇒ \(name($0.to))？" } ?? "",
@@ -154,7 +154,7 @@ struct DevicesView: View {
                 .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（\(mainName) 未连接，或 TotalMix 没勾 Send Level Data）")
         }
         .padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Space.s)
-        .background(Tokens.Palette.bg)
+        .pageBackground(bar: true)
     }
 }
 
