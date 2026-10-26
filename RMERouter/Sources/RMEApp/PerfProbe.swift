@@ -23,6 +23,7 @@ public enum PerfProbe {
             var lines: [String] = ["XT 状态 \(model.xtStatus)，通道条 \(strips) 条，面板\(UserDefaults.standard.object(forKey: "devices.rackOpen") as? Bool == false ? "收起" : "展开")"
                                    + (model.panelSelection.map { "，选中 \($0)" } ?? ""),
                                    "TotalMix 报的型号 \(model.mainTotalMixName ?? "无")，所选主卡 \(model.studioConfig.mainCard.title)，型号不符 \(model.mainCardMismatch)，Core Audio \(model.xtAudio?.name ?? "没找到")",
+                                   "P16 行：" + (model.p16Cells().map { $0.map { "\($0.number)=\($0.output?.number ?? 0)" }.joined(separator: " ") } ?? "无"),
                                    "输入：" + model.xtStrips(.input).map(\.name).joined(separator: " "),
                                    "输出：" + model.xtStrips(.output).map(\.name).joined(separator: " "),
                                    "主卡话放：" + (model.snapshot.devices["xt"]?.preamps.map { "\($0.input) \($0.gainDB.knownValue.map { String($0) } ?? "?")" }.joined(separator: " ") ?? "无")]

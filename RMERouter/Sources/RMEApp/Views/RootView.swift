@@ -562,6 +562,7 @@ struct BrandName: View {
 /// “设备组成”（第 6.4.6 节）：主卡型号、扩展设备开关。改了立即重建并重新读取。
 struct StudioConfigCard: View {
     @Bindable var model: AppModel
+    @State private var twelveMicHint = false
 
     static func note(_ c: MainCard) -> String {
         switch c {
@@ -593,6 +594,7 @@ struct StudioConfigCard: View {
                             var c = model.studioConfig
                             if on { c.expansions.insert(e.id) } else { c.expansions.remove(e.id) }
                             model.studioConfig = c
+                            if on, e.id == "12mic" { twelveMicHint = true }
                         }))
                     .toggleStyle(.checkbox)
                 }
@@ -601,7 +603,35 @@ struct StudioConfigCard: View {
             Text("关掉的设备不再读取，也不出现在设备页、接线和路径搜索里。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         }
+        .sheet(isPresented: $twelveMicHint) { TwelveMicCableHint { twelveMicHint = false } }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
+    }
+}
+
+/// 勾上 12Mic 时的连线提示（文档第 6.4.6 节）：本 App 用 HTTP 控制 12Mic，MADI 光纤上不走，要另接 USB 或网线。
+struct TwelveMicCableHint: View {
+    var close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.m) {
+            Label("12Mic 要另接一根线", systemImage: "cable.connector").font(Tokens.Font.cardTitle)
+            Text("MADI 光纤只传声音（XTC 的控制也走它）。本 App 控制 12Mic 用的是网页接口，要再接一根：")
+                .font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("• USB：12Mic 后面板 USB 接这台 Mac，地址填 172.20.0.1")
+                Text("• 网线：12Mic 的 NET 口接到同一个网络，地址填 12mic.local")
+                Text("• 两种都要在 12Mic 上打开 STATE → remote 里的 HTTP Remote")
+            }
+            .font(Tokens.Font.body)
+            Text("RME 的 MIDI Remote 也能经 MADI 控制 12Mic（论坛说法），但和 XTC 用的 Aux Device 在同一条 MADI 上一起用会互相干扰，本 App 不用这种方式。")
+                .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("知道了", action: close).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(Tokens.Space.l)
+        .frame(width: 460)
     }
 }

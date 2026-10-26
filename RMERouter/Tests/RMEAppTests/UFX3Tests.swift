@@ -85,4 +85,34 @@ final class UFX3Tests: XCTestCase {
         XCTAssertTrue(cables.contains { $0.to == "conn:ufx.madi.in" })
         XCTAssertNil(PanelLayout.all.first { $0.image.hasPrefix("madiface") }, "选 UFX III 时不显示 XT 面板")
     }
+
+    /// P16 行：UFX III 默认接主卡 ADAT 1 / 2 输出 → P16 A / B；P16 第 n 路 = ADAT 输出第 n 路；XT 档案、关掉 P16 时没有这一行。
+    func testP16Row() throws {
+        func model(_ c: StudioConfig) -> AppModel {
+            let d = UserDefaults(suiteName: "p16-\(UUID())")!
+            d.set(try! JSONEncoder().encode(c), forKey: StudioConfig.defaultsKey)
+            return AppModel(defaults: d)
+        }
+        let m = model(StudioConfig(mainCard: .ufx3))
+        XCTAssertTrue(m.snapshot.topology.links.contains { $0.from == "xt.adat1.out" && $0.to == "p16i.adat_a.in" })
+        XCTAssertTrue(m.snapshot.topology.links.contains { $0.from == "xt.adat2.out" && $0.to == "p16i.adat_b.in" })
+        var state = TotalMixState()
+        for n in 0 ..< 94 { state.apply(OSCMessage("/output/\(n)/mute", [.float(0)])) }
+        var map = TotalMixChannelMap()
+        map.layout = .ufx3
+        map.infer(from: state)
+        m.xtMap = map
+        let cells = try XCTUnwrap(m.p16Cells())
+        XCTAssertEqual(cells.count, 16)
+        XCTAssertEqual(cells.map(\.number), Array(1 ... 16))
+        XCTAssertEqual(cells[0].ref, ChannelRef("xt.adat1.out", 1))
+        XCTAssertEqual(cells[8].ref, ChannelRef("xt.adat2.out", 1))
+        XCTAssertEqual(cells[0].output, TotalMixChannel(.output, 15), "AN 8 + 耳机 4 + AES 2 之后是 ADAT 1")
+        XCTAssertEqual(cells[15].output, TotalMixChannel(.output, 30))
+
+        XCTAssertNil(model(StudioConfig(mainCard: .madifaceXT)).p16Cells(), "XT 经 XTC 送 P16，不按主卡输出排")
+        let off = model(StudioConfig(mainCard: .ufx3, expansions: ["12mic", "xtc"]))
+        XCTAssertNil(off.p16Cells())
+        XCTAssertFalse(off.snapshot.topology.links.contains { $0.to.hasPrefix("p16i") })
+    }
 }

@@ -134,10 +134,13 @@ public enum StudioSetup {
         return [mic12, xtc, p16]
     }
 
-    /// UFX III 默认接线：12Mic MADI ↔ 主卡 MADI；XTC、P16 默认不接。
+    /// UFX III 默认接线：12Mic MADI ↔ 主卡 MADI；主卡 ADAT 1 / 2 输出 → P16 ADAT A / B；XTC 默认不接。
     static let ufx3Links = [
         Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi.in"),
         Link(id: "L2", from: "xt.madi.out", to: "12mic.madi_optical.in"),
+        // P16 的 16 路走主卡 ADAT 输出，按输出 1–16 排（文档第 6.4.6 节）；P16 关掉时按端口过滤掉
+        Link(id: "L6", from: "xt.adat1.out", to: "p16i.adat_a.in"),
+        Link(id: "L7", from: "xt.adat2.out", to: "p16i.adat_b.in"),
     ]
 
     /// 默认接线（XT 档案下）；通用主卡没有具体接口，连到主卡的线不出现，在接线页自己加。

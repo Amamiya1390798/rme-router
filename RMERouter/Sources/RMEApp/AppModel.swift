@@ -343,7 +343,7 @@ public final class AppModel {
             let snap = try await makeTwelveMic(url).snapshot()
             apply(twelveMic: snap)
         } catch {
-            twelveMicStatus = .unreachable("12Mic（\(url.absoluteString)）没有回应：检查网线或 USB、地址，以及设备 STATE → remote 的 HTTP Remote 是否打开。")
+            twelveMicStatus = .unreachable("12Mic（\(url.absoluteString)）没有回应：检查网线或 USB、地址，以及设备 STATE → remote 的 HTTP Remote 是否打开。只接 MADI 光纤不行，要另接 USB 或网线。")
         }
     }
 

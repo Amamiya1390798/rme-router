@@ -13,6 +13,15 @@ public struct XTStrip: Identifiable, Equatable, Sendable {
     public var id: TotalMixChannel { tm }
 }
 
+/// P16 行的一格：P16 第 number 路，来自主卡输出 ref（TotalMix 输出条 output），送进来的发送来源名。
+public struct P16Cell: Identifiable, Equatable, Sendable {
+    public var number: Int
+    public var ref: ChannelRef
+    public var output: TotalMixChannel?
+    public var sources: [String]
+    public var id: Int { number }
+}
+
 /// 源头标签：verified 为 false 时路径上有演示数据（还没从设备读到）。
 public struct OriginLabel: Equatable, Sendable {
     public var text: String
@@ -69,6 +78,34 @@ extension AppModel {
             return (key.output, dB)
         }
         .sorted { $0.output < $1.output }
+    }
+
+    /// P16 行（文档第 6.4.6 节）：P16 第 n 路 = 接到 P16 的主卡 ADAT 输出第 n 路（ADAT A 1–8、B 9–16）。
+    /// 接线里没有“主卡 ADAT 输出 → P16”时返回 nil（例如 XT 档案经 XTC 送过去）。
+    public func p16Cells() -> [P16Cell]? {
+        guard studioConfig.has("p16i") else { return nil }
+        let links = snapshot.topology.links
+        var tmOf: [ChannelRef: TotalMixChannel] = [:]
+        for (ch, e) in xtMap.entries where ch.bus == .output { tmOf[e.ref] = ch }
+        var cells: [P16Cell] = []
+        for (k, inPort) in ["p16i.adat_a.in", "p16i.adat_b.in"].enumerated() {
+            guard let l = links.first(where: { $0.to == inPort }), l.from.hasPrefix("xt.adat"), l.from.hasSuffix(".out") else { continue }
+            let n = snapshot.topology.port(l.from)?.singleSpeedChannels ?? 8
+            for c in 1 ... min(n, 8) {
+                let ref = ChannelRef(l.from, c)
+                let tm = tmOf[ref]
+                // 立体声对的右声道：发送记在左声道上
+                let key = tm.map { t in t.number % 2 == 0 && tmState.isStereo(TotalMixChannel(.output, t.number - 1)) == true
+                    ? TotalMixChannel(.output, t.number - 1) : t }
+                let sources = key.map { o in
+                    tmState.nodes.keys.filter { $0.output == o && tmState.gainDB($0) != nil }
+                        .sorted { $0.source < $1.source }
+                        .map { tmState.names[$0.source] ?? $0.source.description }
+                } ?? []
+                cells.append(P16Cell(number: k * 8 + c, ref: ref, output: key, sources: sources))
+            }
+        }
+        return cells.isEmpty ? nil : cells
     }
 
     /// 通道的简短名字：“12Mic Mic 1”“XTC MADI 输入 9”。

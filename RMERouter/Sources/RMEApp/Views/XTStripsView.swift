@@ -82,6 +82,7 @@ struct XTStripsView: View, Equatable {
                         .id(s.tm)
                     }
                 }
+                if model.studioConfig.has("p16i") { p16Row(current: current) }
             }
         }
         .padding(Tokens.Space.m)
@@ -106,6 +107,39 @@ struct XTStripsView: View, Equatable {
         .background(RoundedRectangle(cornerRadius: Tokens.Radius.card).fill(Tokens.Palette.surface))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
         .onChange(of: jump) { if let j = jump { go(to: j.target) } }
+    }
+
+    // MARK: P16 行（文档第 6.4.6 节）
+
+    /// P16 第 n 路 = 主卡 ADAT 输出第 n 路；点一格选中那条输出（上两行就显示送到它的电平）。
+    @ViewBuilder private func p16Row(current: XTStrip?) -> some View {
+        let rate = model.snapshot.devices["xt"]?.clock.configuredRate.knownValue
+        let rateBad = rate.map { ![44_100, 48_000].contains($0) } ?? false
+        row("P16-I", sub: rateBad ? "⚠ 只认 44.1 / 48 kHz" : "ADAT A / B", ids: []) {
+            if let cells = model.p16Cells() {
+                ForEach(cells) { c in
+                    Button { if let o = c.output { output = o; source = nil } } label: {
+                        VStack(spacing: 2) {
+                            Text("P16 \(c.number)").font(Tokens.Font.caption.weight(.semibold))
+                            Text(verbatim: "ADAT \(c.number <= 8 ? "A" : "B") \(c.ref.channel)").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
+                            Text(verbatim: c.sources.isEmpty ? "无" : c.sources.joined(separator: "、"))
+                                .font(.system(size: 10)).lineLimit(1)
+                                .foregroundStyle(c.sources.isEmpty ? Tokens.Palette.textMuted : Tokens.Palette.accent)
+                        }
+                        .frame(width: 64, height: 52)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.surface))
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(c.output != nil && c.output == current?.tm ? Tokens.Palette.accent : Tokens.Palette.border))
+                    }
+                    .buttonStyle(.plain)
+                    .help(c.output == nil ? "主卡 \(c.ref) 在 TotalMix 里没有对应的输出条" :
+                          "P16 第 \(c.number) 路 ← 主卡 \(model.shortName(c.ref))；点了看送到它的电平" + (rateBad ? "。现在采样率 \(rate ?? 0) Hz，P16 只认 44.1 / 48 kHz" : ""))
+                }
+            } else {
+                Text("P16 没有接在主卡的 ADAT 输出上（例如 XT 经 XTC 的 ADAT 送过去），这一行不按输出排；接法在“设置 → 接线”里看。")
+                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            }
+        }
     }
 
     // MARK: 多选、屏蔽、跳转（第 6.4.5 节）
