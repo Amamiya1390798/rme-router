@@ -29,6 +29,7 @@ public struct RootView: View {
             panel
                 .padding(.vertical, 8).padding(.trailing, 8).padding(.leading, sidebarVisible ? 0 : 8)
         }
+        .claudeCursor(model.theme == .claudeAnime)   // 橙色光标 + 小螃蟹（第 5.1.2 节）
         .background(Tokens.Palette.chrome)   // 放在 .id 里面：侧栏底色也跟着主题换
         .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）
         .ignoresSafeArea()

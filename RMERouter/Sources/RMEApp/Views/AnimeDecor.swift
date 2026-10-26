@@ -342,3 +342,47 @@ struct ClaudeSelfPortrait: View {
         .padding(Tokens.Space.l)
     }
 }
+
+/// Claude 看板娘的光标（2026-10-27 用户：想要和 Claude 操控电脑时一样的橙色光标，侧角贴一只小螃蟹）。
+/// 橙色箭头 + 白描边，右下角是用户提供的 Clawd 小图；只在 Claude 看板娘主题下、鼠标在窗口内容里时生效。
+enum ClaudeCursor {
+    @MainActor static let cursor: NSCursor = {
+        let size = NSSize(width: 32, height: 32)
+        let img = NSImage(size: size, flipped: true) { _ in
+            let arrow = NSBezierPath()
+            arrow.move(to: NSPoint(x: 2, y: 2))
+            arrow.line(to: NSPoint(x: 2, y: 22))
+            arrow.line(to: NSPoint(x: 7.5, y: 17))
+            arrow.line(to: NSPoint(x: 11, y: 25))
+            arrow.line(to: NSPoint(x: 14.5, y: 23.5))
+            arrow.line(to: NSPoint(x: 11, y: 15.5))
+            arrow.line(to: NSPoint(x: 18, y: 15.5))
+            arrow.close()
+            arrow.lineJoinStyle = .round
+            NSGraphicsContext.current?.saveGraphicsState()
+            let shadow = NSShadow(); shadow.shadowBlurRadius = 2; shadow.shadowOffset = NSSize(width: 0, height: -1)
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.35); shadow.set()
+            NSColor(hex: 0xD97757).setFill(); arrow.fill()
+            NSGraphicsContext.current?.restoreGraphicsState()
+            NSColor.white.setStroke(); arrow.lineWidth = 1.6; arrow.stroke()
+            if let crab = AnimeArt.image("clawd", skin: .claude) {
+                NSGraphicsContext.current?.imageInterpolation = .none
+                crab.draw(in: NSRect(x: 17, y: 18, width: 14, height: 14))
+            }
+            return true
+        }
+        return NSCursor(image: img, hotSpot: NSPoint(x: 2, y: 2))
+    }()
+}
+
+extension View {
+    /// Claude 看板娘下用橙色小螃蟹光标：macOS 15 起用 pointerStyle（SwiftUI 自己会重设光标，光标区域方式不稳），更早的系统在鼠标移动时设一次。
+    @ViewBuilder func claudeCursor(_ on: Bool) -> some View {
+        if !on { self }
+        else if #available(macOS 15.0, *) {
+            pointerStyle(.image(Image(nsImage: ClaudeCursor.cursor.image), hotSpot: UnitPoint(x: 2.0 / 32, y: 2.0 / 32)))
+        } else {
+            onContinuousHover { if case .active = $0 { ClaudeCursor.cursor.set() } }
+        }
+    }
+}
