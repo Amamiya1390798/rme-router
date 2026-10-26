@@ -26,6 +26,8 @@ cp "$bin" "$app/Contents/MacOS/RMERouter"
 [[ -f Resources/AppIcon.icns ]] && cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 # 设备页的面板图（RME 官方产品图，第 6.4 节）
 [[ -d Resources/Panels ]] && cp -R Resources/Panels "$app/Contents/Resources/Panels"
+# 二次元模式素材（CC BY-NC-SA 4.0：署名、非商用、相同方式共享，见 NOTICE.txt）
+[[ -d Resources/Anime ]] && cp -R Resources/Anime "$app/Contents/Resources/Anime"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

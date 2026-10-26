@@ -131,6 +131,13 @@ public final class AppModel {
     public var theme: UITheme = UITheme.current {
         didSet { UITheme.current = theme; defaults.set(theme.rawValue, forKey: UITheme.defaultsKey) }
     }
+    /// 二次元模式（第 5.1.1 节）：显示立绘、气泡动画。
+    public var animeArt: Bool = UserDefaults.standard.object(forKey: "ui.anime.art") as? Bool ?? true {
+        didSet { defaults.set(animeArt, forKey: "ui.anime.art") }
+    }
+    public var animeMotion: Bool = UserDefaults.standard.object(forKey: "ui.anime.motion") as? Bool ?? true {
+        didSet { defaults.set(animeMotion, forKey: "ui.anime.motion") }
+    }
     public var appearance: UIAppearance = .system {
         didSet { defaults.set(appearance.rawValue, forKey: UIAppearance.defaultsKey); Self.applyAppearance(appearance) }
     }

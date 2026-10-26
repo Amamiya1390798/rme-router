@@ -23,6 +23,7 @@ public struct RootView: View {
                         devices: deviceRows)
                     .equatable()
                     .frame(width: 208)
+                    .background { if model.theme == .anime { AnimeSidebarDecor(model: model) } }
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
             panel
@@ -63,7 +64,12 @@ public struct RootView: View {
             }
             if model.hasPending || !model.history.isEmpty || !model.manualTasks.isEmpty { PendingBar(model: model) }
         }
-        .background(Tokens.Palette.bg)
+        .background {
+            ZStack {
+                Tokens.Palette.bg
+                if model.theme == .anime { AnimeBackdrop(model: model) }   // 第 5.1.1 节
+            }
+        }
         .overlay(PanelAtmosphere().allowsHitTesting(false))
         .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
@@ -432,8 +438,9 @@ struct AppearanceCard: View {
             .pickerStyle(.segmented).labelsHidden().frame(width: 260)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: Tokens.Space.m, alignment: .leading)],
                       alignment: .leading, spacing: Tokens.Space.m) {
-                ForEach(UITheme.allCases) { t in swatch(t) }
+                ForEach(UITheme.pickable) { t in swatch(t) }
             }
+            if model.theme == .deepseek || model.theme == .anime { AnimeModeRow(model: model) }
             Text("只换颜色，不改布局。绿 = 已确认、黄 = 推断、红 = 有问题，在每套主题里意义都一样。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         }
@@ -467,7 +474,7 @@ struct AppearanceCard: View {
                 Text(t.title).font(Tokens.Font.caption)
             }
             .padding(4)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(model.theme == t ? Tokens.Palette.accent : .clear, lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(model.theme == t || (t == .deepseek && model.theme == .anime) ? Tokens.Palette.accent : .clear, lineWidth: 2))
         }
         .buttonStyle(.plain)
         .help("切换到“\(t.title)”")

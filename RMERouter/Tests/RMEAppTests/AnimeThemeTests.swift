@@ -1,0 +1,44 @@
+import XCTest
+import CryptoKit
+@testable import RMEApp
+
+/// 二次元模式（文档第 5.1.1 节）。
+@MainActor
+final class AnimeThemeTests: XCTestCase {
+    func testHiddenUnderDeepSeek() {
+        XCTAssertFalse(UITheme.pickable.contains(.anime), "主题网格里不单列")
+        XCTAssertTrue(UITheme.pickable.contains(.deepseek))
+        XCTAssertEqual(UITheme.anime.title, "二次元模式")
+    }
+
+    /// 正文与底色对比度 ≥ 4.5（浅色、深色）。
+    func testReadable() {
+        func lum(_ c: UInt32) -> Double {
+            func ch(_ v: UInt32) -> Double { let x = Double(v) / 255; return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4) }
+            return 0.2126 * ch(c >> 16 & 0xFF) + 0.7152 * ch(c >> 8 & 0xFF) + 0.0722 * ch(c & 0xFF)
+        }
+        func ratio(_ a: UInt32, _ b: UInt32) -> Double { let (x, y) = (lum(a), lum(b)); return (max(x, y) + 0.05) / (min(x, y) + 0.05) }
+        let t = UITheme.anime
+        for bg in [UITheme.Token.bg, .surface] {
+            XCTAssertGreaterThan(ratio(t.value(.text).0, t.value(bg).0), 4.5)
+            XCTAssertGreaterThan(ratio(t.value(.text).1, t.value(bg).1), 4.5)
+            XCTAssertGreaterThan(ratio(t.value(.textMuted).0, t.value(bg).0), 4.5)
+            XCTAssertGreaterThan(ratio(t.value(.textMuted).1, t.value(bg).1), 4.5)
+        }
+    }
+
+    /// 素材都在、能载入，和 sources.json 记的 sha256 一致；署名与协议文本在。
+    func testArtwork() throws {
+        let dir = try XCTUnwrap(AnimeArt.directory)
+        for n in AnimeArt.names { XCTAssertNotNil(AnimeArt.image(n), n) }
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: dir.appendingPathComponent("sources.json"))) as? [String: Any]
+        let files = try XCTUnwrap(json?["files"] as? [String: [String: String]])
+        for (name, info) in files {
+            let data = try Data(contentsOf: dir.appendingPathComponent(name))
+            XCTAssertEqual(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), info["sha256"], name)
+        }
+        let notice = AnimeModeRow.noticeText
+        for c in AnimeArt.credits { XCTAssertTrue(notice.contains(c.name), c.name) }
+        XCTAssertTrue(notice.contains("CC BY-NC-SA 4.0"))
+    }
+}

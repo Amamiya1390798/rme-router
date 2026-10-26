@@ -12,7 +12,11 @@ struct OSCHelpSheet: View {
     var body: some View {
         let s = model.settings
         VStack(alignment: .leading, spacing: Tokens.Space.m) {
-            Label("没读到 TotalMix", systemImage: "exclamationmark.triangle").font(Tokens.Font.cardTitle)
+            HStack {
+                Label("没读到 TotalMix", systemImage: "exclamationmark.triangle").font(Tokens.Font.cardTitle)
+                Spacer()
+                AnimeFace(mood: .sleepy)
+            }
             Text(diagnosis(s)).font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
             Text("在 TotalMix 里打开 Options ▸ Mixer Settings… ▸ OSC，按顺序改：").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
             VStack(alignment: .leading, spacing: 6) {

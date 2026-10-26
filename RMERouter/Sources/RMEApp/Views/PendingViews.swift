@@ -118,7 +118,11 @@ struct ConfirmSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.l) {
-            Text(result == nil ? "确认发送" : "发送结果").font(Tokens.Font.viewTitle)
+            HStack(spacing: Tokens.Space.s) {
+                Text(result == nil ? "确认发送" : "发送结果").font(Tokens.Font.viewTitle)
+                Spacer()
+                AnimeFace(mood: result == nil ? .determined : .delighted)   // 二次元模式才有（第 5.1.1 节）
+            }
             connectionNote
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.m) {
