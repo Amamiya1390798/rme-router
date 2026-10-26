@@ -84,7 +84,7 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
         case .contrast: return ThemeStyle(title: .heavy, card: .heavyOutline, panel: .flat, meter: .traffic, brand: .plain, selection: .thick)
         case .gemini: return ThemeStyle(title: .rounded, bodyRounded: true, card: .elevated, capsuleChips: true, panel: .glow,
                                         meter: .gradient, brand: .gradient, selection: .glow)
-        case .gpt: return ThemeStyle(title: .standard, card: .filled, capsuleChips: true, panel: .flat, meter: .mono, brand: .bold, selection: .thin)
+        case .gpt: return ThemeStyle(title: .standard, card: .filled, capsuleChips: true, panel: .flat, meter: .gradient, brand: .badge, selection: .thin)
         case .deepseek: return ThemeStyle(title: .standard, card: .elevated, panel: .topGradient, meter: .gradient, brand: .badge, selection: .glow)
         case .kimi: return ThemeStyle(title: .heavy, card: .heavyOutline, capsuleChips: true, panel: .flat, meter: .mono, brand: .badge, selection: .thick)
         }
@@ -96,12 +96,13 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
         case .gemini: return [0x4285F4, 0x9B72CB, 0xD96570]
         case .deepseek: return [0x4D6BFE, 0x7FA2FF]
         case .kimi: return [0x4F46E5, 0x8B5CF6]
+        case .gpt: return [0x10A37F, 0x1ABC9C]
         default: return [value(.accent).0, value(.accent).1]
         }
     }
 
     /// 侧栏选中块用强调色淡底（否则用灰底）。
-    public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi }
+    public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi || self == .gpt }
     public static let defaultsKey = "ui.theme"
 
     /// 当前主题。只在主线程改（设置页），颜色在绘制时读。
@@ -155,19 +156,19 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             case .problem: return (0xD93025, 0xF28B82)
             case .unknown: return (0x9AA0A6, 0x5F6368)
             }
-        case .gpt:
+        case .gpt:   // 旧版 ChatGPT：青绿强调、蓝灰深色
             switch t {
-            case .chrome: return (0xF9F9F9, 0x171717)
-            case .bg: return (0xFFFFFF, 0x212121)
-            case .surface: return (0xF7F7F8, 0x2F2F2F)
-            case .border: return (0xE5E5E5, 0x3A3A3A)
-            case .text: return (0x0D0D0D, 0xECECEC)
-            case .textMuted: return (0x5D5D5D, 0xB4B4B4)
-            case .accent: return (0x0D0D0D, 0xECECEC)
-            case .ok: return (0x10A37F, 0x19C37D)
+            case .chrome: return (0xF7F7F8, 0x202123)
+            case .bg: return (0xFFFFFF, 0x343541)
+            case .surface: return (0xF7F7F8, 0x40414F)
+            case .border: return (0xE5E5E5, 0x565869)
+            case .text: return (0x202123, 0xECECF1)
+            case .textMuted: return (0x6E6E80, 0xACACBE)
+            case .accent: return (0x10A37F, 0x19C37D)
+            case .ok: return (0x5A9E2F, 0x9BD068)      // 偏黄的绿，和主题青绿分开
             case .warn: return (0xC27C0E, 0xF0B429)
-            case .problem: return (0xD93F3F, 0xFF6B6B)
-            case .unknown: return (0xA3A3A3, 0x6B6B6B)
+            case .problem: return (0xEF4146, 0xFF6B6B)
+            case .unknown: return (0xA3A3B0, 0x6E6E80)
             }
         case .deepseek:
             switch t {
