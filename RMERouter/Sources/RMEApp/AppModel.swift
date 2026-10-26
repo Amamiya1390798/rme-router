@@ -55,9 +55,11 @@ public enum CheckupTab: String, CaseIterable, Identifiable, Sendable {
 
 /// 设置页的分栏。
 public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
-    case connection, wiring
+    case connection, wiring, glossary
     public var id: String { rawValue }
-    public var title: String { self == .connection ? "连接" : "接线" }
+    public var title: String {
+        switch self { case .connection: return "连接"; case .wiring: return "接线"; case .glossary: return "TotalMix 对照" }
+    }
 }
 
 public enum XTStatus: Equatable, Sendable {

@@ -144,6 +144,7 @@ public struct RootView: View {
                 switch model.settingsTab {
                 case .connection: ConnectionView(model: model)
                 case .wiring: WiringView(model: model)
+                case .glossary: GlossaryView()
                 }
             }
         }
