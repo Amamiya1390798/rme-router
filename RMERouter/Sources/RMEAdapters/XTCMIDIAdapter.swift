@@ -85,14 +85,17 @@ public struct XTCMIDIAdapter: DeviceAdapter {
         let preamps = s.mics.keys.sorted().map { n -> PreampChannel in
             let m = s.mics[n]!
             let r = "sysex \(n - 1)"
-            return PreampChannel(input: ChannelRef("\(deviceID).mic.in", n),
-                                 label: .unknown(src(r)),
-                                 gainDB: .confirmed(m.gainDB, src(r)),
-                                 phantom: .confirmed(m.phantom, src(r)),
-                                 phase: .confirmed(m.phase, src(r)),
-                                 hiZ: .confirmed(n >= 5 && m.padOrInstrument, src(r)),
-                                 autoGain: .confirmed(m.autoSet, src(r)),
-                                 gainGroup: .confirmed(m.group == 0 ? "无" : "\(m.group)", src(r)))
+            var p = PreampChannel(input: ChannelRef("\(deviceID).mic.in", n),
+                                  label: .unknown(src(r)),
+                                  gainDB: .confirmed(m.gainDB, src(r)),
+                                  phantom: .confirmed(m.phantom, src(r)),
+                                  phase: .confirmed(m.phase, src(r)),
+                                  hiZ: .confirmed(n >= 5 && m.padOrInstrument, src(r)),
+                                  autoGain: .confirmed(m.autoSet, src(r)),
+                                  gainGroup: .confirmed(m.group == 0 ? "无" : "\(m.group)", src(r)))
+            p.muted = .confirmed(m.mute, src(r))
+            p.padInst = .confirmed(m.padOrInstrument, src(r))
+            return p
         }
 
         return DeviceSnapshot(deviceID: deviceID, reachable: true, clock: clock, portFormats: formats,

@@ -22,6 +22,7 @@ public struct StudioScene: Codable, Identifiable, Equatable, Sendable {
             case .gain: return gain.map(PreampValue.gain)
             case .phantom: return phantom.map(PreampValue.flag)
             case .phase: return phase.map(PreampValue.flag)
+            case .mute, .autoSet, .padInst: return nil   // 场景暂不存（文档第 6.3 节）
             }
         }
     }

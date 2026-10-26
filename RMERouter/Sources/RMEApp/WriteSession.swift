@@ -263,6 +263,8 @@ extension AppModel {
             let r = PreampField.gainRange(device: deviceID)
             value = .gain(min(max(g, r.lowerBound), r.upperBound))
         }
+        // 静音、AutoSet、PAD / Inst 只有 XTC 的前级写入接受（文档第 6.3 节）
+        guard !field.xtcOnly || deviceID == "xtc" else { return .notSupported("\(field.label)只能在 XTC 上改") }
         var tmInput: TotalMixChannel? = nil
         switch deviceID {
         case "xt":

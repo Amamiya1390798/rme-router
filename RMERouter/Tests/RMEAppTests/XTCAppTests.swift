@@ -157,6 +157,27 @@ final class XTCAppTests: XCTestCase {
         XCTAssertEqual(m.snapshot.devices["xtc"]?.preamps[2].gainDB.knownValue, 60)
     }
 
+    /// 静音、AutoSet、PAD（Mic 1–4）/ Inst（Mic 5–8）：读出、写入、回读核对；不额外确认；别的设备不接受。
+    func testMuteAutoSetPadWrite() async throws {
+        let m = makeModel()
+        enableRead(m); enableWrite(m)
+        await m.refreshXTC()
+        let mic3 = ChannelRef("xtc.mic.in", 3), mic6 = ChannelRef("xtc.mic.in", 6)
+        XCTAssertEqual(m.snapshot.devices["xtc"]?.preamps[2].value(.mute), .flag(false))
+        XCTAssertNil(m.stagePreamp(deviceID: "xtc", input: mic3, field: .mute, value: .flag(true)))
+        XCTAssertNil(m.stagePreamp(deviceID: "xtc", input: mic3, field: .padInst, value: .flag(true)))
+        XCTAssertNil(m.stagePreamp(deviceID: "xtc", input: mic6, field: .autoSet, value: .flag(true)))
+        XCTAssertNil(m.stagePreamp(deviceID: "xtc", input: mic6, field: .padInst, value: .flag(true)))
+        XCTAssertFalse(m.needsExplicitConfirmation, "这三项不额外确认")
+        let applied = await m.applyPending(confirmation: ConfirmationGate.userConfirmed(m.allPendingOperations))
+        let batch = try XCTUnwrap(applied)
+        XCTAssertEqual(batch.verifiedCount, 4)
+        XCTAssertEqual((fake.value(2)?.msb ?? 0) & 0x09, 0x09, "Mic 3：静音 + PAD")
+        XCTAssertEqual((fake.value(5)?.msb ?? 0) & 0x0A, 0x0A, "Mic 6：AutoSet + Inst")
+        XCTAssertEqual(m.snapshot.devices["xtc"]?.preamps[5].value(.padInst), .flag(true))
+        XCTAssertNotNil(m.stagePreamp(deviceID: "xt", input: ChannelRef("xt.mic.in", 1), field: .mute, value: .flag(true)))
+    }
+
     func testTurningOffWriteDropsPendingAndCapability() async {
         let m = makeModel()
         enableRead(m); enableWrite(m)

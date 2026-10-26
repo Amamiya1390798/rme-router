@@ -206,11 +206,15 @@ public struct XTCMicSettings: Equatable, Sendable {
     }
 
     /// 设置一路（mic 1…8）的参数：只给要改的字段置标志，其余字段设备不动。
-    public static func setParam(mic: Int, gainDB: Double? = nil, phase: Bool? = nil, phantom: Bool? = nil) -> XTCSysEx.Param {
+    public static func setParam(mic: Int, gainDB: Double? = nil, phase: Bool? = nil, phantom: Bool? = nil,
+                                mute: Bool? = nil, autoSet: Bool? = nil, padInst: Bool? = nil) -> XTCSysEx.Param {
         var p = XTCSysEx.Param(index: UInt8(mic - 1), lsb: 0, msb: 0, flags: 0)
         if let g = gainDB { p.lsb |= code(fromGain: g); p.flags! |= 0x01 }
         if let ph = phase { if ph { p.lsb |= 0x40 }; p.flags! |= 0x02 }
+        if let v = mute { if v { p.msb |= 0x01 }; p.flags! |= 0x04 }        // MSB 位 0，标志 0x04
+        if let v = autoSet { if v { p.msb |= 0x02 }; p.flags! |= 0x08 }     // MSB 位 1，标志 0x08
         if let v = phantom { if v { p.msb |= 0x04 }; p.flags! |= 0x10 }
+        if let v = padInst { if v { p.msb |= 0x08 }; p.flags! |= 0x20 }     // MSB 位 3，标志 0x20
         return p
     }
 
@@ -220,6 +224,9 @@ public struct XTCMicSettings: Equatable, Sendable {
         case let (.gain, .gain(g)): return setParam(mic: mic, gainDB: g)
         case let (.phase, .flag(b)): return setParam(mic: mic, phase: b)
         case let (.phantom, .flag(b)): return setParam(mic: mic, phantom: b)
+        case let (.mute, .flag(b)): return setParam(mic: mic, mute: b)
+        case let (.autoSet, .flag(b)): return setParam(mic: mic, autoSet: b)
+        case let (.padInst, .flag(b)): return setParam(mic: mic, padInst: b)
         default: return nil
         }
     }

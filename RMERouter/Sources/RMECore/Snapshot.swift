@@ -57,17 +57,28 @@ public struct ControlPath: Codable, Sendable, Hashable {
 /// 可写的前级字段（文档第 7.2 节）。只有这三个，其余一律拦截。
 public enum PreampField: String, Codable, Sendable, CaseIterable {
     case gain, phantom, phase
+    /// 只有 XTC 能写（文档第 6.3 节）：静音、AutoSet、PAD（Mic 1–4）/ Inst（Mic 5–8）。
+    case mute, autoSet, padInst
 
-    /// TotalMix Global OSC 的参数名（/input/<N>/<key>）。
+    /// 只有 XTC 接受的字段。
+    public var xtcOnly: Bool { self == .mute || self == .autoSet || self == .padInst }
+
+    /// TotalMix Global OSC 的参数名（/input/<N>/<key>）。XTC 专有字段不经 TotalMix 写。
     public var totalMixKey: String {
-        switch self { case .gain: return "gain"; case .phantom: return "48v"; case .phase: return "phase" }
+        switch self {
+        case .gain: return "gain"; case .phantom: return "48v"; case .phase: return "phase"
+        case .mute: return "mute"; case .autoSet: return "autoset"; case .padInst: return "pad"
+        }
     }
-    /// 12Mic JSON 的字段名（input/analog/<n>/<key>）。
+    /// 12Mic JSON 的字段名（input/analog/<n>/<key>）。XTC 专有字段不经 12Mic 写。
     public var twelveMicKey: String {
-        switch self { case .gain: return "gain"; case .phantom: return "p48"; case .phase: return "phase" }
+        switch self { case .gain: return "gain"; case .phantom: return "p48"; case .phase: return "phase"; default: return rawValue }
     }
     public var label: String {
-        switch self { case .gain: return "增益"; case .phantom: return "48V"; case .phase: return "相位" }
+        switch self {
+        case .gain: return "增益"; case .phantom: return "48V"; case .phase: return "相位"
+        case .mute: return "静音"; case .autoSet: return "AutoSet"; case .padInst: return "PAD / Inst"
+        }
     }
     /// 增益可写范围（第 7.2 节：先限定 0–60 dB）。
     public static let gainRange: ClosedRange<Double> = 0 ... 60
@@ -101,6 +112,9 @@ public struct PreampChannel: Codable, Sendable, Equatable, Identifiable {
     public var hiZ: Fact<Bool>            // 乐器输入
     public var autoGain: Fact<Bool>       // AutoSet
     public var gainGroup: Fact<String>
+    /// XTC：静音、PAD（1–4）/ Inst（5–8）开关的原值（文档第 6.3 节）；其他设备 unknown。
+    public var muted: Fact<Bool> = .unknown()
+    public var padInst: Fact<Bool> = .unknown()
 
     public var id: ChannelRef { input }
 
@@ -110,6 +124,9 @@ public struct PreampChannel: Codable, Sendable, Equatable, Identifiable {
         case .gain: return gainDB.knownValue.map(PreampValue.gain)
         case .phantom: return phantom.knownValue.map(PreampValue.flag)
         case .phase: return phase.knownValue.map(PreampValue.flag)
+        case .mute: return muted.knownValue.map(PreampValue.flag)
+        case .autoSet: return autoGain.knownValue.map(PreampValue.flag)
+        case .padInst: return padInst.knownValue.map(PreampValue.flag)
         }
     }
 

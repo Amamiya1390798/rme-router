@@ -59,7 +59,10 @@ public final class FakeXTC: XTCMIDITransport, @unchecked Sendable {
                     if p.index <= 7 {
                         if f & 0x01 != 0 { l = (l & ~0x3F) | (p.lsb & 0x3F) }
                         if f & 0x02 != 0 { l = (l & ~0x40) | (p.lsb & 0x40) }
+                        if f & 0x04 != 0 { m = (m & ~0x01) | (p.msb & 0x01) }
+                        if f & 0x08 != 0 { m = (m & ~0x02) | (p.msb & 0x02) }
                         if f & 0x10 != 0 { m = (m & ~0x04) | (p.msb & 0x04) }
+                        if f & 0x20 != 0 { m = (m & ~0x08) | (p.msb & 0x08) }
                     } else {
                         if f & 0x01 != 0 { l = p.lsb }
                         if f & 0x02 != 0 { m = p.msb }

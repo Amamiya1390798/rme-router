@@ -12,8 +12,8 @@ public enum XTCSendGate {
         case value(index: UInt8)
     }
 
-    /// 前级允许的置位标志：增益 0x01、反相 0x02、48V 0x10。
-    static let micFlags: UInt8 = 0x01 | 0x02 | 0x10
+    /// 前级允许的置位标志：增益 0x01、反相 0x02、静音 0x04、AutoSet 0x08、48V 0x10、PAD / Inst 0x20（编组 0x40 不放行）。
+    static let micFlags: UInt8 = 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20
     /// 路由的两块：0x01 / 0x02。
     static let routingFlags: UInt8 = 0x01 | 0x02
     static let routingIndices: Set<UInt8> = [14, 16, 17, 18, 19]

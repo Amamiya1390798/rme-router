@@ -14,6 +14,15 @@ final class XTCClientTests: XCTestCase {
         try XTCSendGate.check(XTCSysEx.set([XTCRoutingOutput.madi(block: 5).setParam(.madi(block: 2))], device: 0))
     }
 
+    /// 2026-10-26 放宽：静音 0x04、AutoSet 0x08、PAD / Inst 0x20 可写；编组 0x40 仍拦截（文档第 6.3 节）。
+    func testGateAllowsMuteAutoSetPad() throws {
+        let p = XTCMicSettings.setParam(mic: 2, mute: true, autoSet: false, padInst: true)
+        XCTAssertEqual(p.flags, 0x04 | 0x08 | 0x20)
+        XCTAssertEqual(p.msb, 0x01 | 0x08)
+        try XTCSendGate.check(XTCSysEx.set([p], device: 0))
+        XCTAssertThrowsError(try XTCSendGate.check(XTCSysEx.set([.init(index: 1, lsb: 0, msb: 0x10, flags: 0x40)], device: 0)))
+    }
+
     func testGateBlocksDangerousParams() throws {
         let cases: [(XTCSysEx.Param, XTCSendGate.Rejection)] = [
             (.init(index: 25, lsb: 1, msb: 0, flags: 0x7F), .index(25)),        // 加载预设

@@ -253,6 +253,15 @@ struct PreampCard: View {
                     flagToggle(.phantom, on: "48V 开", off: "48V 关", onColor: Tokens.Palette.warn)
                     flagToggle(.phase, on: "Ø 反相", off: "Ø 正相", onColor: Tokens.Palette.accent)
                 }
+                // XTC 专有（文档第 6.3 节）：静音、AutoSet、PAD（Mic 1–4）/ Inst（Mic 5–8）
+                if deviceID == "xtc" {
+                    let pad = preamp.input.channel <= 4
+                    HStack(spacing: Tokens.Space.xs) {
+                        flagToggle(.mute, on: "静音", off: "未静音", onColor: Tokens.Palette.problem)
+                        flagToggle(.autoSet, on: "AutoSet 开", off: "AutoSet 关", onColor: Tokens.Palette.accent)
+                        flagToggle(.padInst, on: pad ? "PAD 开" : "Inst 开", off: pad ? "PAD 关" : "Inst 关", onColor: Tokens.Palette.warn)
+                    }
+                }
             }
             if let error { Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
             HStack(spacing: Tokens.Space.xs) {
@@ -291,6 +300,16 @@ struct PreampCard: View {
     }
 
     /// 48V / 相位开关：点一下把相反的值加入待应用；再点一下撤回。
+    static func help(_ f: PreampField, channel: Int) -> String {
+        switch f {
+        case .phantom: return "切换 48V（先进待应用栏；打开时确认框会再问一次）"
+        case .mute: return "XTC 这一路静音（先进待应用栏）"
+        case .autoSet: return "XTC 自动降增益防过载（先进待应用栏）"
+        case .padInst: return channel <= 4 ? "XTC Mic 1–4 的衰减 PAD（先进待应用栏）" : "XTC Mic 5–8 的乐器输入（先进待应用栏）"
+        default: return "切换相位（先进待应用栏）"
+        }
+    }
+
     @ViewBuilder private func flagToggle(_ field: PreampField, on: String, off: String, onColor: Color) -> some View {
         let current: Bool? = { if case let .flag(b)? = preamp.value(field) { return b } else { return nil } }()
         let target: Bool? = { if case let .flag(b)? = pending(field) { return b } else { return nil } }()
@@ -309,7 +328,7 @@ struct PreampCard: View {
                 .overlay(Capsule().strokeBorder((target != nil ? Tokens.Palette.accent : (shown == true ? onColor : Tokens.Palette.border)).opacity(0.7), lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .help(field == .phantom ? "切换 48V（先进待应用栏；打开时确认框会再问一次）" : "切换相位（先进待应用栏）")
+            .help(Self.help(field, channel: preamp.input.channel))
         }
     }
 
