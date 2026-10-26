@@ -44,11 +44,18 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
     <key>NSHighResolutionCapable</key><true/>
-    <key>NSHumanReadableCopyright</key><string>RME Router（个人工作室工具）</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 amamiya. 二次元模式美术 CC BY-NC-SA 4.0（上善、ZipZipPipe、Small-tailqwq）</string>
 </dict>
 </plist>
 PLIST
-codesign --force --sign - "$app" >/dev/null 2>&1 || true
+# 签名：默认临时签名（本机用）；发给别人时设 SIGN_ID 为钥匙串里的证书名，例如
+#   SIGN_ID="Apple Development: …" scripts/make-app.sh release
+if [[ -n "${SIGN_ID:-}" ]]; then
+  codesign --force --deep --options runtime --sign "$SIGN_ID" "$app"
+  codesign --verify --strict "$app" && echo "已签名：$SIGN_ID"
+else
+  codesign --force --sign - "$app" >/dev/null 2>&1 || true
+fi
 echo "已生成 $app（$config，版本 $version，构建 $build）"
 
 if (( install )); then
