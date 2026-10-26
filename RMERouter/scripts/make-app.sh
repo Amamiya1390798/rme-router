@@ -28,6 +28,8 @@ cp "$bin" "$app/Contents/MacOS/RMERouter"
 [[ -d Resources/Panels ]] && cp -R Resources/Panels "$app/Contents/Resources/Panels"
 # 二次元模式素材（CC BY-NC-SA 4.0：署名、非商用、相同方式共享，见 NOTICE.txt）
 [[ -d Resources/Anime ]] && cp -R Resources/Anime "$app/Contents/Resources/Anime"
+# 二次元模式 · Claude 看板娘（形象由 amamiya 提供）
+[[ -d Resources/AnimeClaude ]] && cp -R Resources/AnimeClaude "$app/Contents/Resources/AnimeClaude"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

@@ -52,7 +52,7 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(UITheme.studio.value(.accent).0, 0x2F6FB5)
         XCTAssertEqual(UITheme.contrast.value(.bg).1, 0x121212)
         XCTAssertEqual(UITheme.gemini.value(.accent).0, 0x1A73E8)
-        XCTAssertEqual(UITheme.allCases.count, 8)   // 含藏在 DeepSeek 下的二次元模式
+        XCTAssertEqual(UITheme.allCases.count, 9)   // 含两套藏起来的二次元模式
         XCTAssertEqual(UITheme.pickable.count, 7)
         XCTAssertEqual(UITheme.deepseek.value(.accent).0, 0x4D6BFE)
         XCTAssertEqual(UITheme.gpt.cardRadius, 16)

@@ -62,20 +62,23 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
     case warm, studio, contrast, gemini, gpt, deepseek, kimi
     /// 二次元模式（第 5.1.1 节）：藏在 DeepSeek 下面，主题网格里不单列。
     case anime
+    /// 二次元模式 · Claude 看板娘（第 5.1.2 节）：藏在默认暖色下面。
+    case claudeAnime
     /// 主题网格里列出的。
-    public static var pickable: [UITheme] { allCases.filter { $0 != .anime } }
+    public static var pickable: [UITheme] { allCases.filter { $0 != .anime && $0 != .claudeAnime } }
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .warm: return "默认暖色"; case .studio: return "工作室蓝灰"; case .contrast: return "高对比"
         case .gemini: return "Gemini 风格"; case .gpt: return "GPT 风格"; case .deepseek: return "DeepSeek 风格"; case .kimi: return "Kimi 风格"
         case .anime: return "二次元模式"
+        case .claudeAnime: return "二次元模式（Claude）"
         }
     }
 
     /// 卡片圆角（第 5.1 节）。
     public var cardRadius: CGFloat {
-        switch self { case .gemini: return 20; case .gpt, .kimi: return 16; case .deepseek: return 14; case .anime: return 18; default: return 12 }
+        switch self { case .gemini: return 20; case .gpt, .kimi: return 16; case .deepseek: return 14; case .anime: return 18; case .claudeAnime: return 14; default: return 12 }
     }
     /// 侧栏页面项圆角（Gemini 是胶囊）。
     public var itemRadius: CGFloat {
@@ -94,6 +97,7 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
         case .kimi: return ThemeStyle(title: .heavy, card: .heavyOutline, capsuleChips: true, panel: .flat, meter: .mono, brand: .badge, selection: .thick)
         case .anime: return ThemeStyle(title: .rounded, bodyRounded: true, card: .elevated, capsuleChips: true, panel: .glow,
                                        meter: .gradient, brand: .gradient, selection: .glow)
+        case .claudeAnime: return ThemeStyle(title: .serif, card: .outlined, panel: .glow, meter: .gradient, brand: .gradient, selection: .glow)
         }
     }
 
@@ -104,13 +108,14 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
         case .deepseek: return [0x4D6BFE, 0x7FA2FF]
         case .kimi: return [0x4F46E5, 0x8B5CF6]
         case .gpt: return [0x10A37F, 0x1ABC9C]
-        case .anime: return [0x536EAE, 0x9BB0E1, 0xF0CF8C]   // 深海蓝 → 浅蓝 → 金（蕾丝金边）
+        case .anime: return [0x536EAE, 0x9BB0E1, 0xF0CF8C]
+        case .claudeAnime: return [0xC15F3C, 0xD97757, 0xC9A15A]   // 陶土橙 → 珊瑚橙 → 金（立绘的裙摆饰带）   // 深海蓝 → 浅蓝 → 金（蕾丝金边）
         default: return [value(.accent).0, value(.accent).1]
         }
     }
 
     /// 侧栏选中块用强调色淡底（否则用灰底）。
-    public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi || self == .gpt || self == .anime }
+    public var tintedSelection: Bool { self == .gemini || self == .deepseek || self == .kimi || self == .gpt || self == .anime || self == .claudeAnime }
     public static let defaultsKey = "ui.theme"
 
     /// 当前主题。只在主线程改（设置页），颜色在绘制时读。
@@ -205,6 +210,20 @@ public enum UITheme: String, CaseIterable, Identifiable, Sendable {
             case .warn: return (0x815C18, 0xF0CF8C)
             case .problem: return (0xC8414F, 0xFF8E98)
             case .unknown: return (0x96A6C9, 0x52658C)
+            }
+        case .claudeAnime:   // Claude 看板娘（第 5.1.2 节）：奶油底、陶土橙、黑饰带、金边
+            switch t {
+            case .chrome: return (0xEFE7DC, 0x1A1412)
+            case .bg: return (0xF7F1E8, 0x221A16)
+            case .surface: return (0xFFFBF5, 0x2D231E)
+            case .border: return (0xE6D8C6, 0x4A3A30)
+            case .text: return (0x2A1E17, 0xF4EBDF)
+            case .textMuted: return (0x6E5646, 0xB8A391)
+            case .accent: return (0xC15F3C, 0xD97757)
+            case .ok: return (0x4F7F45, 0x8FBF7A)
+            case .warn: return (0xA9761F, 0xE3B45A)
+            case .problem: return (0xB23A2E, 0xE86A5C)
+            case .unknown: return (0xA8998A, 0x6F6259)
             }
         case .kimi:
             switch t {
@@ -337,8 +356,8 @@ struct CardBackground: ViewModifier {
         let style = UITheme.current.style.card
         content
             .padding(Tokens.Space.m)
-            .background(Tokens.Palette.surface.opacity(UITheme.current == .anime ? 0.9 : 1), in: shape)
-            .overlay { if UITheme.current == .anime { AnimeCardTrim().clipShape(shape) } }   // 蕾丝、花边（第 5.1.1 节）
+            .background(Tokens.Palette.surface.opacity(UITheme.current.isAnime ? 0.9 : 1), in: shape)
+            .overlay { if UITheme.current.isAnime { AnimeCardTrim().clipShape(shape) } }   // 蕾丝、花边（第 5.1.1 节）
             .overlay {
                 switch style {
                 case .outlined: shape.strokeBorder(Tokens.Palette.border, lineWidth: 1)
