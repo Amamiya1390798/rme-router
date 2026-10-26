@@ -29,7 +29,8 @@ public struct RootView: View {
             panel
                 .padding(.vertical, 8).padding(.trailing, 8).padding(.leading, sidebarVisible ? 0 : 8)
         }
-        .claudeCursor(model.theme == .claudeAnime)   // 橙色光标 + 小螃蟹（第 5.1.2 节）
+        .contentShape(Rectangle())   // 整个窗口内容都算光标区域（否则纯色底的地方不换光标）
+        .modifier(ThemeCursorModifier(theme: model.theme))   // 主题色光标；Claude 贴小螃蟹、DeepSeek 贴鲸鱼尾巴
         .background(Tokens.Palette.chrome)   // 放在 .id 里面：侧栏底色也跟着主题换
         .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）
         .ignoresSafeArea()
@@ -655,4 +656,11 @@ struct TwelveMicCableHint: View {
         .padding(Tokens.Space.l)
         .frame(width: 460)
     }
+}
+
+/// 按当前浅色 / 深色取主题光标。
+struct ThemeCursorModifier: ViewModifier {
+    var theme: UITheme
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View { content.themeCursor(theme, dark: scheme == .dark) }
 }

@@ -343,12 +343,49 @@ struct ClaudeSelfPortrait: View {
     }
 }
 
-/// Claude 看板娘的光标（2026-10-27 用户：想要和 Claude 操控电脑时一样的橙色光标，侧角贴一只小螃蟹）。
-/// 橙色箭头 + 白描边，右下角是用户提供的 Clawd 小图；只在 Claude 看板娘主题下、鼠标在窗口内容里时生效。
-enum ClaudeCursor {
-    @MainActor static let cursor: NSCursor = {
-        let size = NSSize(width: 32, height: 32)
-        let img = NSImage(size: size, flipped: true) { _ in
+/// 各主题的光标（2026-10-27 用户）：主题强调色的箭头 + 白描边；Claude 看板娘右下角贴小螃蟹，
+/// DeepSeek 两套贴鲸鱼尾巴（多数是官方的，偶尔换成社区版）。只在窗口里生效。
+enum ThemeCursor {
+    @MainActor static var cache: [String: NSCursor] = [:]
+
+    enum Badge: String { case none, crab, whaleOfficial, whaleCommunity }
+
+    static func badge(for theme: UITheme, roll: Double = Double.random(in: 0 ..< 1)) -> Badge {
+        switch theme {
+        case .claudeAnime: return .crab
+        case .deepseek, .anime: return roll < 0.12 ? .whaleCommunity : .whaleOfficial   // 偶尔出现社区版
+        default: return .none
+        }
+    }
+
+    static var cursorDirectory: URL? {
+        let fm = FileManager.default
+        if let r = Bundle.main.resourceURL?.appendingPathComponent("Cursor"), fm.fileExists(atPath: r.path) { return r }
+        var u = URL(fileURLWithPath: #filePath)
+        for _ in 0 ..< 4 { u.deleteLastPathComponent() }
+        let repo = u.appendingPathComponent("Resources/Cursor")
+        return fm.fileExists(atPath: repo.path) ? repo : nil
+    }
+
+    @MainActor static func badgeImage(_ b: Badge) -> NSImage? {
+        switch b {
+        case .none: return nil
+        case .crab: return AnimeArt.image("clawd", skin: .claude)
+        case .whaleOfficial: return cursorDirectory.flatMap { NSImage(contentsOf: $0.appendingPathComponent("whale-tail-official.svg")) }
+        case .whaleCommunity: return cursorDirectory.flatMap { NSImage(contentsOf: $0.appendingPathComponent("whale-tail-community.png")) }
+        }
+    }
+
+    /// 这套主题的光标；角标在第一次取时抽一次，之后同一主题一直用它（换主题或重开 App 再抽）。
+    @MainActor static func cursor(for theme: UITheme, dark: Bool) -> NSCursor {
+        let b = cache.keys.first { $0.hasPrefix("\(theme.rawValue)|\(dark)|") }.map { Badge(rawValue: String($0.split(separator: "|")[2])) ?? .none }
+            ?? badge(for: theme)
+        let key = "\(theme.rawValue)|\(dark)|\(b.rawValue)"
+        if let c = cache[key] { return c }
+        let v = theme.value(.accent)
+        let fill = NSColor(hex: dark ? v.1 : v.0)
+        let badge = badgeImage(b)
+        let img = NSImage(size: NSSize(width: 32, height: 32), flipped: true) { _ in
             let arrow = NSBezierPath()
             arrow.move(to: NSPoint(x: 2, y: 2))
             arrow.line(to: NSPoint(x: 2, y: 22))
@@ -362,27 +399,39 @@ enum ClaudeCursor {
             NSGraphicsContext.current?.saveGraphicsState()
             let shadow = NSShadow(); shadow.shadowBlurRadius = 2; shadow.shadowOffset = NSSize(width: 0, height: -1)
             shadow.shadowColor = NSColor.black.withAlphaComponent(0.35); shadow.set()
-            NSColor(hex: 0xD97757).setFill(); arrow.fill()
+            fill.setFill(); arrow.fill()
             NSGraphicsContext.current?.restoreGraphicsState()
             NSColor.white.setStroke(); arrow.lineWidth = 1.6; arrow.stroke()
-            if let crab = AnimeArt.image("clawd", skin: .claude) {
-                NSGraphicsContext.current?.imageInterpolation = .none
-                crab.draw(in: NSRect(x: 17, y: 18, width: 14, height: 14))
+            if let badge {
+                if b == .crab { NSGraphicsContext.current?.imageInterpolation = .none }
+                // 鲸鱼尾巴是细线，垫一个白底小圆，深色背景上也看得清
+                if b != .crab { NSColor.white.withAlphaComponent(0.9).setFill(); NSBezierPath(ovalIn: NSRect(x: 16, y: 17, width: 16, height: 15)).fill() }
+                badge.draw(in: NSRect(x: 17, y: 18, width: 14, height: 14))
             }
             return true
         }
-        return NSCursor(image: img, hotSpot: NSPoint(x: 2, y: 2))
-    }()
+        // 先栅格化成位图（带 SVG 角标的绘制式图片，pointerStyle 有时不认，光标会退回系统箭头）
+        let raster = NSImage(size: img.size)
+        if let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) { raster.addRepresentation(rep) }
+        let c = NSCursor(image: raster.representations.isEmpty ? img : raster, hotSpot: NSPoint(x: 2, y: 2))
+        cache[key] = c
+        return c
+    }
+}
+
+/// 旧名：Claude 看板娘的光标。
+enum ClaudeCursor {
+    @MainActor static var cursor: NSCursor { ThemeCursor.cursor(for: .claudeAnime, dark: NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua) }
 }
 
 extension View {
-    /// Claude 看板娘下用橙色小螃蟹光标：macOS 15 起用 pointerStyle（SwiftUI 自己会重设光标，光标区域方式不稳），更早的系统在鼠标移动时设一次。
-    @ViewBuilder func claudeCursor(_ on: Bool) -> some View {
-        if !on { self }
-        else if #available(macOS 15.0, *) {
-            pointerStyle(.image(Image(nsImage: ClaudeCursor.cursor.image), hotSpot: UnitPoint(x: 2.0 / 32, y: 2.0 / 32)))
+    /// 主题光标：macOS 15 起用 pointerStyle（SwiftUI 自己会重设光标，光标区域方式不稳），更早的系统在鼠标移动时设一次。
+    @ViewBuilder func themeCursor(_ theme: UITheme, dark: Bool) -> some View {
+        let c = ThemeCursor.cursor(for: theme, dark: dark)
+        if #available(macOS 15.0, *) {
+            pointerStyle(.image(Image(nsImage: c.image), hotSpot: UnitPoint(x: 2.0 / 32, y: 2.0 / 32)))
         } else {
-            onContinuousHover { if case .active = $0 { ClaudeCursor.cursor.set() } }
+            onContinuousHover { if case .active = $0 { c.set() } }
         }
     }
 }

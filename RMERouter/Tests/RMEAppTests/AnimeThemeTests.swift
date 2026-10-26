@@ -46,3 +46,30 @@ final class AnimeThemeTests: XCTestCase {
         XCTAssertNotNil(AnimeArt.image("maid-left", skin: .claude))
     }
 }
+
+/// 主题光标（2026-10-27）：每套主题都有；Claude 贴小螃蟹，DeepSeek 两套贴鲸鱼尾巴（偶尔社区版），其余不贴。
+@MainActor
+final class ThemeCursorTests: XCTestCase {
+    func testBadges() {
+        XCTAssertEqual(ThemeCursor.badge(for: .claudeAnime), .crab)
+        XCTAssertEqual(ThemeCursor.badge(for: .deepseek, roll: 0.5), .whaleOfficial)
+        XCTAssertEqual(ThemeCursor.badge(for: .anime, roll: 0.05), .whaleCommunity)
+        XCTAssertEqual(ThemeCursor.badge(for: .warm), ThemeCursor.Badge.none)
+        XCTAssertNotNil(ThemeCursor.badgeImage(.whaleOfficial))
+        XCTAssertNotNil(ThemeCursor.badgeImage(.whaleCommunity))
+        for t in UITheme.allCases { XCTAssertEqual(ThemeCursor.cursor(for: t, dark: false).image.size, NSSize(width: 32, height: 32)) }
+    }
+}
+
+extension ThemeCursorTests {
+    /// 光标图真的画得出来（箭头尖附近不透明）；DeepSeek 带 SVG 角标时也一样。
+    func testCursorRenders() throws {
+        for t in [UITheme.warm, .deepseek, .anime, .claudeAnime] {
+            let img = ThemeCursor.cursor(for: t, dark: true).image
+            let rep = try XCTUnwrap(img.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)), "\(t)")
+            let w = rep.pixelsWide, scale = Double(w) / 32
+            let c = rep.colorAt(x: Int(4 * scale), y: Int(8 * scale))
+            XCTAssertGreaterThan(c?.alphaComponent ?? 0, 0.5, "\(t) 箭头没画出来")
+        }
+    }
+}

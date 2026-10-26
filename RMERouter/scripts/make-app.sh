@@ -30,6 +30,8 @@ cp "$bin" "$app/Contents/MacOS/RMERouter"
 [[ -d Resources/Anime ]] && cp -R Resources/Anime "$app/Contents/Resources/Anime"
 # 二次元模式 · Claude 看板娘（形象由 amamiya 提供）
 [[ -d Resources/AnimeClaude ]] && cp -R Resources/AnimeClaude "$app/Contents/Resources/AnimeClaude"
+# 光标角标：DeepSeek 鲸鱼尾巴（官方 MIT；社区版版权不明，个人自用，见 sources.json）
+[[ -d Resources/Cursor ]] && cp -R Resources/Cursor "$app/Contents/Resources/Cursor"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

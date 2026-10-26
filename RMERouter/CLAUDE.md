@@ -8,7 +8,7 @@ macOS 原生 SwiftUI 应用，在 TotalMix FX 2.1 之上管理 MADIface XT、12M
 
 ## 目录
 
-- `Package.swift`、`Sources/`、`Tests/`：核心 Swift 包（无 UI）。已在 Mac 上编译，`swift test` 全绿（236/236）。
+- `Package.swift`、`Sources/`、`Tests/`：核心 Swift 包（无 UI）。已在 Mac 上编译，`swift test` 全绿（238/238）。
 - `docs/`：需求与设计文档。
 - App：`Sources/RMEApp`（界面库）+ `Sources/RMERouterApp`（入口），`swift run RMERouterApp` 启动；`--render <目录>` 把视图渲染成 PNG 检查；`scripts/make-app.sh` 打包成 `.build/RMERouter.app`。量切页卡顿：`RME_PERF=1 RME_PERF_OUT=结果.txt` 启动 App 可执行文件（可加 `RME_PERF_FOCUS=1`），跑完自动退出；先关掉正在运行的 App（端口会冲突）。Xcode 工程尚未创建。
 

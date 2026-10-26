@@ -1,0 +1,12 @@
+{
+ "files": {
+  "whale-tail-official.svg": {
+   "source": "DeepSeek 官方「深度求索中」鲸鱼尾巴（DSH 客户端，MIT，Copyright (c) 2026 DeepSeek），用户提供；DeepSeek 名称与鲸鱼图形为其商标，个人非商用使用",
+   "sha256": "efd3ec8005d8e0243cea7bddb19dcac6a519d8610d3d0ff0da860c62b1c70127"
+  },
+  "whale-tail-community.png": {
+   "source": "社区插件 null-dat/dsh-whale-tail 的 sprite-v4 第 0 帧，染品牌蓝 #4D6BFE；代码 MIT，素材原作者不可考、版权不明（插件说明：权利人异议即下架），用户提供，个人自用",
+   "sha256": "f5418177ed3dae103aa387e9e63b005dbabc79b014e4028bfd402571e3becbbc"
+  }
+ }
+}
