@@ -68,22 +68,36 @@ struct XTStripsView: View, Equatable {
                     if focus == nil, let s = selectedSource, s.tm.bus == .input { RecordingGhost(strip: s) }
                     ForEach(playbacks) { s in strip(s, origin: nil, current: current, row: playbacks).id(s.tm) }
                 }
-                row("硬件输出", sub: nil, ids: outputs.map(\.tm)) {
+                // P16 格放在对应 ADAT 输出条正下方，和输出条一起滚动（文档第 6.4.6 节）
+                let p16ByOut = Dictionary(grouping: (p16Cells ?? []).filter { $0.output != nil }, by: { $0.output! })
+                row("硬件输出", sub: p16Cells == nil ? nil : (p16RateBad ? "下排 = P16-I\n⚠ 只认 44.1 / 48 kHz" : "下排 = P16-I"), ids: outputs.map(\.tm)) {
                     ForEach(outputs) { s in
                         let lit = focus.map { $0.outputs.contains(s.tm) }
-                        OutputStrip(model: model, strip: s, selected: focus == nil && selectedSource == nil && s.tm == current?.tm,
-                                    routedDB: focus == nil && selectedSource != nil ? sends.first { $0.output == s.tm }?.dB : nil,
-                                    lit: lit, picked: picked.contains(s.tm), flash: flash == s.tm,
-                                    hiddenMark: model.hiddenStrips.contains(s.tm)) {
-                            if pickClick(s, row: outputs) { return }
-                            output = s.tm
-                            source = nil
+                        VStack(alignment: .leading, spacing: 22) {
+                            OutputStrip(model: model, strip: s, selected: focus == nil && selectedSource == nil && s.tm == current?.tm,
+                                        routedDB: focus == nil && selectedSource != nil ? sends.first { $0.output == s.tm }?.dB : nil,
+                                        lit: lit, picked: picked.contains(s.tm), flash: flash == s.tm,
+                                        hiddenMark: model.hiddenStrips.contains(s.tm)) {
+                                if pickClick(s, row: outputs) { return }
+                                output = s.tm
+                                source = nil
+                            }
+                            .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["out:\(s.tm.number)"] = $1 }
+                            if let cs = p16ByOut[s.tm] {
+                                HStack(spacing: 4) {
+                                    ForEach(cs) { c in p16Cell(c, width: cs.count > 1 ? 34 : 72, current: current) }
+                                }
+                            }
                         }
-                        .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["out:\(s.tm.number)"] = $1 }
                         .id(s.tm)
                     }
                 }
-                if model.studioConfig.has("p16i") { p16Row(current: current, outputs: outputs) }
+                if model.studioConfig.has("p16i"), p16Cells == nil {
+                    row("P16-I", sub: nil, ids: []) {
+                        Text("P16 没有接在主卡的 ADAT 输出上（例如 XT 经 XTC 的 ADAT 送过去），不在通道条下面排；接法在“设置 → 接线”里看。")
+                            .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+                    }
+                }
             }
         }
         .padding(Tokens.Space.m)
@@ -121,44 +135,28 @@ struct XTStripsView: View, Equatable {
 
     // MARK: P16 行（文档第 6.4.6 节）
 
-    /// P16 第 n 路 = 主卡 ADAT 输出第 n 路；点一格选中那条输出（上两行就显示送到它的电平）。
-    /// 格子对齐上面的输出条：立体声输出条（72 宽）下面并排两格，单声道一格；前面空出 ADAT 之前的输出条。
-    @ViewBuilder private func p16Row(current: XTStrip?, outputs: [XTStrip]) -> some View {
-        let rate = model.snapshot.devices["xt"]?.clock.configuredRate.knownValue
-        let rateBad = rate.map { ![44_100, 48_000].contains($0) } ?? false
-        row("P16-I", sub: rateBad ? "⚠ 只认 44.1 / 48 kHz" : "ADAT A / B", ids: []) {
-            if let cells = model.p16Cells() {
-                let firstADAT = cells.compactMap(\.output).first
-                let lead = outputs.prefix { $0.tm != firstADAT }.count
-                let stereo = Set(outputs.filter(\.stereo).map(\.tm))
-                if lead < outputs.count {
-                    ForEach(0 ..< lead, id: \.self) { _ in Color.clear.frame(width: 72, height: 1) }
-                }
-                ForEach(cells) { c in
-                    let w: CGFloat = c.output.map { stereo.contains($0) } ?? false ? 34 : 72
-                    Button { if let o = c.output { output = o; source = nil } } label: {
-                        VStack(spacing: 2) {
-                            Text(w < 72 ? "\(c.number)" : "P16 \(c.number)").font(Tokens.Font.caption.weight(.semibold))
-                            Text(verbatim: "\(c.number <= 8 ? "A" : "B")\(c.ref.channel)").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
-                            Text(verbatim: c.sources.isEmpty ? "无" : c.sources.joined(separator: "、"))
-                                .font(.system(size: 10)).lineLimit(1)
-                                .foregroundStyle(c.sources.isEmpty ? Tokens.Palette.textMuted : Tokens.Palette.accent)
-                        }
-                        .frame(width: w, height: 52)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.surface))
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(c.output != nil && c.output == current?.tm ? Tokens.Palette.accent : Tokens.Palette.border))
-                    }
-                    .buttonStyle(.plain)
-                    .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["p16:\(c.number)"] = $1 }
-                    .help(c.output == nil ? "主卡 \(c.ref) 在 TotalMix 里没有对应的输出条" :
-                          "P16 第 \(c.number) 路 ← 主卡 \(model.shortName(c.ref))；点了看送到它的电平" + (rateBad ? "。现在采样率 \(rate ?? 0) Hz，P16 只认 44.1 / 48 kHz" : ""))
-                }
-            } else {
-                Text("P16 没有接在主卡的 ADAT 输出上（例如 XT 经 XTC 的 ADAT 送过去），这一行不按输出排；接法在“设置 → 接线”里看。")
-                    .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+    /// P16 一格：P16 第 n 路 = 主卡 ADAT 输出第 n 路；点了选中那条输出（上两行就显示送到它的电平）。
+    private func p16Cell(_ c: P16Cell, width w: CGFloat, current: XTStrip?) -> some View {
+        Button { if let o = c.output { output = o; source = nil } } label: {
+            VStack(spacing: 2) {
+                Text(w < 72 ? "\(c.number)" : "P16 \(c.number)").font(Tokens.Font.caption.weight(.semibold))
+                Text(verbatim: "\(c.number <= 8 ? "A" : "B")\(c.ref.channel)").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
+                Text(verbatim: c.sources.isEmpty ? "无" : c.sources.joined(separator: "、"))
+                    .font(.system(size: 10)).lineLimit(1)
+                    .foregroundStyle(c.sources.isEmpty ? Tokens.Palette.textMuted : Tokens.Palette.accent)
             }
+            .frame(width: w, height: 52)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Tokens.Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 6)
+                .stroke(c.output == current?.tm ? Tokens.Palette.accent : Tokens.Palette.border))
         }
+        .buttonStyle(.plain)
+        .transformAnchorPreference(key: StripAnchorKey.self, value: .bounds) { $0["p16:\(c.number)"] = $1 }
+        .help("P16 第 \(c.number) 路 ← 主卡 \(model.shortName(c.ref))" + (c.sources.isEmpty ? "，现在没有发送" : "：" + c.sources.joined(separator: "、")) + "；点了看送到它的电平")
+    }
+
+    private var p16RateBad: Bool {
+        model.snapshot.devices["xt"]?.clock.configuredRate.knownValue.map { ![44_100, 48_000].contains($0) } ?? false
     }
 
     // MARK: 多选、屏蔽、跳转（第 6.4.5 节）
