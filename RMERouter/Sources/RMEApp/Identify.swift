@@ -33,7 +33,7 @@ public enum CableStatus: Equatable, Sendable {
     }
 }
 
-/// 信号核对（认线）：说话或轻拍一支麦克风，看它实际出现在 XT 的哪一路输入。只读。
+/// 信号核对（认线）：说话或轻拍一支麦克风，看它实际出现在主卡的哪一路输入。只读。
 public struct IdentifyTest: Equatable, Sendable {
     public enum Outcome: Equatable, Sendable {
         case match(ChannelRef)
@@ -42,7 +42,7 @@ public struct IdentifyTest: Equatable, Sendable {
     }
 
     public var source: ChannelRef
-    /// 按当前接线和路由算出的：它应该出现在 XT 的哪些输入通道。
+    /// 按当前接线和路由算出的：它应该出现在主卡的哪些输入通道。
     public var expected: [ChannelRef]
     /// 到达每个预期通道经过的线缆（两端端口）。
     public var cables: [ChannelRef: [(from: String, to: String)]]
@@ -81,7 +81,7 @@ public enum IdentifyError: Error, Equatable {
 extension AppModel {
     static let verificationsKey = "link.verifications"
 
-    /// 一个来源按当前接线和路由应该出现在 XT 的哪些输入通道，以及路上经过的线缆。
+    /// 一个来源按当前接线和路由应该出现在主卡的哪些输入通道，以及路上经过的线缆。
     public func expectedXTInputs(from source: ChannelRef) -> [ChannelRef: [(from: String, to: String)]] {
         let topo = snapshot.topology
         func isXTInput(_ r: ChannelRef) -> Bool {
@@ -140,7 +140,7 @@ extension AppModel {
 
     public func cancelIdentify() { identify = nil }
 
-    /// XT 各输入通道当前电平（没收到的不列）。
+    /// 主卡各输入通道当前电平（没收到的不列）。
     func xtInputLevels() -> [ChannelRef: Double] {
         let topo = snapshot.topology
         return meters.levels.filter { ref, _ in

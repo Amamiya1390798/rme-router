@@ -1,18 +1,27 @@
 import SwiftUI
 import RMECore
 
-/// 信号核对（文档第 6.5 节）：选一支麦克风 → 说话或轻拍 → 看它实际进了 XT 的哪一路。只读，不改任何设备。
+/// 信号核对（文档第 6.5 节）：选一支麦克风 → 说话或轻拍 → 看它实际进了主卡的哪一路。只读，不改任何设备。
 struct IdentifySheet: View {
     @Bindable var model: AppModel
     var close: () -> Void
     @State private var source: ChannelRef?
     @State private var error: String?
 
-    /// 可选的麦克风：XT 自带、12Mic、XTC。
+    /// 可选的麦克风：主卡自带的话放（跟着“设备组成”：XT 2 路、UFX III 4 路，通用卡按 TotalMix 读到的）、打开的 12Mic、XTC。
     private var sources: [(String, [ChannelRef])] {
-        [("MADIface XT", (1 ... 2).map { ChannelRef("xt.mic.in", $0) }),
-         ("12Mic", (1 ... 12).map { ChannelRef("12mic.analog.in", $0) }),
-         ("OctaMic XTC", (1 ... 8).map { ChannelRef("xtc.mic.in", $0) })]
+        let card = model.studioConfig.mainCard
+        let read = model.snapshot.devices["xt"]?.preamps.map(\.input) ?? []
+        let mainMics = !read.isEmpty ? read : card == .generic ? [] : (1 ... (card == .ufx3 ? 4 : 2)).map { ChannelRef("xt.mic.in", $0) }
+        var out: [(String, [ChannelRef])] = mainMics.isEmpty ? [] : [(card.deviceName, mainMics)]
+        if model.studioConfig.has("12mic") { out.append(("12Mic", (1 ... 12).map { ChannelRef("12mic.analog.in", $0) })) }
+        if model.studioConfig.has("xtc") { out.append(("OctaMic XTC", (1 ... 8).map { ChannelRef("xtc.mic.in", $0) })) }
+        return out
+    }
+
+    /// 按钮上的号码按面板印字：UFX III 的话放是 Mic 9–12（对照表里是 mic 1–4）。
+    private func micNumber(_ r: ChannelRef) -> Int {
+        r.portID == "xt.mic.in" && model.studioConfig.mainCard == .ufx3 ? r.channel + 8 : r.channel
     }
 
     var body: some View {
@@ -58,7 +67,7 @@ struct IdentifySheet: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.fixed(64), spacing: 4), count: 7), alignment: .leading, spacing: 4) {
                         ForEach(refs, id: \.self) { r in
                             Button { source = r; error = nil } label: {
-                                Text("Mic \(r.channel)").font(Tokens.Font.caption).frame(width: 60, height: 22)
+                                Text("Mic \(micNumber(r))").font(Tokens.Font.caption).frame(width: 60, height: 22)
                                     .background(RoundedRectangle(cornerRadius: 4).fill(source == r ? Tokens.Palette.accent.opacity(0.3) : Tokens.Palette.surface))
                                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(source == r ? Tokens.Palette.accent : Tokens.Palette.border))
                             }
