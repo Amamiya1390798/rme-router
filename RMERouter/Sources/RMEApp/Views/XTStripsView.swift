@@ -493,9 +493,14 @@ struct MiniStripButtons: View {
             HStack(spacing: 3) {
                 chip("M", .mute, on: Tokens.Palette.problem)
                 chip("Ø", .phase, on: Tokens.Palette.warn)
-                // 送电脑录音（只有输出有；TotalMix 没回报这一项时不显示）
-                if model.stripValue(ref, .loopback) != nil { chip("录", .loopback, on: Tokens.Palette.problem) }
-                if model.stripValue(ref, .eqEnable) != nil { eqChip }
+            }
+            // 第二行：送电脑录音（只有输出有）、EQ。一行放四个会超出通道条宽度、压到旁边的条
+            let hasLoop = model.stripValue(ref, .loopback) != nil, hasEQ = model.stripValue(ref, .eqEnable) != nil
+            if hasLoop || hasEQ {
+                HStack(spacing: 3) {
+                    if hasLoop { chip("录", .loopback, on: Tokens.Palette.problem) }
+                    if hasEQ { eqChip }
+                }
             }
             if let s = strip, s.tm.number % 2 == 1, canPair(s) { pairChip(s) }
         }
