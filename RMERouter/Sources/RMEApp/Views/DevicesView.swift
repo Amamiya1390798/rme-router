@@ -127,13 +127,14 @@ struct DevicesView: View {
             } label: {
                 Label(rackOpen ? "收起面板" : "展开面板", systemImage: rackOpen ? "chevron.up" : "chevron.down")
             }
+            .fixedSize()
             .help(rackOpen ? "收起设备面板，通道条占满页面" : "展开设备面板")
             if rackOpen {
                 Picker("面", selection: $face) { ForEach(PanelFace.allCases) { Text($0.title).tag($0) } }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                     .onChange(of: face) { select(nil) }
             }
-            Button("信号核对…") { identifying = true }
+            Button("信号核对…") { identifying = true }.fixedSize()
                 .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
                 .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
             Spacer()
@@ -149,7 +150,7 @@ struct DevicesView: View {
                 ForEach(DevicesPane.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
-            Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox)
+            Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox).fixedSize()
                 .disabled(!model.meters.live || model.devicesPane != .strips)
                 .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
         }
@@ -241,6 +242,15 @@ struct RackView: View {
                 HStack(spacing: Tokens.Space.s) {
                     Text(model.snapshot.topology.device(deviceID)?.name ?? deviceID).font(Tokens.Font.cardTitle)
                     if model.isDemo(deviceID) { Badge(text: "演示数据", color: Tokens.Palette.unknown) }
+                    // 12Mic（HTTP 地址）、XTC（MIDI 端点、设备 ID）的连接设置在“设置 → 连接”
+                    if deviceID == "12mic" || deviceID == "xtc" {
+                        Button("连接设置…") {
+                            model.settingsTab = .connection
+                            model.section = .settings
+                        }
+                        .buttonStyle(.link).font(Tokens.Font.caption)
+                        .help(deviceID == "xtc" ? "XTC 的 MIDI 端点、设备 ID、读取与改动开关" : "12Mic 的地址（网线 / USB）")
+                    }
                 }
                 PanelView(panel: panel, selected: selected, linked: linked,
                           signal: { model.hasSignal(port: $0) },

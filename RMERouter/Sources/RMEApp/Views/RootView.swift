@@ -94,8 +94,8 @@ public struct RootView: View {
         .foregroundStyle(Tokens.Palette.textMuted)
         .padding(.horizontal, Tokens.Space.m)
         .frame(height: 40)
-        .contentShape(Rectangle())
-        .modifier(WindowDraggable())
+        // 拖动手势只放在背景层：按钮在上面先收到点击（以前整条都挂手势，检查器按钮等点不动）
+        .background(Color.clear.contentShape(Rectangle()).modifier(WindowDraggable()))
     }
 
     private var pages: some View {
@@ -210,8 +210,7 @@ struct Sidebar: View, Equatable {
         }
         .padding(.horizontal, 10).padding(.bottom, Tokens.Space.l)
         .frame(maxHeight: .infinity, alignment: .top)
-        .contentShape(Rectangle())
-        .modifier(WindowDraggable())
+        .background(Color.clear.contentShape(Rectangle()).modifier(WindowDraggable()))
     }
 
     /// 页面项：圆角块，选中浅色底（不用系统蓝）。

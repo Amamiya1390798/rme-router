@@ -17,7 +17,7 @@ struct StripSearchField: View {
         let hits = model.searchStrips(query)
         TextField("搜索通道条（⌘F）", text: $query)
             .textFieldStyle(.roundedBorder)
-            .frame(width: 220)
+            .frame(minWidth: 110, idealWidth: 220, maxWidth: 220)   // 窗口窄时先缩搜索框，别挤别的按钮
             .focused($focused)
             .onChange(of: focused) { editing = focused || !query.isEmpty }
             .onChange(of: query) { index = 0; editing = focused || !query.isEmpty }

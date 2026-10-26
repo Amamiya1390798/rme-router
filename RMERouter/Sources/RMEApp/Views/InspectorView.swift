@@ -9,6 +9,15 @@ struct InspectorPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.l) {
+                HStack {
+                    Text("检查器").font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
+                    Spacer()
+                    Button { withAnimation(.easeOut(duration: 0.15)) { model.showInspector = false } } label: {
+                        Image(systemName: "xmark").foregroundStyle(Tokens.Palette.textMuted)
+                    }
+                    .buttonStyle(.plain)
+                    .help("关闭检查器（也可以点顶部右边的侧栏按钮）")
+                }
                 // 设备页选中的接口（第 6.8 节）：详情放在检查器顶部，切到别的页也留着（点 × 关），切页不用重建
                 if let (panel, c) = model.selectedConnector {
                     ConnectorDetail(model: model, panel: panel, connector: c, showPath: { model.panelChannel = $0.channel; model.traceTarget = $0 }) {
