@@ -13,7 +13,9 @@ struct GlossaryView: View {
                     TextField("搜索，例如 Send Level、对讲、Talkback", text: $query).textFieldStyle(.roundedBorder).frame(maxWidth: 320)
                     legend(.done); legend(.required); legend(.planned); legend(.no)
                 }
-                if sections.isEmpty {
+                if ["claude", "克克", "小克"].contains(query.trimmingCharacters(in: .whitespaces).lowercased()) {
+                    ClaudeSelfPortrait(size: 160)   // 彩蛋
+                } else if sections.isEmpty {
                     Text("没找到").font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
                 }
                 ForEach(sections) { sec in

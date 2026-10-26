@@ -140,7 +140,7 @@ struct XTStripsView: View, Equatable {
             .allowsHitTesting(false)
             .clipped()
         }
-        .background(RoundedRectangle(cornerRadius: Tokens.Radius.card).fill(Tokens.Palette.surface))
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.card).fill(Tokens.Palette.surface.opacity(UITheme.current.isAnime ? 0.78 : 1)))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card).stroke(Tokens.Palette.border))
         .onChange(of: jump) { if let j = jump { go(to: j.target) } }
     }

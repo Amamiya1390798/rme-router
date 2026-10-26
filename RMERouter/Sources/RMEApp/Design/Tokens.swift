@@ -356,7 +356,7 @@ struct CardBackground: ViewModifier {
         let style = UITheme.current.style.card
         content
             .padding(Tokens.Space.m)
-            .background(Tokens.Palette.surface.opacity(UITheme.current.isAnime ? 0.9 : 1), in: shape)
+            .background(Tokens.Palette.surface.opacity(UITheme.current.isAnime ? 0.78 : 1), in: shape)
             .overlay { if UITheme.current.isAnime { AnimeCardTrim().clipShape(shape) } }   // 蕾丝、花边（第 5.1.1 节）
             .overlay {
                 switch style {

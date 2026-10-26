@@ -20,7 +20,7 @@ public struct RootView: View {
                 // 只在值变了才写（同值写入也会通知观察者）。
                 Sidebar(selection: Binding(get: { model.section },
                                            set: { if model.section != $0 { model.section = $0 } }),
-                        devices: deviceRows)
+                        devices: deviceRows, theme: model.theme)
                     .equatable()
                     .frame(width: 208)
                     .background { if model.theme.isAnime { AnimeSidebarDecor(model: model) } }
@@ -29,8 +29,8 @@ public struct RootView: View {
             panel
                 .padding(.vertical, 8).padding(.trailing, 8).padding(.leading, sidebarVisible ? 0 : 8)
         }
+        .background(Tokens.Palette.chrome)   // 放在 .id 里面：侧栏底色也跟着主题换
         .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）
-        .background(Tokens.Palette.chrome)
         .ignoresSafeArea()
         .sheet(isPresented: $model.showConfirm) { ConfirmSheet(model: model) }
         .sheet(item: $model.eqEditing) { t in EQEditor(model: model, target: t) { model.eqEditing = nil } }
@@ -197,8 +197,10 @@ struct Sidebar: View, Equatable {
 
     @Binding var selection: AppSection?
     var devices: [DeviceRow]
+    /// 换主题时要重画（颜色在绘制时按主题取值；没有它，侧栏要等切浅色 / 深色才跟上）。
+    var theme: UITheme = UITheme.current
 
-    static func == (a: Sidebar, b: Sidebar) -> Bool { a.devices == b.devices && a.selection == b.selection }
+    static func == (a: Sidebar, b: Sidebar) -> Bool { a.devices == b.devices && a.selection == b.selection && a.theme == b.theme }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -486,9 +488,15 @@ struct AppearanceCard: View {
 
 /// 侧边栏顶部：App 图标 + 名字（代替标题栏文字，第 5.1 节）。
 struct BrandHeader: View {
+    @State private var taps = 0
+    @State private var egg = false
+
     var body: some View {
         HStack(spacing: Tokens.Space.s) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 26, height: 26)
+                // 彩蛋：连点 5 下
+                .onTapGesture { taps += 1; if taps >= 5 { taps = 0; egg = true } }
+                .popover(isPresented: $egg, arrowEdge: .trailing) { ClaudeSelfPortrait { egg = false } }
             VStack(alignment: .leading, spacing: 0) {
                 BrandName()
                 Text("路由与监听").font(.system(size: 10)).foregroundStyle(Tokens.Palette.textMuted)
@@ -511,6 +519,7 @@ struct StatusPill: View {
         } label: {
             HStack(spacing: 6) {
                 Circle().fill(dot).frame(width: 7, height: 7)
+                CrabBadge()
                 Text(text).font(.system(size: 11, weight: .medium)).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 3)

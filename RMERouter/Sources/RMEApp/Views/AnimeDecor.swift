@@ -126,7 +126,7 @@ struct AnimeBackdrop: View {
                 if let bg = AnimeArt.image(scheme == .dark ? "palace-night" : "palace-day") {
                     Image(nsImage: bg).resizable().aspectRatio(contentMode: .fill)
                         .frame(width: g.size.width, height: g.size.height).clipped()
-                    Tokens.Palette.bg.opacity(scheme == .dark ? 0.72 : 0.8)
+                    Tokens.Palette.bg.opacity(scheme == .dark ? 0.55 : 0.5)
                 } else if UITheme.current.animeSkin == .claude {
                     ClaudePaper()   // 背景图还没出：暖色渐变 + 终端点阵
                 }
@@ -192,11 +192,13 @@ struct AnimeSidebarDecor: View {
             if model.animeArt, let maid = AnimeArt.image("maid-left") {
                 Image(nsImage: maid).resizable().aspectRatio(contentMode: .fit)
                     .frame(height: 230)
-                    .mask(LinearGradient(colors: [.clear, .black, .black], startPoint: .top, endPoint: .center))
+                    // 只淡出脚下（以前是从头顶淡入，头被“遮”掉了）
+                    .mask(LinearGradient(colors: [.black, .black, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom))
                     .opacity(0.95)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 92)   // 让出底部设备状态列表
             }
+            if UITheme.current.animeSkin == .claude, model.animeArt { WalkingCrab(width: 190).frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 88) }
         }
         .allowsHitTesting(false)
     }
@@ -280,5 +282,63 @@ struct PixelFlower: View {
                 }
             }
         }
+    }
+}
+
+/// 小螃蟹（用户提供的 Clawd 图，非商用同人）：在一段宽度里慢慢左右走；关了“气泡动画”或系统减少动态效果时站着不动。
+struct WalkingCrab: View {
+    var width: CGFloat
+    var size: CGFloat = 26
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if let crab = AnimeArt.image("clawd", skin: .claude) {
+            let still = reduceMotion || UserDefaults.standard.object(forKey: "ui.anime.motion") as? Bool == false
+            TimelineView(.animation(minimumInterval: 1.0 / 24, paused: still)) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                let phase: CGFloat = still ? 0.3 : CGFloat((sin(t * 0.35) + 1) / 2)   // 0…1 来回
+                let facingLeft = !still && cos(t * 0.35) < 0
+                let hop: CGFloat = still ? 0 : CGFloat(abs(sin(t * 6)) * 2.5)        // 小碎步
+                Image(nsImage: crab).interpolation(.none).resizable().frame(width: size, height: size)
+                    .scaleEffect(x: facingLeft ? -1 : 1, y: 1)
+                    .offset(x: phase * (width - size) - (width - size) / 2, y: -hop)
+            }
+            .frame(width: width, height: size + 4)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// 只在 Claude 看板娘下出现的小螃蟹图标（状态胶囊等处）。
+struct CrabBadge: View {
+    var size: CGFloat = 14
+    var body: some View {
+        if UITheme.current.animeSkin == .claude, let crab = AnimeArt.image("clawd", skin: .claude) {
+            Image(nsImage: crab).interpolation(.none).resizable().frame(width: size, height: size).accessibilityHidden(true)
+        }
+    }
+}
+
+/// 彩蛋（2026-10-27 用户：“你画的自己找几个地方藏进去”）：Claude 手画的 Q 版自画像（矢量）。
+/// 入口：连点侧栏左上角 App 图标 5 下；在“TotalMix 对照”里搜 claude / 克克。不分主题都能触发。
+struct ClaudeSelfPortrait: View {
+    var size: CGFloat = 220
+    var close: (() -> Void)? = nil
+
+    static var image: NSImage? {
+        AnimeArt.directory(.claude).flatMap { NSImage(contentsOf: $0.appendingPathComponent("drafts/face-delighted-claude.svg")) }
+    }
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.s) {
+            if let img = Self.image {
+                Image(nsImage: img).resizable().aspectRatio(contentMode: .fit).frame(width: size, height: size)
+            }
+            Text("被你找到啦～这是我自己画的我 ✨").font(Tokens.Font.body)
+            Text("—— Claude").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+            if let close { Button("好耶", action: close).keyboardShortcut(.defaultAction) }
+        }
+        .padding(Tokens.Space.l)
     }
 }

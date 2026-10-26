@@ -25,13 +25,19 @@ extension ConfirmMode {
 struct ViewHeader: View {
     var title: String
     var subtitle: String?
+    /// 二次元模式下标题右边的 Q 版表情（第 5.1.2 节）；其他主题不显示。
+    var mood: AnimeFace.Mood = .delighted
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
-            Text(title).font(Tokens.Font.viewTitle).foregroundStyle(Tokens.Palette.text)
-            if let subtitle {
-                Text(subtitle).font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                Text(title).font(Tokens.Font.viewTitle).foregroundStyle(Tokens.Palette.text)
+                if let subtitle {
+                    Text(subtitle).font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
+                }
             }
+            Spacer(minLength: 0)
+            AnimeFace(mood: mood, size: 64)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
