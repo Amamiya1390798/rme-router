@@ -506,15 +506,39 @@ struct OutputStrip: View {
     var select: () -> Void
     @State private var dropTarget = false
     @State private var message: String?
+    @State private var editingVolume = false
+
+    /// 点 dB 数字改输出音量（和检查器、输出页同一个编辑框，走待应用与确认规则：一次抬高超过 20 dB 要确认，第 7.4 节）。
+    @ViewBuilder private var volumeButton: some View {
+        let now = strip.ref.flatMap { model.stripValue($0, .volume) }
+        let pending = strip.ref.flatMap { model.pendingStrip($0, .volume) }
+        let shown = pending ?? now
+        // 整条通道条有点选手势，普通按钮的点击会被它抢走，这里用高优先级手势
+        Text(TotalMixStripParam.volume.text(shown)).font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(pending != nil ? Tokens.Palette.accent : Tokens.Palette.textMuted)
+            .padding(.horizontal, 3)
+            .background(RoundedRectangle(cornerRadius: 3).fill(Tokens.Palette.border.opacity(pending != nil ? 0.8 : 0.35)))
+            .contentShape(Rectangle())
+            .highPriorityGesture(TapGesture().onEnded { if strip.ref != nil, now != nil { editingVolume = true } })
+        .help(now == nil ? "读不到这一路的输出音量" : "点了改「\(strip.name)」的输出音量")
+        .popover(isPresented: $editingVolume, arrowEdge: .bottom) {
+            let on = now.flatMap { TotalMixFader.isOn($0) ? $0 : nil }
+            let initial = shown.flatMap { TotalMixFader.isOn($0) ? $0 : nil }
+            GainEditor(current: on, initial: initial, title: "\(strip.name) 输出音量") { dB in
+                if let ref = strip.ref, !StripControls.sameVolume(dB, on) || pending != nil {
+                    if let e = model.stripActions.stage(ref, .volume, dB ?? -300) { message = e }
+                }
+                editingVolume = false
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 3) {
             Text(strip.name).font(.system(size: 11, weight: .semibold)).lineLimit(1).frame(maxWidth: .infinity)
             Text("输出 \(recordingText(strip))").font(.system(size: 9)).foregroundStyle(Tokens.Palette.textMuted)
             if let ref = strip.ref { MeterBar(store: model.meters, ref: ref, width: 46) } else { Spacer().frame(height: 6) }
-            let vol = strip.ref.flatMap { model.stripValue($0, .volume) }
-            Text(TotalMixStripParam.volume.text(vol)).font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Tokens.Palette.textMuted)
+            volumeButton
             if let ref = strip.ref { MiniStripButtons(model: model, ref: ref, strip: strip) }
         }
         .padding(5)
