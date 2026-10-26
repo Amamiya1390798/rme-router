@@ -453,6 +453,9 @@ struct SourceStrip: View {
             // 源头话放的增益（第 6.4.3 节）：XT Mic，或追到的 12Mic / XTC 话放
             if strip.tm.bus == .input, let ref = strip.ref, let sp = model.stripPreamp(ref) {
                 StripGainChip(model: model, sp: sp)
+            } else if strip.tm.bus == .input {
+                // 没有话放的输入也留出这一行，一行里的条一样高（懒加载行按先建出来的条定高，高的会被裁）
+                Color.clear.frame(height: 16)
             }
             Button { editing = true } label: {
                 Group {
@@ -567,17 +570,26 @@ struct MiniStripButtons: View {
     var strip: XTStrip? = nil
 
     var body: some View {
+        let hasLoop = model.stripValue(ref, .loopback) != nil, hasEQ = model.stripValue(ref, .eqEnable) != nil
         VStack(spacing: 3) {
-            HStack(spacing: 3) {
-                chip("M", .mute, on: Tokens.Palette.problem)
-                chip("Ø", .phase, on: Tokens.Palette.warn)
+            // 没有“录”（输入、回放）：M Ø EQ 挤一行，省出的一行给话放增益，一行里的条一样高
+            if !hasLoop && hasEQ {
+                HStack(spacing: 2) {
+                    chip("M", .mute, on: Tokens.Palette.problem, width: 18)
+                    chip("Ø", .phase, on: Tokens.Palette.warn, width: 18)
+                    eqChip(width: 20)
+                }
+            } else {
+                HStack(spacing: 3) {
+                    chip("M", .mute, on: Tokens.Palette.problem)
+                    chip("Ø", .phase, on: Tokens.Palette.warn)
+                }
             }
             // 第二行：送电脑录音（只有输出有）、EQ。一行放四个会超出通道条宽度、压到旁边的条
-            let hasLoop = model.stripValue(ref, .loopback) != nil, hasEQ = model.stripValue(ref, .eqEnable) != nil
-            if hasLoop || hasEQ {
+            if hasLoop {
                 HStack(spacing: 3) {
                     if hasLoop { chip("录", .loopback, on: Tokens.Palette.problem) }
-                    if hasEQ { eqChip }
+                    if hasEQ { eqChip() }
                 }
             }
             if let s = strip {
@@ -609,11 +621,11 @@ struct MiniStripButtons: View {
     }
 
     /// EQ：开着时高亮；点了打开 EQ 窗口（第 7.8 节）。
-    private var eqChip: some View {
+    private func eqChip(width: CGFloat = 22) -> some View {
         let on = ((model.pendingStrip(ref, .eqEnable) ?? model.stripValue(ref, .eqEnable)) ?? 0) >= 0.5
         return Button { model.eqEditing = EQTarget(ref: ref, name: strip?.name ?? ref.description) } label: {
             Text("EQ").font(.system(size: 9, weight: .semibold))
-                .frame(width: 22, height: 15)
+                .frame(width: width, height: 15)
                 .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(on ? Tokens.Palette.accent.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
                 .foregroundStyle(on ? Tokens.Palette.text : Tokens.Palette.textMuted)
         }
@@ -621,14 +633,14 @@ struct MiniStripButtons: View {
         .help(on ? "EQ 开着；点了调整" : "打开 EQ（3 段 + 低切）")
     }
 
-    private func chip(_ label: String, _ p: TotalMixStripParam, on color: Color) -> some View {
+    private func chip(_ label: String, _ p: TotalMixStripParam, on color: Color, width: CGFloat = 20) -> some View {
         let now = model.stripValue(ref, p), pend = model.pendingStrip(ref, p)
         let isOn = ((pend ?? now) ?? 0) >= 0.5
         return Button {
             if model.stageStrip(ref, p, isOn ? 0 : 1) == nil { Task { await model.commitIfQuick() } }
         } label: {
             Text(label).font(.system(size: 10, weight: .semibold))
-                .frame(width: 20, height: 15)
+                .frame(width: width, height: 15)
                 .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(isOn ? color.opacity(0.35) : Tokens.Palette.border.opacity(0.5)))
                 .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip).stroke(pend != nil ? Tokens.Palette.accent : .clear))
                 .foregroundStyle(isOn ? Tokens.Palette.text : Tokens.Palette.textMuted)
