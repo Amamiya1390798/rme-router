@@ -47,7 +47,57 @@ public enum PanelLayout {
         PanelConnector(id: id, name: name, kind: kind, x: x / 100, y: y / 100, size: size / 100, ports: ports, channel: channel)
     }
 
-    public static let all: [DevicePanel] = [
+    /// 当前设备组成下的全部面板（第 6.4.6 节）：主卡面板按型号，关掉的扩展设备不出现。
+    public static var all: [DevicePanel] {
+        let config = StudioConfig.current
+        let main: [DevicePanel] = config.mainCard == .ufx3 ? ufx3 : config.mainCard == .madifaceXT ? base.filter { $0.deviceID == "xt" } : []
+        return main + base.filter { $0.deviceID != "xt" && config.has($0.deviceID) }
+    }
+
+    /// Fireface UFX III（官方产品图，接口位置按图标注，对照手册 p.9–10；文档第 6.4.6 节）。
+    static let ufx3: [DevicePanel] = [
+        DevicePanel(deviceID: "xt", face: .rear, image: "fireface-ufx3-rear.png", aspect: 2000.0 / 205, connectors: [
+            c("ufx.iec", "IEC 电源", .other, 9.5, 50, 6),
+            c("ufx.midi1.out", "MIDI 1 输出", .other, 21.2, 55, 3.3),
+            c("ufx.midi1.in", "MIDI 1 输入", .other, 25.6, 55, 3.3),
+            c("ufx.usb", "USB 3.0（电脑）", .computer, 31.3, 62, 2.4),
+            c("ufx.adat2.out", "ADAT 2 输出", .audio, 31.1, 28, 2.2, ["xt.adat2.out"]),
+            c("ufx.adat2.in", "ADAT 2 输入", .audio, 33.9, 28, 2.2, ["xt.adat2.in"]),
+            c("ufx.adat1.out", "ADAT 1 输出", .audio, 36.8, 28, 2.2, ["xt.adat1.out"]),
+            c("ufx.adat1.in", "ADAT 1 输入", .audio, 39.7, 28, 2.2, ["xt.adat1.in"]),
+            c("ufx.remote", "Remote（ARC USB）", .other, 37.9, 68, 2.4),
+            c("ufx.madi.out", "MADI 输出（光）", .audio, 42.8, 26, 2.5, ["xt.madi.out"]),
+            c("ufx.madi.in", "MADI 输入（光）", .audio, 45.5, 26, 2.5, ["xt.madi.in"]),
+            c("ufx.wc.out", "Word / MADI 同轴输出（BNC）", .clock, 41.9, 61, 3.3),
+            c("ufx.wc.in", "Word / MADI 同轴输入（BNC）", .clock, 45.5, 61, 3.3),
+            c("ufx.aes.out", "AES/EBU 输出（XLR）", .audio, 51.3, 52, 4.5, ["xt.aes.out"]),
+            c("ufx.aes.in", "AES/EBU 输入（XLR）", .audio, 56.7, 52, 4.5, ["xt.aes.in"]),
+            c("ufx.out.1", "Line 输出 1（XLR）", .audio, 78.9, 50, 4.5, ["xt.an.out"], channel: 1),
+            c("ufx.out.2", "Line 输出 2（XLR）", .audio, 73.5, 50, 4.5, ["xt.an.out"], channel: 2),
+            c("ufx.out.3", "Line 输出 3（TRS）", .audio, 68.6, 28, 2.2, ["xt.an.out"], channel: 3),
+            c("ufx.out.4", "Line 输出 4（TRS）", .audio, 68.6, 63, 2.2, ["xt.an.out"], channel: 4),
+            c("ufx.out.5", "Line 输出 5（TRS）", .audio, 65.2, 28, 2.2, ["xt.an.out"], channel: 5),
+            c("ufx.out.6", "Line 输出 6（TRS）", .audio, 65.2, 63, 2.2, ["xt.an.out"], channel: 6),
+            c("ufx.out.7", "Line 输出 7（TRS）", .audio, 61.7, 28, 2.2, ["xt.an.out"], channel: 7),
+            c("ufx.out.8", "Line 输出 8（TRS）", .audio, 61.7, 63, 2.2, ["xt.an.out"], channel: 8),
+        ] + [(1, 94.1, 28), (2, 94.1, 62), (3, 90.6, 28), (4, 90.6, 62), (5, 87.1, 28), (6, 87.1, 62), (7, 83.7, 28), (8, 83.7, 62)].map { n, x, y in
+            c("ufx.in.\(n)", "Line 输入 \(n)（TRS）", .audio, x, y, 2.2, ["xt.line.in"], channel: n)
+        }),
+        DevicePanel(deviceID: "xt", face: .front, image: "fireface-ufx3-front.png", aspect: 2000.0 / 198, connectors: [
+            c("ufx.mic.9", "Mic/Line/Inst 9", .audio, 9.1, 50, 4.6, ["xt.mic.in"], channel: 1),
+            c("ufx.mic.10", "Mic/Line/Inst 10", .audio, 17.2, 50, 4.6, ["xt.mic.in"], channel: 2),
+            c("ufx.mic.11", "Mic/Line/Inst 11", .audio, 25.3, 50, 4.6, ["xt.mic.in"], channel: 3),
+            c("ufx.mic.12", "Mic/Line/Inst 12", .audio, 33.3, 50, 4.6, ["xt.mic.in"], channel: 4),
+            c("ufx.phones.1", "耳机 1（输出 9/10）", .audio, 40.3, 62, 2.4, ["xt.phones.out"], channel: 1),
+            c("ufx.phones.2", "耳机 2（输出 11/12）", .audio, 40.3, 28, 2.4, ["xt.phones.out"], channel: 3),
+            c("ufx.midi2.in", "MIDI 2 输入", .other, 44.7, 45, 3.3),
+            c("ufx.midi2.out", "MIDI 2 输出", .other, 49.0, 45, 3.3),
+            c("ufx.memory", "Memory（DURec U 盘）", .other, 54.0, 45, 2.4),
+            c("ufx.power", "电源开关", .other, 91.0, 47, 3.5),
+        ]),
+    ]
+
+    static let base: [DevicePanel] = [
         DevicePanel(deviceID: "xt", face: .rear, image: "madiface-xt-rear.png", aspect: 2000.0 / 426, connectors: [
             c("xt.dc", "DC 电源", .other, 5.9, 27.9, 4),
             c("xt.power", "电源开关", .other, 14, 27.9, 3),

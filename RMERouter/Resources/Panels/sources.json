@@ -58,5 +58,29 @@
     "source_page": "https://www.rme-usa.com/octamic-xtc.html",
     "source_archive": "https://www.rme-usa.com/octamic-xtc.html?file=files/downloads/Media-Material/RME_OctaMic_XTC_Images_Web_PNG.zip",
     "sha256": "10b9b3cfe53070edf9faf07ed921ccdd2c7e623e98d21539d50319121cce4335"
+  },
+  {
+    "model": "RME Fireface UFX III",
+    "face": "front",
+    "file": "fireface-ufx3-front.png",
+    "width": 6400,
+    "height": 2720,
+    "source_page": "https://rme-audio.de/fireface-ufx-3.html",
+    "source_archive": "https://www.rme-usa.com/files/downloads/Media-Material/RME_Fireface-UFX-III_Renderings.zip",
+    "sha256": "36328c6cc4570ef0e91301ecf51c663a55964ae7c210a943a5b977ffe1f25f39",
+    "original_file": "fireface-ufx-iii-front.png",
+    "note": "按不透明外框裁掉留白后缩放到 2000 px 宽（同其他面板图）；sha256 为原图"
+  },
+  {
+    "model": "RME Fireface UFX III",
+    "face": "rear",
+    "file": "fireface-ufx3-rear.png",
+    "width": 6400,
+    "height": 2720,
+    "source_page": "https://rme-audio.de/fireface-ufx-3.html",
+    "source_archive": "https://www.rme-usa.com/files/downloads/Media-Material/RME_Fireface-UFX-III_Renderings.zip",
+    "sha256": "25265ef7fb82bbcd2612d3ef473f75ee19df37cc1a1310a627cd3d5561c9ebed",
+    "original_file": "fireface-ufx-iii-rear.png",
+    "note": "按不透明外框裁掉留白后缩放到 2000 px 宽（同其他面板图）；sha256 为原图"
   }
 ]

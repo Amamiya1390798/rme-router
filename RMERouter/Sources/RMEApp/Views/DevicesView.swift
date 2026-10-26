@@ -199,7 +199,7 @@ struct RackView: View {
         VStack(alignment: .leading, spacing: 64) {
             unit("12mic").transformAnchorPreference(key: RackAnchorKey.self, value: .bounds) { $0["row:0"] = $1 }
             HStack(alignment: .center, spacing: Tokens.Space.l) {
-                if PanelLayout.panel("xt", face) != nil, model.studioConfig.mainCard == .madifaceXT {
+                if PanelLayout.panel("xt", face) != nil {
                     unit("xt").frame(maxWidth: 560)
                 } else {
                     // 通用主卡（第 6.4.6 节）：没有面板图，显示一张卡片

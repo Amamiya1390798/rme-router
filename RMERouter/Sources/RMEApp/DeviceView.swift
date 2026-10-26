@@ -142,7 +142,11 @@ extension AppModel {
             return CableSpec(id: l.id, from: a, to: b, type: p.type, text: "\(name(l.from)) → \(name(l.to))",
                              issues: (issues[l.id] ?? []).map(\.description), verified: status != .declared)
         }
-        out.append(CableSpec(id: "usb", from: "conn:xt.usb", to: "node:mac", type: .usb, text: "MADIface XT USB 3 → 这台 Mac", issues: []))
+        // 主卡的 USB 口 → 这台 Mac（按当前主卡面板找 USB 接口；没有面板图的主卡不画）
+        if let usb = PanelLayout.panel("xt", .rear)?.connectors.first(where: { $0.kind == .computer && $0.name.contains("USB") }) {
+            out.append(CableSpec(id: "usb", from: "conn:\(usb.id)", to: "node:mac", type: .usb,
+                                 text: "\(StudioConfig.current.mainCard.deviceName) USB → 这台 Mac", issues: []))
+        }
         return out
     }
 }

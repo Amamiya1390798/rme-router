@@ -58,4 +58,31 @@ final class UFX3Tests: XCTestCase {
         XCTAssertEqual(PreampField.gainRange(device: "12mic").upperBound, 60)
         XCTAssertEqual(TotalMixWrite.preamp(input: TotalMixChannel(.input, 9), field: .gain, value: .gain(80)).message.arguments.first, .float(75))
     }
+
+    /// 面板：每个音频接口都对应档案里的端口；线缆画到 UFX III 的 MADI 口和 USB 口；图片在。
+    func testPanels() async throws {
+        StudioConfig.current = StudioConfig(mainCard: .ufx3)
+        let topo = StudioSetup.topology()
+        let rear = try XCTUnwrap(PanelLayout.panel("xt", .rear))
+        XCTAssertEqual(rear.image, "fireface-ufx3-rear.png")
+        XCTAssertNotNil(PanelLayout.image(rear.image))
+        XCTAssertNotNil(PanelLayout.image("fireface-ufx3-front.png"))
+        for p in PanelLayout.all where p.deviceID == "xt" {
+            for c in p.connectors where c.routes {
+                for port in c.ports { XCTAssertNotNil(topo.port(port), "\(c.id) → \(port) 不在 UFX III 档案里") }
+            }
+        }
+        // 档案里每个物理接口在面板上都有位置（电脑回放除外）
+        let onPanel = Set(PanelLayout.all.filter { $0.deviceID == "xt" }.flatMap(\.connectors).flatMap(\.ports))
+        for port in topo.device("xt")!.ports where port.id != "xt.playback.in" {
+            XCTAssertTrue(onPanel.contains(port.id), "\(port.id) 在面板上没有位置")
+        }
+        let d = UserDefaults(suiteName: "ufx3p-\(UUID())")!
+        d.set(try JSONEncoder().encode(StudioConfig(mainCard: .ufx3)), forKey: StudioConfig.defaultsKey)
+        let m = AppModel(defaults: d)
+        let cables = m.cables(face: .rear)
+        XCTAssertTrue(cables.contains { $0.id == "usb" && $0.from == "conn:ufx.usb" })
+        XCTAssertTrue(cables.contains { $0.to == "conn:ufx.madi.in" })
+        XCTAssertNil(PanelLayout.all.first { $0.image.hasPrefix("madiface") }, "选 UFX III 时不显示 XT 面板")
+    }
 }
