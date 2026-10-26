@@ -4,9 +4,13 @@
    "source": "DeepSeek 官方「深度求索中」鲸鱼尾巴（DSH 客户端，MIT，Copyright (c) 2026 DeepSeek），用户提供；DeepSeek 名称与鲸鱼图形为其商标，个人非商用使用",
    "sha256": "efd3ec8005d8e0243cea7bddb19dcac6a519d8610d3d0ff0da860c62b1c70127"
   },
-  "whale-tail-community.png": {
-   "source": "社区插件 null-dat/dsh-whale-tail 的 sprite-v4 第 0 帧，染品牌蓝 #4D6BFE；代码 MIT，素材原作者不可考、版权不明（插件说明：权利人异议即下架），用户提供，个人自用",
-   "sha256": "f5418177ed3dae103aa387e9e63b005dbabc79b014e4028bfd402571e3becbbc"
+  "whale-tail-official.gif": {
+   "source": "DeepSeek 官方“思考中”鲸鱼尾巴动画（品牌蓝，60 帧 × 50 ms），MIT，Copyright (c) 2026 DeepSeek；用户提供",
+   "sha256": "27bf6f481904a1de01a7808f6730d2db5758a9a73bafe7b1844b77eb1968329c"
+  },
+  "whale-tail-community-v4.png": {
+   "source": "社区插件 null-dat/dsh-whale-tail 的 sprite-v4（32 帧 × 48 px，一圈 1333 ms），染品牌蓝 #4D6BFE；素材版权不明，个人自用；用户提供",
+   "sha256": "3634e0c4229acf39e358310467822e9cfb982d84aa0086cc4dc82ae84735d56b"
   }
  }
 }

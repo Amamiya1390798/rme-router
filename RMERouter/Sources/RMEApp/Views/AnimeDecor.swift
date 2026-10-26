@@ -344,11 +344,16 @@ struct ClaudeSelfPortrait: View {
 }
 
 /// 各主题的光标（2026-10-27 用户）：主题强调色的箭头 + 白描边；Claude 看板娘右下角贴小螃蟹，
-/// DeepSeek 两套贴鲸鱼尾巴（多数是官方的，偶尔换成社区版）。只在窗口里生效。
+/// DeepSeek 两套贴会动的鲸鱼尾巴（多数是官方动画，偶尔换成社区版）。只在窗口里生效。
 enum ThemeCursor {
-    @MainActor static var cache: [String: NSCursor] = [:]
-
     enum Badge: String { case none, crab, whaleOfficial, whaleCommunity }
+
+    /// 一套光标：一帧或多帧（会动的角标），每帧时长。
+    struct Animation { var frames: [NSCursor]; var frameDuration: Double }
+
+    @MainActor static var cache: [String: Animation] = [:]
+    /// 每套主题抽到的角标：第一次取时抽一次，之后一直用它（重开 App 再抽）。
+    @MainActor static var picked: [UITheme: Badge] = [:]
 
     static func badge(for theme: UITheme, roll: Double = Double.random(in: 0 ..< 1)) -> Badge {
         switch theme {
@@ -367,24 +372,54 @@ enum ThemeCursor {
         return fm.fileExists(atPath: repo.path) ? repo : nil
     }
 
-    @MainActor static func badgeImage(_ b: Badge) -> NSImage? {
+    /// 角标的各帧与每帧时长：官方 GIF 逐帧取，社区 sprite 按 48 px 一格切；小螃蟹、没有角标只有一帧。
+    @MainActor static func badgeFrames(_ b: Badge) -> (frames: [NSImage], duration: Double) {
         switch b {
-        case .none: return nil
-        case .crab: return AnimeArt.image("clawd", skin: .claude)
-        case .whaleOfficial: return cursorDirectory.flatMap { NSImage(contentsOf: $0.appendingPathComponent("whale-tail-official.svg")) }
-        case .whaleCommunity: return cursorDirectory.flatMap { NSImage(contentsOf: $0.appendingPathComponent("whale-tail-community.png")) }
+        case .none: return ([], 1)
+        case .crab: return (AnimeArt.image("clawd", skin: .claude).map { [$0] } ?? [], 1)
+        case .whaleOfficial:
+            guard let url = cursorDirectory?.appendingPathComponent("whale-tail-official.gif"),
+                  let rep = NSImage(contentsOf: url)?.representations.first as? NSBitmapImageRep else { return ([], 1) }
+            let n = (rep.value(forProperty: .frameCount) as? Int) ?? 1
+            var frames: [NSImage] = [], total = 0.0
+            for i in 0 ..< n {
+                rep.setProperty(.currentFrame, withValue: i)
+                total += (rep.value(forProperty: .currentFrameDuration) as? Double) ?? 0.05
+                if let cg = rep.cgImage { frames.append(NSImage(cgImage: cg, size: NSSize(width: 14, height: 14))) }
+            }
+            return (frames, n > 0 ? total / Double(n) : 0.05)
+        case .whaleCommunity:
+            guard let url = cursorDirectory?.appendingPathComponent("whale-tail-community-v4.png"),
+                  let cg = NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return ([], 1) }
+            let n = cg.width / cg.height
+            let frames = (0 ..< n).compactMap { i in
+                cg.cropping(to: CGRect(x: i * cg.height, y: 0, width: cg.height, height: cg.height)).map { NSImage(cgImage: $0, size: NSSize(width: 14, height: 14)) }
+            }
+            return (frames, 1.333 / Double(max(n, 1)))   // 插件数据：v4 一圈 1333 ms
         }
     }
 
-    /// 这套主题的光标；角标在第一次取时抽一次，之后同一主题一直用它（换主题或重开 App 再抽）。
-    @MainActor static func cursor(for theme: UITheme, dark: Bool) -> NSCursor {
-        let b = cache.keys.first { $0.hasPrefix("\(theme.rawValue)|\(dark)|") }.map { Badge(rawValue: String($0.split(separator: "|")[2])) ?? .none }
-            ?? badge(for: theme)
+    /// 旧接口：角标的第一帧。
+    @MainActor static func badgeImage(_ b: Badge) -> NSImage? { badgeFrames(b).frames.first }
+
+    @MainActor static func animation(for theme: UITheme, dark: Bool) -> Animation {
+        let b = picked[theme] ?? badge(for: theme)
+        picked[theme] = b
         let key = "\(theme.rawValue)|\(dark)|\(b.rawValue)"
-        if let c = cache[key] { return c }
+        if let a = cache[key] { return a }
         let v = theme.value(.accent)
         let fill = NSColor(hex: dark ? v.1 : v.0)
-        let badge = badgeImage(b)
+        let (badges, duration) = badgeFrames(b)
+        let frames = (badges.isEmpty ? [nil] : badges.map { Optional($0) }).map { make(fill: fill, badge: $0, crab: b == .crab) }
+        let a = Animation(frames: frames, frameDuration: duration)
+        cache[key] = a
+        return a
+    }
+
+    /// 第一帧（不动的时候用）。
+    @MainActor static func cursor(for theme: UITheme, dark: Bool) -> NSCursor { animation(for: theme, dark: dark).frames[0] }
+
+    @MainActor private static func make(fill: NSColor, badge: NSImage?, crab: Bool) -> NSCursor {
         let img = NSImage(size: NSSize(width: 32, height: 32), flipped: true) { _ in
             let arrow = NSBezierPath()
             arrow.move(to: NSPoint(x: 2, y: 2))
@@ -403,19 +438,17 @@ enum ThemeCursor {
             NSGraphicsContext.current?.restoreGraphicsState()
             NSColor.white.setStroke(); arrow.lineWidth = 1.6; arrow.stroke()
             if let badge {
-                if b == .crab { NSGraphicsContext.current?.imageInterpolation = .none }
+                if crab { NSGraphicsContext.current?.imageInterpolation = .none }
                 // 鲸鱼尾巴是细线，垫一个白底小圆，深色背景上也看得清
-                if b != .crab { NSColor.white.withAlphaComponent(0.9).setFill(); NSBezierPath(ovalIn: NSRect(x: 16, y: 17, width: 16, height: 15)).fill() }
+                else { NSColor.white.withAlphaComponent(0.9).setFill(); NSBezierPath(ovalIn: NSRect(x: 16, y: 17, width: 16, height: 15)).fill() }
                 badge.draw(in: NSRect(x: 17, y: 18, width: 14, height: 14))
             }
             return true
         }
-        // 先栅格化成位图（带 SVG 角标的绘制式图片，pointerStyle 有时不认，光标会退回系统箭头）
+        // 先栅格化成位图（绘制式图片 pointerStyle 有时不认，光标会退回系统箭头）
         let raster = NSImage(size: img.size)
         if let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) { raster.addRepresentation(rep) }
-        let c = NSCursor(image: raster.representations.isEmpty ? img : raster, hotSpot: NSPoint(x: 2, y: 2))
-        cache[key] = c
-        return c
+        return NSCursor(image: raster.representations.isEmpty ? img : raster, hotSpot: NSPoint(x: 2, y: 2))
     }
 }
 
@@ -424,14 +457,56 @@ enum ClaudeCursor {
     @MainActor static var cursor: NSCursor { ThemeCursor.cursor(for: .claudeAnime, dark: NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua) }
 }
 
-extension View {
-    /// 主题光标：macOS 15 起用 pointerStyle（SwiftUI 自己会重设光标，光标区域方式不稳），更早的系统在鼠标移动时设一次。
-    @ViewBuilder func themeCursor(_ theme: UITheme, dark: Bool) -> some View {
-        let c = ThemeCursor.cursor(for: theme, dark: dark)
-        if #available(macOS 15.0, *) {
-            pointerStyle(.image(Image(nsImage: c.image), hotSpot: UnitPoint(x: 2.0 / 32, y: 2.0 / 32)))
+/// 主题光标：不动的用 pointerStyle（macOS 15 起；14 在鼠标移动时设一次）。
+/// 会动的角标（鲸鱼尾巴）交给 AppKit 定时换帧：只在窗口是前台、鼠标在窗口里时每帧 set 一次，SwiftUI 不重画；
+/// 关了“气泡动画”或系统减少动态效果时停在第一帧。
+struct AnimatedThemeCursor: ViewModifier {
+    var theme: UITheme
+    var dark: Bool
+    var motion: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let anim = ThemeCursor.animation(for: theme, dark: dark)
+        if anim.frames.count > 1 && motion && !reduceMotion {
+            content.overlay(CursorAnimator(animation: anim).allowsHitTesting(false))
+        } else if #available(macOS 15.0, *) {
+            content.pointerStyle(.image(Image(nsImage: anim.frames[0].image), hotSpot: UnitPoint(x: 2.0 / 32, y: 2.0 / 32)))
         } else {
-            onContinuousHover { if case .active = $0 { c.set() } }
+            content.onContinuousHover { if case .active = $0 { anim.frames[0].set() } }
         }
+    }
+}
+
+/// 按帧换光标的 AppKit 视图（不接收点击）。
+struct CursorAnimator: NSViewRepresentable {
+    var animation: ThemeCursor.Animation
+
+    final class V: NSView {
+        var animation: ThemeCursor.Animation? { didSet { restart() } }
+        private var timer: Timer?
+        private var step = 0
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); restart() }
+        func restart() {
+            timer?.invalidate(); timer = nil
+            guard window != nil, let a = animation else { return }
+            timer = Timer.scheduledTimer(withTimeInterval: a.frameDuration, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.tick() }
+            }
+        }
+        private func tick() {
+            guard let a = animation, let w = window, w.isKeyWindow, NSApp.isActive else { return }
+            let p = convert(w.mouseLocationOutsideOfEventStream, from: nil)
+            guard bounds.contains(p) else { return }
+            step &+= 1
+            a.frames[step % a.frames.count].set()
+        }
+        deinit { timer?.invalidate() }
+    }
+
+    func makeNSView(context: Context) -> V { let v = V(); v.animation = animation; return v }
+    func updateNSView(_ v: V, context: Context) {
+        if v.animation?.frames.first !== animation.frames.first { v.animation = animation }
     }
 }

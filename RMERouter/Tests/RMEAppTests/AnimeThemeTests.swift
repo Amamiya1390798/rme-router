@@ -58,6 +58,11 @@ final class ThemeCursorTests: XCTestCase {
         XCTAssertNotNil(ThemeCursor.badgeImage(.whaleOfficial))
         XCTAssertNotNil(ThemeCursor.badgeImage(.whaleCommunity))
         for t in UITheme.allCases { XCTAssertEqual(ThemeCursor.cursor(for: t, dark: false).image.size, NSSize(width: 32, height: 32)) }
+        // 鲸鱼尾巴会动：官方 GIF 60 帧 × 50 ms，社区 sprite 32 帧
+        let official = ThemeCursor.badgeFrames(.whaleOfficial), community = ThemeCursor.badgeFrames(.whaleCommunity)
+        XCTAssertEqual(official.frames.count, 60); XCTAssertEqual(official.duration, 0.05, accuracy: 0.005)
+        XCTAssertEqual(community.frames.count, 32)
+        XCTAssertEqual(ThemeCursor.badgeFrames(.crab).frames.count, 1)
     }
 }
 

@@ -30,7 +30,7 @@ public struct RootView: View {
                 .padding(.vertical, 8).padding(.trailing, 8).padding(.leading, sidebarVisible ? 0 : 8)
         }
         .contentShape(Rectangle())   // 整个窗口内容都算光标区域（否则纯色底的地方不换光标）
-        .modifier(ThemeCursorModifier(theme: model.theme))   // 主题色光标；Claude 贴小螃蟹、DeepSeek 贴鲸鱼尾巴
+        .modifier(ThemeCursorModifier(theme: model.theme, motion: model.animeMotion))   // 主题色光标；Claude 贴小螃蟹、DeepSeek 贴鲸鱼尾巴
         .background(Tokens.Palette.chrome)   // 放在 .id 里面：侧栏底色也跟着主题换
         .id(model.theme)   // 换主题时重画（颜色在绘制时按主题取值）
         .ignoresSafeArea()
@@ -661,6 +661,7 @@ struct TwelveMicCableHint: View {
 /// 按当前浅色 / 深色取主题光标。
 struct ThemeCursorModifier: ViewModifier {
     var theme: UITheme
+    var motion: Bool
     @Environment(\.colorScheme) private var scheme
-    func body(content: Content) -> some View { content.themeCursor(theme, dark: scheme == .dark) }
+    func body(content: Content) -> some View { content.modifier(AnimatedThemeCursor(theme: theme, dark: scheme == .dark, motion: motion)) }
 }
