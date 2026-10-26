@@ -18,7 +18,7 @@ struct IdentifySheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.l) {
             Text("信号核对").font(Tokens.Font.viewTitle)
-            Text("选一支麦克风，开始后对着它说话或轻拍。App 看 XT 全部输入的电平，找出它实际进了哪一路，再和接线表、路由算出来的比。只读，不改任何设备。")
+            Text("选一支麦克风，开始后对着它说话或轻拍。App 看 \(mainName) 全部输入的电平，找出它实际进了哪一路，再和接线表、路由算出来的比。只读，不改任何设备。")
                 .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
 
             if let t = model.identify { running(t) } else { picker }
@@ -69,7 +69,7 @@ struct IdentifySheet: View {
             }
             if let s = source {
                 let e = model.expectedXTInputs(from: s)
-                Text(verbatim: e.isEmpty ? "按当前接线和路由，\(model.shortName(s)) 到不了 XT。"
+                Text(verbatim: e.isEmpty ? "按当前接线和路由，\(model.shortName(s)) 到不了 \(mainName)。"
                      : "按当前接线和路由，\(model.shortName(s)) 应该出现在：" + e.keys.sorted().map(model.shortName).joined(separator: "、"))
                     .font(Tokens.Font.body).fixedSize(horizontal: false, vertical: true)
             }
@@ -109,7 +109,7 @@ struct IdentifySheet: View {
                     }
                 }
             case .none?:
-                Label("没检测到：10 秒内 XT 没有任何输入明显变响。查一下线、增益、静音，或换支麦克风再试。", systemImage: "questionmark.circle")
+                Label("没检测到：10 秒内 \(mainName) 没有任何输入明显变响。查一下线、增益、静音，或换支麦克风再试。", systemImage: "questionmark.circle")
                     .foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             }
         }

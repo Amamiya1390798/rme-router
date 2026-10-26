@@ -8,13 +8,13 @@ struct MacNodeCard: View {
     @State private var open = false
 
     private var lines: [String] {
-        let logicWarn: [String] = model.logicSettings.map { $0.usesXT.input && $0.usesXT.output ? [] : ["⚠ Logic 没有全用 XT"] } ?? []
+        let logicWarn: [String] = model.logicSettings.map { $0.uses(model.mainAudioKeyword).input && $0.uses(model.mainAudioKeyword).output ? [] : ["⚠ Logic 没有全用 \(mainName)"] } ?? []
         guard let a = model.xtAudio else {
-            return [model.audioChecked ? "没找到 XT（没接或驱动没装）" : "还没读取"] + logicWarn
+            return [model.audioChecked ? "没找到 \(mainName)（没接或驱动没装）" : "还没读取"] + logicWarn
         }
         var l = ["\(a.transport) · \(a.sampleRate.map(AppModel.rateText) ?? "?") · \(a.inputs) 入 / \(a.outputs) 出"]
         let clients = model.xtAudioClients
-        l.append(clients.isEmpty ? "没有程序在用 XT" : "在用：" + clients.map(\.name).joined(separator: "、"))
+        l.append(clients.isEmpty ? "没有程序在用 \(mainName)" : "在用：" + clients.map(\.name).joined(separator: "、"))
         return l + logicWarn
     }
 
@@ -23,7 +23,7 @@ struct MacNodeCard: View {
             NodeCard(title: "这台 Mac", lines: lines, color: Color(hex: 0x9B8BD6))
         }
         .buttonStyle(.plain)
-        .help("点开看 XT 与电脑的连接、采样率、哪些程序在用")
+        .help("点开看 \(mainName) 与电脑的连接、采样率、哪些程序在用")
         .popover(isPresented: $open, arrowEdge: .bottom) { MacDetail(model: model) }
     }
 }
@@ -56,7 +56,7 @@ struct MacDetail: View {
                     .font(Tokens.Font.caption)
                 }
                 Divider()
-                Text("在用 XT 的程序").font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
+                Text("在用 \(mainName) 的程序").font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
                 let clients = model.xtAudioClients
                 if clients.isEmpty {
                     Text("没有").font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted)
@@ -69,10 +69,10 @@ struct MacDetail: View {
                             .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
                     }
                 }
-                Text("录音通道 n = XT 硬件输入 n（固定）；回放通道 n = TotalMix 软件回放 n。")
+                Text("录音通道 n = \(mainName) 硬件输入 n（固定）；回放通道 n = TotalMix 软件回放 n。")
                     .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("系统里没找到 MADIface XT：检查 USB / PCIe 线和 RME 驱动。")
+                Text("系统里没找到 \(mainFullName)：检查 USB / PCIe 线和 RME 驱动。")
                     .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             }
             Divider()
@@ -88,7 +88,7 @@ struct MacDetail: View {
         .padding(Tokens.Space.l)
         .frame(width: 360)
         .onAppear { model.refreshAudio() }
-        .confirmationDialog("把 XT 的采样率改成 \(pendingRate.map(AppModel.rateText) ?? "")？",
+        .confirmationDialog("把 \(mainName) 的采样率改成 \(pendingRate.map(AppModel.rateText) ?? "")？",
                             isPresented: Binding(get: { pendingRate != nil }, set: { if !$0 { pendingRate = nil } })) {
             Button("改") {
                 guard let r = pendingRate else { return }
@@ -110,7 +110,7 @@ struct MacDetail: View {
     @ViewBuilder private var dawSection: some View {
         Text("DAW").font(Tokens.Font.caption.weight(.semibold)).foregroundStyle(Tokens.Palette.textMuted)
         if let logic = model.logicSettings {
-            let uses = logic.usesXT
+            let uses = logic.uses(model.mainAudioKeyword)
             Grid(alignment: .leading, horizontalSpacing: Tokens.Space.m, verticalSpacing: Tokens.Space.xs) {
                 GridRow {
                     Text("Logic 录音设备").foregroundStyle(Tokens.Palette.textMuted)
@@ -123,7 +123,7 @@ struct MacDetail: View {
             }
             .font(Tokens.Font.body)
             if !(uses.input && uses.output) {
-                Text("Logic 现在没有全用 XT：在 Logic 的 设置 → 音频 里把输入、输出设备选成 MADIface XT，否则录不到 / 听不到 XT 的声音。")
+                Text("Logic 现在没有全用 \(mainName)：在 Logic 的 设置 → 音频 里把输入、输出设备选成 \(mainFullName)，否则录不到 / 听不到 \(mainName) 的声音。")
                     .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.warn).fixedSize(horizontal: false, vertical: true)
             }
             Text("读自 Logic 的偏好文件（格式未公开，只读）。").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
@@ -131,7 +131,7 @@ struct MacDetail: View {
             Text("没找到 Logic 的设置（没装 Logic，或还没打开过）。").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         }
         switch model.dawActivePlayback {
-        case nil: Text("回放电平：收不到（XT 未连接或没勾 Send Level Data）").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
+        case nil: Text("回放电平：收不到（\(mainName) 未连接或没勾 Send Level Data）").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         case ""?: Text("DAW 现在没有从任何回放送出声音").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         case let p?: Text("DAW 正在从回放 \(p) 送出声音").font(Tokens.Font.body).foregroundStyle(Tokens.Palette.ok)
         }

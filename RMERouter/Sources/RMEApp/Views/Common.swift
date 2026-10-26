@@ -96,8 +96,8 @@ struct StatusStrip: View {
         switch status {
         case .notLoaded: return "还没有从 TotalMix 读取"
         case .loading: return "正在从 TotalMix 读取…"
-        case .live: return "MADIface XT 已连接，显示的是实时配置"
-        case .offlineSaved: return "MADIface XT 未连接：显示的是 TotalMix 保存的配置"
+        case .live: return "\(mainFullName) 已连接，显示的是实时配置"
+        case .offlineSaved: return "\(mainFullName) 未连接：显示的是 TotalMix 保存的配置"
         case let .unreachable(reason): return reason
         }
     }
@@ -135,7 +135,7 @@ struct MeterBar: View {
             .help("峰值电平 \(String(format: "%.1f", dB)) dB")
         } else {
             Text("无信号").font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.unknown)
-                .help("XT 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
+                .help("\(mainName) 未连接，或 TotalMix 没有发送电平（OSC 设置里勾选 Send Level Data）")
         }
     }
 

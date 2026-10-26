@@ -170,7 +170,7 @@ public enum StageError: Error, Equatable {
     public var text: String {
         switch self {
         case let .notMapped(r): return "\(r) 在 TotalMix 对照表里找不到，不能写入"
-        case .notTotalMix: return "只有 MADIface XT（TotalMix）上的发送可以修改"
+        case .notTotalMix: return "只有 \(mainFullName)（TotalMix）上的发送可以修改"
         case .notLoaded: return "还没有从 TotalMix 读取"
         case let .notConnected(d): return "\(d) 没有读到，不能写入"
         case let .unknownCurrent(f): return "读不到当前的\(f)，不能写入（先读一次设备）"

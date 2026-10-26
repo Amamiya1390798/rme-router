@@ -46,7 +46,7 @@ struct EQEditor: View {
                 .frame(width: 150)
                 .opacity(lcOn ? 1 : 0.5)
             }
-            Text("XT 每个通道就是 3 段 EQ + 低切（硬件上限）。第 1、3 段类型和低切斜率在协议里是序号，含义还没核对，先只显示；曲线按峰值型、12 dB/oct 低切示意。")
+            Text("\(mainName) 每个通道就是 3 段 EQ + 低切（硬件上限）。第 1、3 段类型和低切斜率在协议里是序号，含义还没核对，先只显示；曲线按峰值型、12 dB/oct 低切示意。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted).fixedSize(horizontal: false, vertical: true)
             if let error { Text(error).font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.problem) }
             HStack {

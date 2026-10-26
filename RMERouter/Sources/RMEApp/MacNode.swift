@@ -7,7 +7,7 @@ import RMEAdapters
 extension AppModel {
     /// 读一次 Core Audio（很快，只读）。XT 的采样率并进 XT 快照的时钟。
     public func refreshAudio() {
-        let info = audioSystem.device(nameContains: "MADIface XT")
+        let info = mainAudioKeyword.flatMap { audioSystem.device(nameContains: $0) }
         if info != xtAudio { xtAudio = info }
         let modified = (try? logicPrefsURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         if modified == nil || modified != logicPrefsReadAt {
@@ -30,6 +30,13 @@ extension AppModel {
         replaceDevices(devices)
     }
 
+    /// TotalMix 报的主卡型号（/status/device）。
+    public var mainTotalMixName: String? { snapshot.devices["xt"]?.settings["totalmix.device"]?.knownValue }
+    /// 在 Core Audio 里认主卡用的名字片段（见 MainCard.audioKeyword）。
+    public var mainAudioKeyword: String? { studioConfig.mainCard.audioKeyword(totalMix: mainTotalMixName) }
+    /// TotalMix 报的型号和“设备组成”里选的主卡不一致。
+    public var mainCardMismatch: Bool { studioConfig.mainCard.mismatches(totalMix: mainTotalMixName) }
+
     /// 在用 XT 的程序，换成看得懂的名字（Logic Pro 等）。
     public var xtAudioClients: [(name: String, input: Bool, output: Bool)] {
         (xtAudio?.clients ?? []).map { c in
@@ -41,9 +48,9 @@ extension AppModel {
 
     /// 改 XT 采样率（界面先弹确认框）。返回错误说明；nil 表示已核对。
     public func setXTSampleRate(_ rate: Double) async -> String? {
-        guard let info = xtAudio else { return "没找到 XT" }
+        guard let info = xtAudio else { return "没找到 \(mainName)" }
         do { try audioSystem.setSampleRate(rate, device: info.id) }
-        catch AudioSystemError.notAllowed { return "XT 不支持 \(Self.rateText(rate))" }
+        catch AudioSystemError.notAllowed { return "\(mainName) 不支持 \(Self.rateText(rate))" }
         catch { return "改采样率失败：\(error)" }
         try? await Task.sleep(for: .milliseconds(500))
         refreshAudio()
@@ -62,8 +69,11 @@ public struct LogicAudioSettings: Equatable, Sendable {
     public var outputDevice: String?
 
     /// 录音或放音设备是不是 XT。
-    public var usesXT: (input: Bool, output: Bool) {
-        (inputDevice?.contains("MADIface XT") == true, outputDevice?.contains("MADIface XT") == true)
+    public var usesXT: (input: Bool, output: Bool) { uses("MADIface XT") }
+    /// 录音或放音设备是不是名字含 keyword 的卡；keyword 为 nil（认不出主卡）时都算不是。
+    public func uses(_ keyword: String?) -> (input: Bool, output: Bool) {
+        guard let k = keyword else { return (false, false) }
+        return (inputDevice?.contains(k) == true, outputDevice?.contains(k) == true)
     }
 
     public static let defaultURL = FileManager.default.homeDirectoryForCurrentUser

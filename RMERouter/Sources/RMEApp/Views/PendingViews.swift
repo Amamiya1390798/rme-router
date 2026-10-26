@@ -166,10 +166,10 @@ struct ConfirmSheet: View {
             if !sends.isEmpty || !strips.isEmpty || !globals.isEmpty || preamps.contains(where: { $0.deviceID == "xt" }) {
                 switch model.xtStatus {
                 case .live:
-                    Label("MADIface XT 已连接：改动会立即影响声音。", systemImage: "exclamationmark.triangle")
+                    Label("\(mainFullName) 已连接：改动会立即影响声音。", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(Tokens.Palette.warn)
                 case .offlineSaved:
-                    Label("MADIface XT 未连接：只改 TotalMix 保存的配置，不会出声。", systemImage: "info.circle")
+                    Label("\(mainFullName) 未连接：只改 TotalMix 保存的配置，不会出声。", systemImage: "info.circle")
                         .foregroundStyle(Tokens.Palette.textMuted)
                 default:
                     Label("TotalMix 状态未知。", systemImage: "questionmark.circle").foregroundStyle(Tokens.Palette.textMuted)

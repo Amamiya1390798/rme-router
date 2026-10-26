@@ -56,3 +56,24 @@ final class DAWTests: XCTestCase {
         XCTAssertTrue(AppModel.onlyWithSignal(groups, active: []).isEmpty, "都没信号：整台设备不列")
     }
 }
+
+/// 主卡名字跟着“设备组成”走，认型号不误判（XTC 不算 XT，UFX II / UFX+ 不算 UFX III）。
+final class MainCardNameTests: XCTestCase {
+    func testAudioKeywordAndMismatch() {
+        XCTAssertEqual(MainCard.ufx3.audioKeyword(totalMix: nil), "UFX III")
+        XCTAssertFalse("Fireface UFX II (23)".contains("UFX III"))
+        XCTAssertNil(MainCard.generic.audioKeyword(totalMix: nil), "通用卡报不出型号就不认")
+        XCTAssertEqual(MainCard.generic.audioKeyword(totalMix: "Fireface 802"), "Fireface 802")
+        XCTAssertFalse(MainCard.madifaceXT.mismatches(totalMix: "MADIface XT"))
+        XCTAssertTrue(MainCard.madifaceXT.mismatches(totalMix: "OctaMic XTC"))
+        XCTAssertTrue(MainCard.madifaceXT.mismatches(totalMix: "Fireface UFX III"))
+        XCTAssertFalse(MainCard.ufx3.mismatches(totalMix: "Fireface UFX III"))
+        XCTAssertTrue(MainCard.ufx3.mismatches(totalMix: "Fireface UFX II"))
+        XCTAssertTrue(MainCard.ufx3.mismatches(totalMix: "Fireface UFX+"))
+        XCTAssertFalse(MainCard.generic.mismatches(totalMix: "Fireface 802"))
+        XCTAssertFalse(MainCard.ufx3.mismatches(totalMix: nil))
+        let s = LogicAudioSettings(inputDevice: "Fireface UFX III (1)", outputDevice: "MADIface XT")
+        XCTAssertTrue(s.uses("UFX III").input); XCTAssertFalse(s.uses("UFX III").output)
+        XCTAssertFalse(s.uses(nil).input)
+    }
+}

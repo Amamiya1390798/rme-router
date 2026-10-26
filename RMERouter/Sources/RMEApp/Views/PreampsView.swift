@@ -73,7 +73,7 @@ public struct PreampsView: View {
         let xtPreamps = model.snapshot.devices["xt"]?.preamps ?? []
         let xtNote: String? = {
             switch model.xtStatus {
-            case .offlineSaved: return "XT 未连接：显示的是 TotalMix 保存的配置。"
+            case .offlineSaved: return "\(mainName) 未连接：显示的是 TotalMix 保存的配置。"
             case .live: return "实时读取自 TotalMix。"
             default: return nil
             }
@@ -86,10 +86,10 @@ public struct PreampsView: View {
         if case let .unreachable(r) = model.xtcStatus { xtcReason = r }
         let xtcPreamps = model.xtcStatus == .live ? (model.snapshot.devices["xtc"]?.preamps ?? []) : []
         return [
-            PreampSection(id: "xt", deviceName: "MADIface XT", preamps: xtPreamps,
+            PreampSection(id: "xt", deviceName: "\(mainFullName)", preamps: xtPreamps,
                           available: !xtPreamps.isEmpty && (model.xtStatus == .live || model.xtStatus == .offlineSaved),
                           note: xtNote,
-                          emptyHelp: "XT 前面板 Mic 1–2 的话放经 TotalMix Global OSC 读取。在“设置 → 连接”确认 TotalMix 端口，然后点“读取设备”。若 TotalMix 里隐藏了这两路，会读不到。",
+                          emptyHelp: "\(mainName) 前面板 Mic 1–2 的话放经 TotalMix Global OSC 读取。在“设置 → 连接”确认 TotalMix 端口，然后点“读取设备”。若 TotalMix 里隐藏了这两路，会读不到。",
                           unreachableReason: xtReason, loading: model.xtStatus == .loading),
             PreampSection(id: "12mic", deviceName: "12Mic", preamps: model.snapshot.devices["12mic"]?.preamps ?? [],
                           available: model.twelveMicStatus == .live && !(model.snapshot.devices["12mic"]?.preamps.isEmpty ?? true),

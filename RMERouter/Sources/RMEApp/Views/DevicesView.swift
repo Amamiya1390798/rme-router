@@ -135,7 +135,7 @@ struct DevicesView: View {
                     .onChange(of: face) { select(nil) }
             }
             Button("信号核对…") { identifying = true }.fixedSize()
-                .help("对着一支麦克风说话，看它实际进了 XT 的哪一路，核对接线")
+                .help("对着一支麦克风说话，看它实际进了 \(mainName) 的哪一路，核对接线")
                 .sheet(isPresented: $identifying) { IdentifySheet(model: model) { identifying = false } }
             Spacer()
             StripSearchField(model: model, editing: $searching) { tm in
@@ -152,7 +152,7 @@ struct DevicesView: View {
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             Toggle("只看有信号", isOn: $onlySignal).toggleStyle(.checkbox).fixedSize()
                 .disabled(!model.meters.live || model.devicesPane != .strips)
-                .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）")
+                .help(model.meters.live ? "只列最近有电平的通道条" : "收不到电平（\(mainName) 未连接，或 TotalMix 没勾 Send Level Data）")
         }
         .padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Space.s)
         .background(Tokens.Palette.bg)

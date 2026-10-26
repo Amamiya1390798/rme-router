@@ -225,7 +225,7 @@ struct XTStripsView: View, Equatable {
     @ViewBuilder private func header(_ s: XTStrip?, sends: [(output: TotalMixChannel, dB: Double)],
                                      outputs: [XTStrip], current: XTStrip?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
-            Text("MADIface XT · 通道条").font(Tokens.Font.cardTitle)
+            Text("\(mainFullName) · 通道条").font(Tokens.Font.cardTitle)
             // 多选时这一行换成多选操作（不加新行，免得通道条往下跳、点偏）
             if !picked.isEmpty {
                 pickBar(current: current)

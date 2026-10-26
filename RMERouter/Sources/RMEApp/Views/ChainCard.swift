@@ -21,7 +21,7 @@ struct ChainCard: View {
             header
             cables
             if focus.edges.isEmpty {
-                Text(focus.isEmpty ? "链上没有 XT 通道（没接线或没有路由）。" : "链上还没有发送：用下面的“加一个去处”，或把通道条拖到输出条上。")
+                Text(focus.isEmpty ? "链上没有 \(mainName) 通道（没接线或没有路由）。" : "链上还没有发送：用下面的“加一个去处”，或把通道条拖到输出条上。")
                     .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
             } else {
                 VStack(alignment: .leading, spacing: 2) {

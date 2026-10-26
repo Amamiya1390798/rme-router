@@ -91,7 +91,7 @@ public struct OutputsContent: View {
                 Toggle("只看有信号", isOn: onlySignal ?? .constant(false)).toggleStyle(.switch).controlSize(.small)
                     .font(Tokens.Font.body).fixedSize()
                     .disabled(onlySignal == nil)
-                    .help(onlySignal == nil ? "收不到电平（XT 未连接，或 TotalMix 没勾 Send Level Data）" : "每张卡只列有电平的来源")
+                    .help(onlySignal == nil ? "收不到电平（\(mainName) 未连接，或 TotalMix 没勾 Send Level Data）" : "每张卡只列有电平的来源")
                 Toggle("显示电脑回放", isOn: $showPlayback).toggleStyle(.switch).controlSize(.small)
                     .font(Tokens.Font.body).fixedSize()
             }

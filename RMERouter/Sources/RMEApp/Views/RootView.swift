@@ -511,9 +511,12 @@ struct StatusPill: View {
 
     private var summary: (Color, String) {
         let rate = model.xtAudio?.sampleRate.map(AppModel.rateText)
+        if model.mainCardMismatch, let n = model.mainTotalMixName, model.xtStatus == .live || model.xtStatus == .offlineSaved {
+            return (Tokens.Palette.warn, "TotalMix 是 \(n)，和所选主卡不一致")
+        }
         switch model.xtStatus {
-        case .live: return (Tokens.Palette.ok, "XT 已连接" + (rate.map { " · \($0)" } ?? ""))
-        case .offlineSaved: return (Tokens.Palette.warn, "XT 未连接 · 显示保存的配置")
+        case .live: return (Tokens.Palette.ok, "\(mainName) 已连接" + (rate.map { " · \($0)" } ?? ""))
+        case .offlineSaved: return (Tokens.Palette.warn, "\(mainName) 未连接 · 显示保存的配置")
         case .loading: return (Tokens.Palette.warn, "正在读取…")
         case .unreachable: return (Tokens.Palette.problem, "TotalMix 没有回应")
         case .notLoaded: return (Tokens.Palette.unknown, "还没读取")

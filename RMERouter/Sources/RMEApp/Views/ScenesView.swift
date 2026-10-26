@@ -46,7 +46,7 @@ public struct ScenesView: View {
             }
             Text(devices.isEmpty
                  ? "还没有读到任何设备，不能保存（演示数据不会存进场景）。"
-                 : "会保存：" + devices.map { $0 == "xt" ? "MADIface XT（TotalMix）" : "12Mic" }.joined(separator: "、") + "。XTC 没有可读协议，不在场景里。")
+                 : "会保存：" + devices.map { $0 == "xt" ? "\(mainFullName)（TotalMix）" : "12Mic" }.joined(separator: "、") + "。XTC 没有可读协议，不在场景里。")
                 .font(Tokens.Font.caption).foregroundStyle(Tokens.Palette.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

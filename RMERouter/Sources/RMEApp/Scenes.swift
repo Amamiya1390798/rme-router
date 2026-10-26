@@ -115,7 +115,7 @@ public struct SceneDiff: Identifiable, Equatable, Sendable {
     }
 
     static func deviceLabel(_ dev: String) -> String {
-        switch dev { case "xt": return "XT"; case "xtc": return "XTC"; default: return "12Mic" }
+        switch dev { case "xt": return "\(mainName)"; case "xtc": return "XTC"; default: return "12Mic" }
     }
 }
 

@@ -86,8 +86,8 @@ struct OnboardingSheet: View {
         switch model.xtStatus {
         case .notLoaded: EmptyView()
         case .loading: Text("正在连接…").foregroundStyle(Tokens.Palette.textMuted)
-        case .live: Label("已连上，XT 在线", systemImage: "checkmark.circle").foregroundStyle(Tokens.Palette.ok)
-        case .offlineSaved: Label("已连上 TotalMix；XT 未连接（显示保存的配置）", systemImage: "checkmark.circle").foregroundStyle(Tokens.Palette.ok)
+        case .live: Label("已连上，\(mainName) 在线", systemImage: "checkmark.circle").foregroundStyle(Tokens.Palette.ok)
+        case .offlineSaved: Label("已连上 TotalMix；\(mainName) 未连接（显示保存的配置）", systemImage: "checkmark.circle").foregroundStyle(Tokens.Palette.ok)
         case let .unreachable(r): Text(r).foregroundStyle(Tokens.Palette.problem).fixedSize(horizontal: false, vertical: true)
         }
     }

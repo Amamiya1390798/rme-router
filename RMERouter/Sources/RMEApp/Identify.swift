@@ -72,8 +72,8 @@ public enum IdentifyError: Error, Equatable {
 
     public var text: String {
         switch self {
-        case .noLevels: return "收不到 XT 的电平：XT 要在线，TotalMix 的 OSC 设置里要勾 Send Level Data"
-        case .notTraced: return "按当前接线和路由，这一路到不了 XT；先在“设置 → 接线”或路由里接通"
+        case .noLevels: return "收不到 \(mainName) 的电平：\(mainName) 要在线，TotalMix 的 OSC 设置里要勾 Send Level Data"
+        case .notTraced: return "按当前接线和路由，这一路到不了 \(mainName)；先在“设置 → 接线”或路由里接通"
         }
     }
 }
