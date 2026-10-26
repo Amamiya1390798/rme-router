@@ -69,7 +69,7 @@ struct XTStripsView: View, Equatable {
                     ForEach(playbacks) { s in strip(s, origin: nil, current: current, row: playbacks).id(s.tm) }
                 }
                 // P16 格放在对应 ADAT 输出条正下方，和输出条一起滚动（文档第 6.4.6 节）
-                let p16ByOut = Dictionary(grouping: (p16Cells ?? []).filter { $0.output != nil }, by: { $0.output! })
+                let p16ByOut = Dictionary(grouping: (p16Cells ?? []).compactMap { c in c.output.map { ($0, c) } }, by: \.0).mapValues { $0.map(\.1) }
                 row("硬件输出", sub: p16Cells == nil ? nil : (p16RateBad ? "下排 = P16-I\n⚠ 只认 44.1 / 48 kHz" : "下排 = P16-I"), ids: outputs.map(\.tm)) {
                     ForEach(outputs) { s in
                         let lit = focus.map { $0.outputs.contains(s.tm) }
@@ -118,7 +118,7 @@ struct XTStripsView: View, Equatable {
                 // 主卡 ADAT 输出条 → P16 格（文档第 6.4.6 节）：选中的那条输出全亮，其余淡显
                 if focus == nil, let cells = p16Cells {
                     ForEach(cells.filter { $0.output != nil }) { c in
-                        if let a = anchors["out:\(c.output!.number)"], let b = anchors["p16:\(c.number)"] {
+                        if let o = c.output, let a = anchors["out:\(o.number)"], let b = anchors["p16:\(c.number)"] {
                             RouteLines(from: g[a], targets: [(g[b], nil)], opacity: c.output == current?.tm ? 1 : 0.3)
                         }
                     }

@@ -89,7 +89,7 @@ extension AppModel {
         for portID in c.ports {
             guard let port = topo.port(portID) else { continue }
             if let ch = channel ?? c.channel { refs.append(ChannelRef(portID, ch)) }
-            else { refs += (1 ... port.singleSpeedChannels).map { ChannelRef(portID, $0) } }
+            else { refs += stride(from: 1, through: port.singleSpeedChannels, by: 1).map { ChannelRef(portID, $0) } }
         }
         let name = channel.map { "\(c.name) 第 \($0) 路" } ?? c.name
         var focus = StripFocus(title: name)

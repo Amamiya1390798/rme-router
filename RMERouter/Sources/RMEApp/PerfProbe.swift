@@ -7,6 +7,27 @@ import Foundation
 public enum PerfProbe {
     public static var enabled: Bool { ProcessInfo.processInfo.environment["RME_PERF"] == "1" }
 
+    /// 压测（`RME_STRESS=1`）：一启动就每 40 ms 换一页、开关检查器，持续 `RME_STRESS_SECONDS`（默认 30）秒，复现“刚启动时快速切页闪退”。
+    public static var stress: Bool { ProcessInfo.processInfo.environment["RME_STRESS"] == "1" }
+
+    public static func runStress(_ model: AppModel) {
+        let seconds = Double(ProcessInfo.processInfo.environment["RME_STRESS_SECONDS"] ?? "") ?? 30
+        Task { @MainActor in
+            let start = Date()
+            var i = 0
+            while Date().timeIntervalSince(start) < seconds {
+                model.section = AppSection.allCases[i % AppSection.allCases.count]
+                if i % 7 == 0 { model.showInspector.toggle() }
+                if i % 11 == 0 { model.panelSelection = model.panelSelection == nil ? "xt.madi1.in" : nil }
+                i += 1
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+            CrashLog.note("压测完成：\(i) 次切换")
+            print("压测完成：\(i) 次切换")
+            exit(0)
+        }
+    }
+
     public static func run(_ model: AppModel, rounds: Int = 3) {
         let watch = Watchdog()
         watch.start()

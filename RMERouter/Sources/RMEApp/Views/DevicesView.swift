@@ -373,7 +373,7 @@ struct CableLayer: View {
                 Self.path(r.points)
                     .stroke(Self.color(r.cable.type).opacity(on ? 0.95 : 0.12),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: r.cable.verified ? [] : [7, 5]))
-                ForEach(Array([r.points.first!, r.points.last!].enumerated()), id: \.offset) { _, p in
+                ForEach(Array([r.points.first, r.points.last].compactMap { $0 }.enumerated()), id: \.offset) { _, p in
                     Circle().fill(Self.color(r.cable.type).opacity(on ? 1 : 0.15)).frame(width: 8, height: 8).position(p)
                 }
                 if on, let warn = r.cable.issues.first {
@@ -411,7 +411,7 @@ struct CableLayer: View {
             let gap = ra == rb ? min(ra, rows.count - 2) : min(ra, rb)
             lanes[gap, default: 0] += 1
             let mid = (rows[gap].maxY + rows[gap + 1].minY) / 2
-            let gy = mid + CGFloat(lanes[gap]! - 3) * 7
+            let gy = mid + CGFloat((lanes[gap] ?? 1) - 3) * 7
             func end(_ f: CGRect, _ id: String) -> CGPoint {
                 guard id.hasPrefix("node:") else { return CGPoint(x: f.midX, y: f.midY) }
                 let k = nodeUse[id, default: 0]

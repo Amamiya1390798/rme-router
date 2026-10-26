@@ -4,7 +4,15 @@ import RMEApp
 
 /// 单窗口工具：关掉窗口即退出，不留一个没有窗口的后台进程（看起来像 App 消失了）。
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// 只在主窗口关掉时退出：输入法候选窗等临时窗口在启动时也会开关，不能把它们当成“最后一个窗口”。
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        CrashLog.install()
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { n in
+            if (n.object as? NSWindow)?.identifier?.rawValue == "main" { NSApp.terminate(nil) }
+        }
+    }
+    func applicationWillTerminate(_ notification: Notification) { CrashLog.note("正常退出") }
 }
 
 struct RMERouterApp: App {
@@ -14,6 +22,7 @@ struct RMERouterApp: App {
         m.startsMeters = true
         AppModel.applyAppearance(m.appearance)
         if PerfProbe.enabled { PerfProbe.run(m) }
+        if PerfProbe.stress { PerfProbe.runStress(m) }
         return m
     }()
 

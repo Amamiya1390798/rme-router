@@ -46,7 +46,7 @@ extension AppModel {
     public func xtStrips(_ bus: TotalMixBus) -> [XTStrip] {
         let names = tmState.names
         let numbers = Set(tmState.channels.keys.filter { $0.bus == bus }.map(\.number))
-        guard let maxN = numbers.max() else { return [] }
+        guard let maxN = numbers.max(), maxN >= 1 else { return [] }
         return (1 ... maxN).compactMap { n in
             let ch = TotalMixChannel(bus, n)
             if n % 2 == 0, tmState.isStereo(TotalMixChannel(bus, n - 1)) == true { return nil }
@@ -91,7 +91,7 @@ extension AppModel {
         for (k, inPort) in ["p16i.adat_a.in", "p16i.adat_b.in"].enumerated() {
             guard let l = links.first(where: { $0.to == inPort }), l.from.hasPrefix("xt.adat"), l.from.hasSuffix(".out") else { continue }
             let n = snapshot.topology.port(l.from)?.singleSpeedChannels ?? 8
-            for c in 1 ... min(n, 8) {
+            for c in stride(from: 1, through: min(n, 8), by: 1) {
                 let ref = ChannelRef(l.from, c)
                 let tm = tmOf[ref]
                 // 立体声对的右声道：发送记在左声道上
@@ -125,7 +125,7 @@ extension AppModel {
             var all: [ChannelRef: OriginLabel] = [:]
             let inputs = snapshot.topology.devices.first { $0.id == "xt" }?.ports.filter { $0.direction == .input && $0.type != .usb } ?? []
             for port in inputs {
-                for ch in 1 ... port.singleSpeedChannels {
+                for ch in stride(from: 1, through: port.singleSpeedChannels, by: 1) {   // 0 路的口（通用主卡没读到前）不能写 1 ... 0
                     let ref = ChannelRef(port.id, ch)
                     let paths = trace.upstream(to: ref).filter { $0.first?.hop.from != ref }
                     let origins = Set(paths.compactMap { $0.first?.hop.from }).sorted()
