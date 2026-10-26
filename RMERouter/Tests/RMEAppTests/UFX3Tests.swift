@@ -109,6 +109,9 @@ final class UFX3Tests: XCTestCase {
         XCTAssertEqual(cells[8].ref, ChannelRef("xt.adat2.out", 1))
         XCTAssertEqual(cells[0].output, TotalMixChannel(.output, 15), "AN 8 + 耳机 4 + AES 2 之后是 ADAT 1")
         XCTAssertEqual(cells[15].output, TotalMixChannel(.output, 30))
+        let cables = m.cables(face: .rear)
+        XCTAssertTrue(cables.contains { $0.id == "L6" && $0.from == "conn:ufx.adat1.out" && $0.to == "node:p16i" }, "\(cables.map { "\($0.id) \($0.from)→\($0.to)" })")
+        XCTAssertTrue(cables.contains { $0.id == "L7" && $0.from == "conn:ufx.adat2.out" && $0.to == "node:p16i" })
 
         XCTAssertNil(model(StudioConfig(mainCard: .madifaceXT)).p16Cells(), "XT 经 XTC 送 P16，不按主卡输出排")
         let off = model(StudioConfig(mainCard: .ufx3, expansions: ["12mic", "xtc"]))

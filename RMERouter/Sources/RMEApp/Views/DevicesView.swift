@@ -403,6 +403,8 @@ struct CableLayer: View {
         guard rows.count >= 2 else { return [] }
         func rowOf(_ y: CGFloat) -> Int? { rows.firstIndex { y >= $0.minY - 4 && y <= $0.maxY + 4 } }
         var lanes: [Int: Int] = [:]
+        // 同一张节点卡片上的多根线（P16 的 ADAT A、B）错开进，免得叠成一根
+        var nodeUse: [String: Int] = [:]
         return cables.compactMap { c in
             guard let fa = anchors[c.from], let fb = anchors[c.to] else { return nil }
             guard let ra = rowOf(fa.midY), let rb = rowOf(fb.midY) else { return nil }
@@ -410,11 +412,13 @@ struct CableLayer: View {
             lanes[gap, default: 0] += 1
             let mid = (rows[gap].maxY + rows[gap + 1].minY) / 2
             let gy = mid + CGFloat(lanes[gap]! - 3) * 7
-            func end(_ f: CGRect, node: Bool) -> CGPoint {
-                guard node else { return CGPoint(x: f.midX, y: f.midY) }
-                return CGPoint(x: f.minX + 28, y: gy < f.minY ? f.minY : f.maxY)
+            func end(_ f: CGRect, _ id: String) -> CGPoint {
+                guard id.hasPrefix("node:") else { return CGPoint(x: f.midX, y: f.midY) }
+                let k = nodeUse[id, default: 0]
+                nodeUse[id] = k + 1
+                return CGPoint(x: min(f.minX + 28 + CGFloat(k) * 40, f.maxX - 12), y: gy < f.minY ? f.minY : f.maxY)
             }
-            let a = end(fa, node: c.from.hasPrefix("node:")), b = end(fb, node: c.to.hasPrefix("node:"))
+            let a = end(fa, c.from), b = end(fb, c.to)
             return Routed(cable: c, points: [a, CGPoint(x: a.x, y: gy), CGPoint(x: b.x, y: gy), b],
                           labelAt: CGPoint(x: max(a.x, b.x) + 150, y: gy))
         }
@@ -531,4 +535,9 @@ extension Color {
     init(hex: UInt32) {
         self.init(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
     }
+}
+
+/// 出图检查用（`--render`）：设备页面板机架。
+public enum RackRender {
+    @MainActor public static func rear(_ model: AppModel) -> some View { RackView(model: model, face: .rear, selected: .constant(nil)) }
 }

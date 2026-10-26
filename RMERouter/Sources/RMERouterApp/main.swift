@@ -22,7 +22,10 @@ if let i = CommandLine.arguments.firstIndex(of: "--render"), i + 1 < CommandLine
 enum Renderer {
     static func renderAll(to dir: URL) async {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let model = AppModel(defaults: UserDefaults(suiteName: "rme.render") ?? .standard)
+        let defaults = UserDefaults(suiteName: "rme.render") ?? .standard
+        // 设备组成跟本机设置一样（检查面板与线缆）
+        if let c = UserDefaults.standard.data(forKey: StudioConfig.defaultsKey) ?? UserDefaults(suiteName: "local.rme.router")?.data(forKey: StudioConfig.defaultsKey) { defaults.set(c, forKey: StudioConfig.defaultsKey) }
+        let model = AppModel(defaults: defaults)
         await model.refresh()
         print("XT 状态：\(model.xtStatus)")
         let trace = SignalTrace(snapshot: model.snapshot)
@@ -32,6 +35,8 @@ enum Renderer {
             render(OutputsContent(outputs: model.outputs, status: model.xtStatus, lastLoaded: model.lastLoaded,
                                   demoDevices: demo, showPlayback: .constant(false), columns: 3),
                    width: 1000, appearance: appearance, to: dir.appendingPathComponent("outputs-\(name).png"))
+            render(RackRender.rear(model), width: 1300, appearance: appearance,
+                   to: dir.appendingPathComponent("rack-rear-\(name).png"))
             for target in [ChannelRef("xt.mic.in", 1), ChannelRef("12mic.analog.in", 1)] {
                 render(SignalFlowContent(target: target, deviceName: model.deviceName(of: target), trace: trace,
                                          deviceNameOf: model.deviceName(of:)),
