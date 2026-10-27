@@ -42,13 +42,20 @@ extension AppModel {
     /// 时钟源 ClockSource 0 = Internal（与设置窗口一致）；MADIn_64ch 1 = “64 (32) ch”、MADIn_SMUX 1 = “48K Frame”（输出格式）。
     /// TotalMix 的 OSC 读不到这些。只认核对过的取值，其余不猜；只读。
     func mergeFirefaceSettingsIntoXT() {
+        let domain = "de.rme-audio.FirefaceUSBSettingsKX" as CFString
+        CFPreferencesAppSynchronize(domain)   // 拿 Fireface USB Settings 刚改的值（随 Core Audio 每 2 秒读一次）
         guard studioConfig.mainCard == .madifaceXT, let name = xtAudio?.name,
-              let all = UserDefaults(suiteName: "de.rme-audio.FirefaceUSBSettingsKX")?.dictionaryRepresentation(),
+              let all = UserDefaults(suiteName: domain as String)?.dictionaryRepresentation(),
               let dev = all[name] as? [String: Any], var xt = snapshot.devices["xt"] else { return }
         let src = FactSource(deviceID: "xt", interface: "fireface-usb-settings", reference: "de.rme-audio.FirefaceUSBSettingsKX", observedAt: Date())
         var changed = false
-        if (dev["ClockSource"] as? Int) == 0, xt.clock.source.knownValue != .internal {
-            xt.clock.source = .confirmed(.internal, src); changed = true
+        if let cs = dev["ClockSource"] as? Int {
+            if cs == 0 {
+                if xt.clock.source.knownValue != .internal { xt.clock.source = .confirmed(.internal, src); changed = true }
+            } else if xt.clock.source.source.interface == "fireface-usb-settings", xt.clock.source.knownValue != nil {
+                // 改成了别的时钟源：编号含义还没核对，不猜，标未知（不留着旧的“内部”）
+                xt.clock.source = .unknown(src); changed = true
+            }
         }
         if let rate = xt.clock.configuredRate.knownValue {
             for k in 1 ... 3 {
