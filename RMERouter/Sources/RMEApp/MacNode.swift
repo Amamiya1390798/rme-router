@@ -50,12 +50,18 @@ extension AppModel {
         let src = FactSource(deviceID: "xt", interface: "fireface-usb-settings", reference: "de.rme-audio.FirefaceUSBSettingsKX", observedAt: Date())
         var changed = false
         if let cs = dev["ClockSource"] as? Int {
-            if cs == 0 {
-                if xt.clock.source.knownValue != .internal { xt.clock.source = .confirmed(.internal, src); changed = true }
-            } else if xt.clock.source.source.interface == "fireface-usb-settings", xt.clock.source.knownValue != nil {
-                // 改成了别的时钟源：编号含义还没核对，不猜，标未知（不留着旧的“内部”）
-                xt.clock.source = .unknown(src); changed = true
+            // 2026-10-27 真机核对：0 = Internal、3 = MADI 1（用户在设置里切换后读回）；1 字时钟、2 AES、4 / 5 MADI 2 / 3 按菜单顺序推断
+            let fact: Fact<ClockSource>
+            switch cs {
+            case 0: fact = .confirmed(.internal, src)
+            case 3: fact = .confirmed(.port("xt.madi1.in"), src)
+            case 1: fact = Fact(.wordClock, .inferred, source: src)
+            case 2: fact = Fact(.port("xt.aes.in"), .inferred, source: src)
+            case 4: fact = Fact(.port("xt.madi2.in"), .inferred, source: src)
+            case 5: fact = Fact(.port("xt.madi3.in"), .inferred, source: src)
+            default: fact = .unknown(src)
             }
+            if xt.clock.source.knownValue != fact.knownValue || xt.clock.source.evidence != fact.evidence { xt.clock.source = fact; changed = true }
         }
         if let rate = xt.clock.configuredRate.knownValue {
             for k in 1 ... 3 {
