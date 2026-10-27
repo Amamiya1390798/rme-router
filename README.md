@@ -26,7 +26,7 @@
 
 ## 安装与构建
 
-下载 Releases 里的 `RME-Router.dmg`，把 App 拖进“应用程序”。第一次打开如果提示无法验证开发者，右键 → 打开。
+拿到 `RME-Router.dmg` 后把 App 拖进“应用程序”（也可以按下面从源码自己打包）。第一次打开如果提示无法验证开发者，右键 → 打开。
 
 从源码构建（需要 Xcode 命令行工具）：
 
@@ -43,4 +43,6 @@ scripts/make-app.sh release --install
 - 代码：作者 A.M（cly20041110@gmail.com）。
 - 设备面板图来自 RME 官方产品图，见 `RMERouter/Resources/Panels/sources.json`。
 - 二次元模式“深海女仆工坊”美术：CC BY-NC-SA 4.0（上善 → ZipZipPipe → Small-tailqwq），仅限非商用。
-- 其他素材来源记在各自目录的 `sources.json` 里。RME、TotalMix、DeepSeek、Claude 等名称与标志归各自所有者，本项目与它们无关。
+- Claude 看板娘：形象由作者提供，其余立绘与背景由 OpenAI image_gen 按原形象生成；小螃蟹 Clawd 是 Anthropic 的 Claude 吉祥物（图取自 dashboardicons.com 图标库），非商用同人使用。
+- 光标鲸鱼尾巴：DeepSeek 官方“思考中”图标（MIT，Copyright (c) 2026 DeepSeek）；社区版动画来自 null-dat/dsh-whale-tail，原作者不可考。
+- 以上素材的权利归原作者所有；如有权利人异议，联系作者即下架。来源与校验值记在各自目录的 `sources.json` 里。RME、TotalMix、DeepSeek、Claude 等名称与标志归各自所有者，本项目与它们无关。
