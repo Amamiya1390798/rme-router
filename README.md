@@ -26,7 +26,7 @@
 
 ## 安装与构建
 
-拿到 `RME-Router.dmg` 后把 App 拖进“应用程序”（也可以按下面从源码自己打包）。第一次打开如果提示无法验证开发者，右键 → 打开。
+从 [Releases](https://github.com/Amamiya1390798/rme-router/releases) 下载 `RME-Router.dmg`，把 App 拖进“应用程序”（也可以按下面从源码自己打包）。第一次打开如果提示无法验证开发者，右键 → 打开。
 
 从源码构建（需要 Xcode 命令行工具）：
 
