@@ -48,6 +48,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSLocalNetworkUsageDescription</key><string>读取并控制同一网络或 USB 网络上的 RME 12Mic（HTTP 接口），以及本机的 TotalMix FX（OSC）。</string>
     <key>NSHumanReadableCopyright</key><string>© 2026 amamiya (cly20041110@gmail.com). 二次元模式美术 CC BY-NC-SA 4.0（上善、ZipZipPipe、Small-tailqwq）</string>
 </dict>
 </plist>

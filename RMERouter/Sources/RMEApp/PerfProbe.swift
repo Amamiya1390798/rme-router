@@ -45,6 +45,12 @@ public enum PerfProbe {
                                    + (model.panelSelection.map { "，选中 \($0)" } ?? ""),
                                    "TotalMix 报的型号 \(model.mainTotalMixName ?? "无")，所选主卡 \(model.studioConfig.mainCard.title)，型号不符 \(model.mainCardMismatch)，Core Audio \(model.xtAudio?.name ?? "没找到")",
                                    "P16 行：" + (model.p16Cells().map { $0.map { "\($0.number)=\($0.output?.number ?? 0)" }.joined(separator: " ") } ?? "无"),
+                                   "12Mic 状态 \(model.twelveMicStatus)，XTC 状态 \(model.xtcStatus)，演示数据设备 \(["12mic", "xtc"].filter { model.isDemo($0) })",
+                                   "12Mic 话放：" + (model.snapshot.devices["12mic"]?.preamps.map { "\($0.input.channel):\($0.gainDB.knownValue.map { String(format: "%.0f", $0) } ?? "?")\($0.phantom.knownValue == true ? "+48V" : "")" }.joined(separator: " ") ?? "无"),
+                                   "XTC 话放：" + (model.snapshot.devices["xtc"]?.preamps.map { "\($0.input.channel):\($0.gainDB.knownValue.map { String(format: "%.0f", $0) } ?? "?")\($0.phantom.knownValue == true ? "+48V" : "")" }.joined(separator: " ") ?? "无"),
+                                   "时钟：" + ["xt", "12mic", "xtc"].map { d in "\(d) \(model.snapshot.devices[d]?.clock.configuredRate.knownValue.map(String.init) ?? "?") Hz" }.joined(separator: "，"),
+                                   "12Mic 路由（前 8 条）：" + (model.snapshot.devices["12mic"]?.routes.prefix(8).map { "\($0.source)→\($0.destination)" }.joined(separator: " ") ?? "无"),
+                                   "体检：" + model.checkupResults.flatMap { r in r.findings.filter { !$0.verdict.isPass }.map { "\n  [\(r.info.id)] \(r.info.title)｜\($0.subject)｜\($0.verdict)" } }.joined(),
                                    "输入：" + model.xtStrips(.input).map(\.name).joined(separator: " "),
                                    "输出：" + model.xtStrips(.output).map(\.name).joined(separator: " "),
                                    "主卡话放：" + (model.snapshot.devices["xt"]?.preamps.map { "\($0.input) \($0.gainDB.knownValue.map { String($0) } ?? "?")" }.joined(separator: " ") ?? "无")]
