@@ -25,12 +25,12 @@ final class ClockReportTests: XCTestCase {
         let mic = rows[1]
         XCTAssertEqual(mic.rate?.knownValue, 48000)
         XCTAssertEqual(mic.isMaster, false)
-        XCTAssertEqual(mic.sourceText, "跟随MADI 光口输入（来自 MADIface XT 的 MADI 1 输出）")
+        XCTAssertEqual(mic.sourceText, "跟随MADI 光口输入（来自 MADIface XT 的 MADI 2 输出）")
         XCTAssertEqual(mic.soundness, "Good")
         let optical = mic.inputs.first { $0.portID == "12mic.madi_optical.in" }
         XCTAssertEqual(optical?.lock?.knownValue, true)
         XCTAssertEqual(optical?.sync?.knownValue, true)
-        XCTAssertEqual(optical?.upstream, "MADIface XT 的 MADI 1 输出")
+        XCTAssertEqual(optical?.upstream, "MADIface XT 的 MADI 2 输出")
         XCTAssertEqual(mic.inputs.first { $0.portID == "12mic.madi_coaxial.in" }?.lock?.knownValue, false)
 
         let xt = rows[0]

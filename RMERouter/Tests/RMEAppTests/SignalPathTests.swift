@@ -39,15 +39,16 @@ final class SignalPathTests: XCTestCase {
         XCTAssertEqual(f.edges.count, 2)
     }
 
-    /// 选整个 MADI 2 输入口：高亮它的通道条，面板上只亮接进来的线（XTC → XT，L4）。
+    /// 选整个 MADI 1 输入口：高亮它的通道条，面板上只亮接进来的线（XTC → XT，L4；2026-10-27 起 XTC 在 MADI 1）。
     func testFocusWholeMadiPort() async {
         let m = await loaded()
-        let f = m.stripFocus(connector: conn("xt.madi2.in"))
-        XCTAssertTrue(f.inputs.contains(TotalMixChannel(.input, 69)))
-        XCTAssertFalse(f.inputs.contains(TotalMixChannel(.input, 70)), "立体声右声道并进左声道")
+        let f = m.stripFocus(connector: conn("xt.madi1.in"))
         XCTAssertTrue(f.links.contains("L4"))
-        // 只选其中第 1 路
-        XCTAssertEqual(m.stripFocus(connector: conn("xt.madi2.in"), channel: 1).inputs, [TotalMixChannel(.input, 69)])
+        XCTAssertFalse(f.links.contains("L1"), "12Mic 的线接在 MADI 2，不该亮")
+        // MADI 2 输入口（12Mic）：亮 L1，演示数据里的通道条在这一口
+        let g = m.stripFocus(connector: conn("xt.madi2.in"))
+        XCTAssertTrue(g.links.contains("L1"))
+        XCTAssertTrue(g.inputs.contains(TotalMixChannel(.input, 69)))
     }
 
     /// 整个 MADI 口超过 8 路：默认只看有发送的通道条；要全部时照旧。
@@ -78,7 +79,7 @@ final class SignalPathTests: XCTestCase {
         // 输出口 → 另一台设备的输入口 = 接线（已有的拒绝）
         XCTAssertEqual(m.dragIntent(from: conn("12mic.coax.out"), to: conn("xt.madi3.in")),
                        .addLink(from: "12mic.madi_coaxial.out", to: "xt.madi3.in"))
-        XCTAssertEqual(m.dragIntent(from: conn("xt.madi1.out"), to: conn("12mic.sfp")), .rejected("这根线已经有了"))
+        XCTAssertEqual(m.dragIntent(from: conn("xt.madi2.out"), to: conn("12mic.sfp")), .rejected("这根线已经有了"))
         // 麦克风 → 输出口 = 送一路声音
         XCTAssertEqual(m.dragIntent(from: conn("12mic.mic.3"), to: conn("xt.phones")),
                        .send(from: ChannelRef("12mic.analog.in", 3), to: ChannelRef("xt.phones.out", 1)))

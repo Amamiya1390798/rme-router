@@ -57,7 +57,7 @@ final class DeviceViewTests: XCTestCase {
         let rear = m.cables(face: .rear)
         XCTAssertEqual(rear.count, m.links.count + 1)            // 每根线 + XT 到 Mac 的 USB
         XCTAssertEqual(rear.first { $0.id == "L1" }?.from, "conn:12mic.sfp")
-        XCTAssertEqual(rear.first { $0.id == "L1" }?.to, "conn:xt.madi1.in")
+        XCTAssertEqual(rear.first { $0.id == "L1" }?.to, "conn:xt.madi2.in")
         XCTAssertEqual(rear.first { $0.to == "node:p16i" }?.from, "conn:xtc.adat1.out")
         XCTAssertEqual(rear.first { $0.id == "usb" }?.to, "node:mac")
         XCTAssertFalse(rear.first { $0.id == "L1" }?.issues.isEmpty ?? true, "SFP(LC) 对 SC 应提示转接")
@@ -65,9 +65,9 @@ final class DeviceViewTests: XCTestCase {
     }
 
     func testChannelRefText() {
-        let r = ChannelRef("xt.madi1.in", 9)
+        let r = ChannelRef("xt.madi2.in", 9)
         XCTAssertEqual(ChannelRef(text: r.description), r)
-        XCTAssertNil(ChannelRef(text: "xt.madi1.in"))
+        XCTAssertNil(ChannelRef(text: "xt.madi2.in"))
     }
 
     /// TotalMix 式通道条：立体声并成一条，回放映射到 xt.playback.in，读回送到某输出的电平。

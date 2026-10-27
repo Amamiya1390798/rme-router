@@ -56,8 +56,9 @@ public struct XTCMIDIAdapter: DeviceAdapter {
             case 0: return .internal
             case 1: return .wordClock
             case 2 ... 5: return .port("\(deviceID).aes\(c - 1).in")
-            case 6: return .port("\(deviceID).adat.in")
-            case 7: return .port("\(deviceID).madi.in")
+            // 2026-10-27 真机：XTC 面板上时钟是 MADI 同步，读回值是 6（手册顺序 “…ADAT、MADI” 对不上）；7 推断为 ADAT
+            case 6: return .port("\(deviceID).madi.in")
+            case 7: return .port("\(deviceID).adat.in")
             default: return nil
             }
         }

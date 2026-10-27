@@ -46,7 +46,7 @@ final class InspectorTests: XCTestCase {
         let info = model.inspectorInfo(ChannelRef("12mic.madi_optical.out", 9))
         XCTAssertEqual(info.from.map(\.ref), [ChannelRef("12mic.analog.in", 1)])
         XCTAssertEqual(info.from.first?.via, "12Mic 直通")
-        XCTAssertEqual(info.to.map(\.ref), [ChannelRef("xt.madi1.in", 9)])
+        XCTAssertEqual(info.to.map(\.ref), [ChannelRef("xt.madi2.in", 9)])
         XCTAssertEqual(info.to.first?.via, "线缆")
         XCTAssertEqual(info.origins, [ChannelRef("12mic.analog.in", 1)])
     }

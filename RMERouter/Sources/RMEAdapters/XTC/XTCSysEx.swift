@@ -249,7 +249,7 @@ public struct XTCMicSettings: Equatable, Sendable {
 public struct XTCState: Equatable, Sendable {
     public var mics: [Int: XTCMicSettings] = [:]           // 1…8
     public var routing: [XTCRoutingOutput: XTCRoutingSource] = [:]
-    public var clockSource: Int?                            // 0 internal、1 WCK、2–5 AES1–4、6 ADAT、7 MADI
+    public var clockSource: Int?                            // 0 internal、1 WCK、2–5 AES1–4、6 MADI（真机核对）、7 ADAT（推断）
     public var sampleRate: Int?
     public var madi64: Bool?
     public var madiFrame48k: Bool?

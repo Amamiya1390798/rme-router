@@ -22,7 +22,7 @@ public final class FakeXTC: XTCMIDITransport, @unchecked Sendable {
         p[14] = (3, 4)
         p[15] = (0, 0)
         p[16] = (0, 0); p[17] = (0, 0); p[18] = (0, 0); p[19] = (0, 0)
-        p[21] = (7, 2)
+        p[21] = (6, 2)   // 时钟：MADI（真机 2026-10-27 读回 6）、48 kHz
         p[22] = (0x0C, 0)
         p[25] = (0x20, 0x20)
         params = p

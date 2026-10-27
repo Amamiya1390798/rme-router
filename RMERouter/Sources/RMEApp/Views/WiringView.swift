@@ -15,6 +15,11 @@ public struct WiringView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.xl) {
                 ViewHeader(title: "接线", subtitle: "设备之间实际接了哪些线。信号流、体检、时钟、跨设备送声都按这张表计算；改动立即保存。", mood: .determined)
+                if model.linkStore.load() == nil {
+                    // 没改过接线时用的是默认接法（2026-10-27：用户指出没告诉过这是默认）
+                    Label("现在用的是默认接法（XTC 在 XT 的 MADI 1、12Mic 在 MADI 2）。和实际不一样就在下面改，改过之后按你的保存。", systemImage: "info.circle")
+                        .font(Tokens.Font.body).foregroundStyle(Tokens.Palette.warn)
+                }
                 linkList
                 addCard
                 HStack {

@@ -145,10 +145,11 @@ public enum StudioSetup {
 
     /// 默认接线（XT 档案下）；通用主卡没有具体接口，连到主卡的线不出现，在接线页自己加。
     static let defaultLinks = [
-        Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi1.in"),
-        Link(id: "L2", from: "xt.madi1.out", to: "12mic.madi_optical.in"),
-        Link(id: "L3", from: "xt.madi2.out", to: "xtc.madi.in"),
-        Link(id: "L4", from: "xtc.madi.out", to: "xt.madi2.in"),
+        // 2026-10-27 真机核对（用户确认 + Fireface USB Settings 里 MADI 1 收 64 路、MADI 2 收 56 路）：XTC 在 MADI 1，12Mic 在 MADI 2
+        Link(id: "L1", from: "12mic.madi_optical.out", to: "xt.madi2.in"),
+        Link(id: "L2", from: "xt.madi2.out", to: "12mic.madi_optical.in"),
+        Link(id: "L3", from: "xt.madi1.out", to: "xtc.madi.in"),
+        Link(id: "L4", from: "xtc.madi.out", to: "xt.madi1.in"),
         Link(id: "L5", from: "xtc.adat1.out", to: "p16i.adat_a.in"),
     ]
 

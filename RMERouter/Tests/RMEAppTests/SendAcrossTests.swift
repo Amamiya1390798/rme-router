@@ -20,8 +20,8 @@ final class SendAcrossTests: XCTestCase {
         cfg.protocolClasses = [RouteWriteTests.Fake12Mic.self]
         let session = URLSession(configuration: cfg)
         let map = TotalMixChannelMap(confirmed: [
-            TotalMixChannel(.input, 69): ChannelRef("xt.madi2.in", 1), TotalMixChannel(.input, 70): ChannelRef("xt.madi2.in", 2),
-            TotalMixChannel(.output, 39): ChannelRef("xt.madi1.out", 33), TotalMixChannel(.output, 40): ChannelRef("xt.madi1.out", 34),
+            TotalMixChannel(.input, 69): ChannelRef("xt.madi1.in", 1), TotalMixChannel(.input, 70): ChannelRef("xt.madi1.in", 2),
+            TotalMixChannel(.output, 39): ChannelRef("xt.madi2.out", 33), TotalMixChannel(.output, 40): ChannelRef("xt.madi2.out", 34),
         ])
         let model = AppModel(defaults: UserDefaults(suiteName: "rme.send.\(UUID())")!,
                              makeAdapter: { TotalMixOSCAdapter(port: $0.port, transport: tm.transport, channelMap: map) },
@@ -45,9 +45,9 @@ final class SendAcrossTests: XCTestCase {
         XCTAssertTrue(plan.manualSteps[0].contains("Digital Routing"))
         XCTAssertEqual(plan.steps.map(\.action), [
             .manual(plan.manualSteps[0]),
-            .cable(from: ChannelRef("xtc.madi.out", 1), to: ChannelRef("xt.madi2.in", 1)),
-            .totalMixSend(source: ChannelRef("xt.madi2.in", 1), destination: ChannelRef("xt.madi1.out", 33), dB: -30),
-            .cable(from: ChannelRef("xt.madi1.out", 33), to: ChannelRef("12mic.madi_optical.in", 33)),
+            .cable(from: ChannelRef("xtc.madi.out", 1), to: ChannelRef("xt.madi1.in", 1)),
+            .totalMixSend(source: ChannelRef("xt.madi1.in", 1), destination: ChannelRef("xt.madi2.out", 33), dB: -30),
+            .cable(from: ChannelRef("xt.madi2.out", 33), to: ChannelRef("12mic.madi_optical.in", 33)),
             .existing(model.snapshot.devices["12mic"]!.routes.first { $0.destination == phonesL }!),
         ])
         XCTAssertEqual(plan.autoCount, 1)
@@ -61,7 +61,7 @@ final class SendAcrossTests: XCTestCase {
         XCTAssertEqual(plans.count, 2)                                   // 左右各一条
         XCTAssertEqual(model.stageSendPlan(plans), [])
         XCTAssertEqual(model.pending.map(\.newDB), [-30, -30])
-        XCTAssertEqual(model.pending.map(\.destination), [ChannelRef("xt.madi1.out", 33), ChannelRef("xt.madi1.out", 34)])
+        XCTAssertEqual(model.pending.map(\.destination), [ChannelRef("xt.madi2.out", 33), ChannelRef("xt.madi2.out", 34)])
         XCTAssertEqual(model.manualTasks.count, 1, "两路落在 XTC 同一个 8 路块，人工步骤只列一次")
         XCTAssertEqual(fakeTM.lastWrites, [], "加入待应用不发送")
 

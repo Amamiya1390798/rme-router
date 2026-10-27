@@ -17,14 +17,14 @@ final class IdentifyTests: XCTestCase {
     }
 
     let mic3 = ChannelRef("12mic.analog.in", 3)
-    let expected = ChannelRef("xt.madi1.in", 11)   // 演示路由 Mic 3 → MADI 光口输出 11，接线 L1 → XT MADI 1 输入 11
+    let expected = ChannelRef("xt.madi2.in", 11)   // 演示路由 Mic 3 → MADI 光口输出 11，接线 L1 → XT MADI 2 输入 11
 
     func testExpectedFollowsWiringAndRouting() {
         let m = model()
         let e = m.expectedXTInputs(from: mic3)
         XCTAssertEqual(Array(e.keys), [expected])
         XCTAssertEqual(e[expected]?.map(\.from), ["12mic.madi_optical.out"])
-        XCTAssertEqual(e[expected]?.map(\.to), ["xt.madi1.in"])
+        XCTAssertEqual(e[expected]?.map(\.to), ["xt.madi2.in"])
         XCTAssertEqual(Array(m.expectedXTInputs(from: ChannelRef("xt.mic.in", 1)).keys), [ChannelRef("xt.mic.in", 1)])
         XCTAssertTrue(m.expectedXTInputs(from: ChannelRef("12mic.analog.in", 12)).isEmpty == false)
     }
@@ -37,16 +37,16 @@ final class IdentifyTests: XCTestCase {
     func testMatchMarksCableVerified() throws {
         let m = model()
         let t0 = Date()
-        m.meters.update([expected: -80, ChannelRef("xt.madi1.in", 12): -75], now: t0)
+        m.meters.update([expected: -80, ChannelRef("xt.madi2.in", 12): -75], now: t0)
         XCTAssertNil(m.startIdentify(source: mic3, now: t0))
-        m.meters.update([expected: -18, ChannelRef("xt.madi1.in", 12): -74], now: t0.addingTimeInterval(1))
+        m.meters.update([expected: -18, ChannelRef("xt.madi2.in", 12): -74], now: t0.addingTimeInterval(1))
         m.identifySample(now: t0.addingTimeInterval(1))
         m.finishIdentify(now: t0.addingTimeInterval(2))
         XCTAssertEqual(m.identify?.outcome, .match(expected))
         let l1 = try XCTUnwrap(m.links.first { $0.id == "L1" })
         guard case let .verified(v) = m.cableStatus(l1) else { return XCTFail("\(m.cableStatus(l1))") }
         XCTAssertEqual(v.method, .signal)
-        XCTAssertEqual(v.detail, "12Mic Mic 3 → MADIface XT MADI 1 输入 11")
+        XCTAssertEqual(v.detail, "12Mic Mic 3 → MADIface XT MADI 2 输入 11")
         // 存盘：重新打开还在
         XCTAssertEqual(AppModel(defaults: defaults).cableStatus(l1), .verified(v))
     }
@@ -54,7 +54,7 @@ final class IdentifyTests: XCTestCase {
     func testElsewhereReportsWhereItArrived() {
         let m = model()
         let t0 = Date()
-        let wrong = ChannelRef("xt.madi2.in", 11)
+        let wrong = ChannelRef("xt.madi1.in", 11)
         m.meters.update([expected: -90, wrong: -90], now: t0)
         m.startIdentify(source: mic3, now: t0)
         m.meters.update([expected: -90, wrong: -12], now: t0.addingTimeInterval(1))
@@ -80,7 +80,7 @@ final class IdentifyTests: XCTestCase {
         let m = model()
         let l1 = try XCTUnwrap(m.links.first { $0.id == "L1" }), l2 = try XCTUnwrap(m.links.first { $0.id == "L2" })
         XCTAssertEqual(m.cableStatus(l2), .declared)
-        // 12Mic 报告它的光口输入已锁定（L2：XT MADI 1 输出 → 12Mic 光口输入）
+        // 12Mic 报告它的光口输入已锁定（L2：XT MADI 2 输出 → 12Mic 光口输入）
         let src = FactSource(deviceID: "12mic", interface: "12mic-json")
         m.apply(twelveMic: DeviceSnapshot(deviceID: "12mic", reachable: true,
                                           clock: ClockState(configuredRate: .confirmed(48_000, src), source: .confirmed(.internal, src),

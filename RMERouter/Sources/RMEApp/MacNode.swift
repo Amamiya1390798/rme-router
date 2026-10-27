@@ -17,6 +17,7 @@ extension AppModel {
         }
         audioChecked = true
         mergeAudioIntoXT()
+        mergeFirefaceSettingsIntoXT()
     }
 
     /// 把 Core Audio 的采样率填进 XT 时钟（TotalMix 的 OSC 读不到这一项）。只有值变了才改快照。
@@ -36,6 +37,31 @@ extension AppModel {
     public var mainAudioKeyword: String? { studioConfig.mainCard.audioKeyword(totalMix: mainTotalMixName) }
     /// TotalMix 报的型号和“设备组成”里选的主卡不一致。
     public var mainCardMismatch: Bool { studioConfig.mainCard.mismatches(totalMix: mainTotalMixName) }
+
+    /// Fireface USB Settings（RME 驱动自带的设置程序）存在本机偏好里的 XT 设置（2026-10-27 真机核对）：
+    /// 时钟源 ClockSource 0 = Internal（与设置窗口一致）；MADIn_64ch 1 = “64 (32) ch”、MADIn_SMUX 1 = “48K Frame”（输出格式）。
+    /// TotalMix 的 OSC 读不到这些。只认核对过的取值，其余不猜；只读。
+    func mergeFirefaceSettingsIntoXT() {
+        guard studioConfig.mainCard == .madifaceXT, let name = xtAudio?.name,
+              let all = UserDefaults(suiteName: "de.rme-audio.FirefaceUSBSettingsKX")?.dictionaryRepresentation(),
+              let dev = all[name] as? [String: Any], var xt = snapshot.devices["xt"] else { return }
+        let src = FactSource(deviceID: "xt", interface: "fireface-usb-settings", reference: "de.rme-audio.FirefaceUSBSettingsKX", observedAt: Date())
+        var changed = false
+        if (dev["ClockSource"] as? Int) == 0, xt.clock.source.knownValue != .internal {
+            xt.clock.source = .confirmed(.internal, src); changed = true
+        }
+        if let rate = xt.clock.configuredRate.knownValue {
+            for k in 1 ... 3 {
+                guard let c64 = dev["MADI\(k)_64ch"] as? Int, let smux = dev["MADI\(k)_SMUX"] as? Int, c64 >= 0, smux == 1 else { continue }   // 只核对过 SMUX 1 = 48K Frame
+                let fmt = StreamFormat(sampleRate: rate, madiFrame: .frame48k, channelMode: c64 == 1 ? .ch64 : .ch56)
+                if xt.portFormats["xt.madi\(k).out"]?.knownValue != fmt { xt.portFormats["xt.madi\(k).out"] = .confirmed(fmt, src); changed = true }
+            }
+        }
+        guard changed else { return }
+        var devices = snapshot.devices
+        devices["xt"] = xt
+        replaceDevices(devices)
+    }
 
     /// 在用 XT 的程序，换成看得懂的名字（Logic Pro 等）。
     public var xtAudioClients: [(name: String, input: Bool, output: Bool)] {
