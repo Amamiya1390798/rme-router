@@ -40,7 +40,7 @@ scripts/make-app.sh release --install
 
 ## 素材与许可
 
-- 代码：作者 A.M（cly20041110@gmail.com）。
+- 代码：作者 CLAUDE  模型调用者 A.M（cly20041110@gmail.com）。
 - 设备面板图来自 RME 官方产品图，见 `RMERouter/Resources/Panels/sources.json`。
 - 二次元模式“深海女仆工坊”美术：CC BY-NC-SA 4.0（上善 → ZipZipPipe → Small-tailqwq），仅限非商用。
 - Claude 看板娘：形象由作者提供，其余立绘与背景由 OpenAI image_gen 按原形象生成；小螃蟹 Clawd 是 Anthropic 的 Claude 吉祥物（图取自 dashboardicons.com 图标库），非商用同人使用。
